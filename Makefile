@@ -17,3 +17,5 @@ docker-pull:
 	docker-compose pull
 docker-build:
 	docker-compose build --pull
+logs:
+	docker-compose logs -f
