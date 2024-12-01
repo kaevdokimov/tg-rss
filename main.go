@@ -189,7 +189,7 @@ func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
 		var publishedAt time.Time
 		rows.Scan(&title, &link, &publishedAt)
 		counter++
-		message += fmt.Sprintf("%d. [%s](%s) - %s\n", counter, title, link, publishedAt.Format("02.01.2006 15:04"))
+		message += fmt.Sprintf("%d. %s - [%s](%s)\n", counter, publishedAt.Format("02.01.2006 15:04"), title, link)
 	}
 	if message == "" {
 		message = "Новостей пока нет"
@@ -264,7 +264,7 @@ func parseRSS(url string, bot *tgbotapi.BotAPI) {
 			var chatID int64
 			rows.Scan(&chatID)
 
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("[%s](%s) - %s\n", item.Title, item.Link, publishedAt.Format("02.01.2006 15:04")))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("%s\n[%s](%s)", publishedAt.Format("02.01.2006 15:04"), item.Title, item.Link))
 			msg.ParseMode = "Markdown"
 			msg.DisableWebPagePreview = true
 			bot.Send(msg)
