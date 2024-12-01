@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -12,14 +13,49 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-// Настройки базы данных
-const (
-	dbHost     = "news_db"
-	dbPort     = 5432
-	dbUser     = "postgres"
-	dbPassword = "password"
-	dbName     = "news_bot"
+var (
+	TGBotKey string
+	// Настройки базы данных
+	DBHost string
+	DBPort int
+	DBUser string
+	DBPass string
+	DBName string
 )
+
+func init() {
+	// Считывание переменных окружения
+	TGBotKey = getEnv("TELEGRAM_API_KEY", "")
+	DBHost = getEnv("POSTGRES_HOST", "")
+	DBPort, _ = strconv.Atoi(getEnv("POSTGRES_PORT", "5432"))
+	DBUser = getEnv("POSTGRES_USER", "postgres")
+	DBPass = getEnv("POSTGRES_PASSWORD", "password")
+	DBName = getEnv("POSTGRES_NAME", "news_bot")
+
+	// Проверка обязательных переменных
+	if TGBotKey == "" {
+		log.Fatal("Не задана переменная окружения TELEGRAM_API_KEY")
+	}
+	if DBHost == "" {
+		log.Fatal("Не задана переменная окружения POSTGRES_HOST")
+	}
+	if DBUser == "" {
+		log.Fatal("Не задана переменная окружения POSTGRES_USER")
+	}
+	if DBPass == "" {
+		log.Fatal("Не задана переменная окружения POSTGRES_PASSWORD")
+	}
+	if DBName == "" {
+		log.Fatal("Не задана переменная окружения POSTGRES_NAME")
+	}
+}
+
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
+}
 
 // Структура для хранения новостей
 type News struct {
@@ -36,7 +72,7 @@ var (
 func main() {
 	var err error
 	// Подключение к базе данных
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", dbHost, dbPort, dbUser, dbPassword, dbName)
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", DBHost, DBPort, DBUser, DBPass, DBName)
 	db, err = sql.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Fatalf("Не удалось подключиться к базе данных: %v", err)
@@ -48,7 +84,7 @@ func main() {
 	initDB()
 
 	// Запуск Telegram бота
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_API_KEY"))
+	bot, err := tgbotapi.NewBotAPI(TGBotKey)
 	if err != nil {
 		log.Fatalf("Не удалось создать Telegram бота: %v", err)
 	}
