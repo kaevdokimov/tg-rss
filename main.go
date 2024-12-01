@@ -195,6 +195,7 @@ func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
 		message = "Новостей пока нет"
 	}
 	msg := tgbotapi.NewMessage(chatID, message)
+	msg.DisableWebPagePreview = true
 	msg.ParseMode = "Markdown"
 	bot.Send(msg)
 }
@@ -263,17 +264,9 @@ func parseRSS(url string, bot *tgbotapi.BotAPI) {
 			var chatID int64
 			rows.Scan(&chatID)
 
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("[%s](%s)", item.Title, item.Link))
-			msg.ParseMode = "Markdown"
-			bot.Send(msg)
-		}
-
-		for rows.Next() {
-			var chatID int64
-			rows.Scan(&chatID)
-
 			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("[%s](%s) - %s\n", item.Title, item.Link, publishedAt.Format("02.01.2006 15:04")))
 			msg.ParseMode = "Markdown"
+			msg.DisableWebPagePreview = true
 			bot.Send(msg)
 		}
 	}

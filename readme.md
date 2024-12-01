@@ -23,6 +23,7 @@ up:
 
 Пример команд на добавление RSS-лент:
 
-1. /add https://lenta.ru/rss
-2. /add https://ria.ru/export/rss2/index.xml
-3. /add https://rssexport.rbc.ru/rbcnews/news/30/full.rss
+1. /start
+2. /add https://lenta.ru/rss
+3. /add https://ria.ru/export/rss2/index.xml
+4. /add https://rssexport.rbc.ru/rbcnews/news/30/full.rss
