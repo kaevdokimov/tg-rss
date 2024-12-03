@@ -110,7 +110,6 @@ func main() {
 		case "start":
 			saveUser(update.Message.Chat.ID, bot)
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Вы подписались на обновления новостей!"))
-
 		case "add":
 			source := update.Message.CommandArguments()
 			if source == "" {
@@ -118,10 +117,15 @@ func main() {
 				continue
 			}
 			addSource(source, bot, update.Message.Chat.ID)
-		case "news5":
-			sendLatestNews(bot, update.Message.Chat.ID, 5)
-		case "news10":
+		case "news":
 			sendLatestNews(bot, update.Message.Chat.ID, 10)
+		// case "search":
+		// 	search := update.Message.CommandArguments()
+		// 	if search == "" {
+		// 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Укажите поисковый запрос!"))
+		// 		continue
+		// 	}
+		// 	sendFoundNews(search, bot, update.Message.Chat.ID, 10)
 		default:
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неизвестная команда"))
 		}
@@ -138,9 +142,11 @@ func initDB() {
 
 	CREATE TABLE IF NOT EXISTS news (
 		id SERIAL PRIMARY KEY,
-		title TEXT NOT NULL,
-		link TEXT NOT NULL UNIQUE,
-		published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		title VARCHAR(1024) NOT NULL,
+		description TEXT NOT NULL,
+		link VARCHAR(1024) NOT NULL UNIQUE,
+		published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		tsvector_title_description TSVECTOR GENERATED ALWAYS AS (setweight(to_tsvector('russian', title), 'A') || setweight(to_tsvector('russian', description), 'B')) STORED
 	);
 	CREATE TABLE IF NOT EXISTS users (
 		chat_id BIGINT PRIMARY KEY
@@ -175,7 +181,7 @@ func addSource(url string, bot *tgbotapi.BotAPI, chatID int64) {
 
 // Отправка последних новостей
 func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
-	rows, err := db.Query("SELECT title, link, published_at FROM news ORDER BY published_at DESC LIMIT $1", count)
+	rows, err := db.Query("SELECT title, description, link, published_at FROM news ORDER BY published_at DESC LIMIT $1", count)
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении новостей"))
 		return
@@ -183,13 +189,11 @@ func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
 	defer rows.Close()
 
 	var message string
-	var counter int
 	for rows.Next() {
-		var title, link string
+		var title, description, link string
 		var publishedAt time.Time
-		rows.Scan(&title, &link, &publishedAt)
-		counter++
-		message += fmt.Sprintf("%d. %s - [%s](%s)\n", counter, publishedAt.Format("02.01.2006 15:04"), title, link)
+		rows.Scan(&title, &description, &link, &publishedAt)
+		message += fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), title, link, description)
 	}
 	if message == "" {
 		message = "Новостей пока нет"
@@ -199,6 +203,45 @@ func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
 	msg.ParseMode = "Markdown"
 	bot.Send(msg)
 }
+
+// func sendFoundNews(search string, bot *tgbotapi.BotAPI, chatID int64, count int) {
+// 	rows, err := db.Query("select count(*) as total from news where tsvector_title_description @@ to_tsquery('$1:*');", search)
+// 	if err != nil {
+// 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при поиске и определении количества новостей"))
+// 		return
+// 	}
+// 	var total int
+// 	for rows.Next() {
+// 		rows.Scan(&total)
+// 	}
+// 	if total == 0 {
+// 		bot.Send(tgbotapi.NewMessage(chatID, "Новостей не найдено"))
+// 		return
+// 	}
+
+// 	rows, err = db.Query("select ts_rank(tsvector_title_description, to_tsquery('$1:*')) AS rank, title, description, link, published_at from news where tsvector_title_description @@ to_tsquery('$1:*') order by rank desc published_at desc limit $2;", search, count)
+// 	if err != nil {
+// 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении новостей"))
+// 		return
+// 	}
+// 	defer rows.Close()
+
+// 	message := fmt.Sprintf("Всего найдено новостей: %d\n", total)
+// 	message += fmt.Sprintf("Поиск по запросу: %s\n\n", search)
+// 	for rows.Next() {
+// 		var title, description, link string
+// 		var publishedAt time.Time
+// 		rows.Scan(&title, &description, &link, &publishedAt)
+// 		message += fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), title, link, description)
+// 	}
+// 	if message == "" {
+// 		message = "Новостей пока нет"
+// 	}
+// 	msg := tgbotapi.NewMessage(chatID, message)
+// 	msg.DisableWebPagePreview = true
+// 	msg.ParseMode = "Markdown"
+// 	bot.Send(msg)
+// }
 
 // Запуск парсинга RSS лент
 func startRSSPolling(bot *tgbotapi.BotAPI) {
@@ -222,7 +265,7 @@ func startRSSPolling(bot *tgbotapi.BotAPI) {
 			parseRSS(url, bot)
 		}
 
-		time.Sleep(10 * time.Second) // Обновление каждые 10 секунд
+		time.Sleep(15 * time.Second) // Обновление каждые 15 секунд
 	}
 }
 
@@ -241,12 +284,12 @@ func parseRSS(url string, bot *tgbotapi.BotAPI) {
 		}
 		newsSentToUser[item.Link] = struct{}{}
 
-		publishedAt := time.Now() // Если дата отсутствует, используем текущее время
+		publishedAt := time.Now() // Если дата отсутствует, исп������льз��ем текущее время
 		if item.PublishedParsed != nil {
 			publishedAt = *item.PublishedParsed
 		}
 
-		_, err := db.Exec("INSERT INTO news (title, link, published_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", item.Title, item.Link, publishedAt)
+		_, err := db.Exec("INSERT INTO news (title, description, link, published_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", item.Title, item.Description, item.Link, publishedAt)
 		if err != nil {
 			log.Printf("Ошибка при сохранении новости: %v", err)
 			continue
@@ -264,7 +307,7 @@ func parseRSS(url string, bot *tgbotapi.BotAPI) {
 			var chatID int64
 			rows.Scan(&chatID)
 
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("%s\n[%s](%s)", publishedAt.Format("02.01.2006 15:04"), item.Title, item.Link))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), item.Title, item.Link, item.Description))
 			msg.ParseMode = "Markdown"
 			msg.DisableWebPagePreview = true
 			bot.Send(msg)
