@@ -94,4 +94,11 @@ jobs:
             -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
             -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
             -e POSTGRES_DB=${{ secrets.POSTGRES_DB }} \
-            -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/news-bot:latest
+            -e TZ=Europe/Moscow \
+            -p 8080:8080 \
+            --network=news-net \
+            --restart=always \
+            --log-opt max-size=10m \
+            --log-opt max-file=5 \
+            --health-cmd='curl -f http://localhost:8080/health || exit 1' \
+            ${{ secrets.DOCKER_USERNAME }}/news-bot:latest
