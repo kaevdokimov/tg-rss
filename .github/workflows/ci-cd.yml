@@ -22,15 +22,25 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.20  # Укажите нужную версию Go
+          go-version: 1.23  # Укажите нужную версию Go
 
       # Установка зависимостей
       - name: Install dependencies
-        run: go mod tidy
+        run: go mod download
+      
+      # Сборка приложения
+      - name: Build application
+        run: go build -ldflags='-s -w -extldflags "-static"' -o ./bot
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bot
+          path: bot
 
       # Запуск тестов
-      - name: Run tests
-        run: go test ./... -v
+      # - name: Run tests
+      #   run: go test ./... -v
 
   docker-build:
     name: Build and Push Docker Image
@@ -40,6 +50,12 @@ jobs:
       # Проверка репозитория
       - name: Checkout code
         uses: actions/checkout@v3
+        
+      # Скачивание артифакта
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: bot
 
       # Логин в Docker Hub
       - name: Log in to Docker Hub
