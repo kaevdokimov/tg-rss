@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build and Test
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
 
     steps:
       # Проверка репозитория
@@ -34,7 +34,7 @@ jobs:
 
   docker-build:
     name: Build and Push Docker Image
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     needs: build
     steps:
       # Проверка репозитория
@@ -56,7 +56,7 @@ jobs:
 
   deploy:
     name: Deploy to Server
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     needs: docker-build
     steps:
       # Логин на удаленный сервер
