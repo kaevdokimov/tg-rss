@@ -221,7 +221,7 @@ func sendFoundNews(search string, bot *tgbotapi.BotAPI, chatID int64, count int)
 		return
 	}
 
-	rows, err = db.Query(fmt.Sprintf("select ts_rank(tsvector_title_description, to_tsquery('%s:*')) AS rank, title, description, link, published_at from news where tsvector_title_description @@ to_tsquery('%s:*') order by rank desc published_at desc limit %d;", search, count))
+	rows, err = db.Query(fmt.Sprintf("select ts_rank(tsvector_title_description, to_tsquery('%s:*')) AS rank, title, description, link, published_at from news where tsvector_title_description @@ to_tsquery('%s:*') order by rank desc published_at desc limit %d;", search, search, count))
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении новостей"))
 		return
