@@ -39,8 +39,8 @@ jobs:
           path: bot
 
       # Запуск тестов
-      # - name: Run tests
-      #   run: go test ./... -v
+      - name: Run tests
+        run: go test ./... -v
 
   docker-build:
     name: Build and Push Docker Image

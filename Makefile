@@ -19,3 +19,6 @@ docker-build:
 	docker-compose build --pull
 logs:
 	docker-compose logs -f
+
+console:
+	docker exec -it news_bot sh

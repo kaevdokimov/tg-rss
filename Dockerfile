@@ -19,6 +19,9 @@ COPY . ./
 # Build the Go application
 RUN go build -ldflags='-s -w -extldflags "-static"' -o ./bot
 
+# Test Go application
+RUN go test -v ./...
+
 # Create a minimal runtime image
 FROM alpine:3.20
 
