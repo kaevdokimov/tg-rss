@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build and Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       # Проверка репозитория
@@ -44,7 +44,7 @@ jobs:
 
   docker-build:
     name: Build and Push Docker Image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
     steps:
       # Проверка репозитория
@@ -72,7 +72,7 @@ jobs:
 
   deploy:
     name: Deploy to Server
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: docker-build
     steps:
       # Логин на удаленный сервер
