@@ -88,6 +88,7 @@ jobs:
             docker stop news-bot || true
             docker rm news-bot || true
             docker run -d --name news-bot \
+            -e TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }} \
             -e POSTGRES_HOST=${{ secrets.POSTGRES_HOST }} \
             -e POSTGRES_PORT=${{ secrets.POSTGRES_PORT }} \
             -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
