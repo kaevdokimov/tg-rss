@@ -195,7 +195,7 @@ func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
 		var title, description, link string
 		var publishedAt time.Time
 		rows.Scan(&title, &description, &link, &publishedAt)
-		message += fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), title, link, description)
+		message += fmt.Sprintf("%s\n[%s](%s)\n%s\n", publishedAt.Format("02.01.2006 15:04"), title, link, description)
 	}
 	if message == "" {
 		message = "Новостей пока нет"
@@ -234,7 +234,7 @@ func sendFoundNews(search string, bot *tgbotapi.BotAPI, chatID int64, count int)
 		var title, description, link string
 		var publishedAt time.Time
 		rows.Scan(&title, &description, &link, &publishedAt)
-		message += fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), title, link, description)
+		message += fmt.Sprintf("%s\n[%s](%s)\n%s\n", publishedAt.Format("02.01.2006 15:04"), title, link, description)
 	}
 	if message == "" {
 		message = "Новостей пока нет"
@@ -309,7 +309,7 @@ func parseRSS(url string, bot *tgbotapi.BotAPI) {
 			var chatID int64
 			rows.Scan(&chatID)
 
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), item.Title, item.Link, item.Description))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("%s\n[%s](%s)\n%s\n", publishedAt.Format("02.01.2006 15:04"), item.Title, item.Link, item.Description))
 			msg.ParseMode = "Markdown"
 			msg.DisableWebPagePreview = true
 			bot.Send(msg)
