@@ -13,6 +13,8 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
+const TIMEOUT = 60
+
 var (
 	TGBotKey string
 	// Настройки базы данных
@@ -119,13 +121,13 @@ func main() {
 			addSource(source, bot, update.Message.Chat.ID)
 		case "news":
 			sendLatestNews(bot, update.Message.Chat.ID, 10)
-		// case "search":
-		// 	search := update.Message.CommandArguments()
-		// 	if search == "" {
-		// 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Укажите поисковый запрос!"))
-		// 		continue
-		// 	}
-		// 	sendFoundNews(search, bot, update.Message.Chat.ID, 10)
+		case "search":
+			search := update.Message.CommandArguments()
+			if search == "" {
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Укажите поисковый запрос!"))
+				continue
+			}
+			sendFoundNews(search, bot, update.Message.Chat.ID, 10)
 		default:
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неизвестная команда"))
 		}
@@ -204,44 +206,44 @@ func sendLatestNews(bot *tgbotapi.BotAPI, chatID int64, count int) {
 	bot.Send(msg)
 }
 
-// func sendFoundNews(search string, bot *tgbotapi.BotAPI, chatID int64, count int) {
-// 	rows, err := db.Query("select count(*) as total from news where tsvector_title_description @@ to_tsquery('$1:*');", search)
-// 	if err != nil {
-// 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при поиске и определении количества новостей"))
-// 		return
-// 	}
-// 	var total int
-// 	for rows.Next() {
-// 		rows.Scan(&total)
-// 	}
-// 	if total == 0 {
-// 		bot.Send(tgbotapi.NewMessage(chatID, "Новостей не найдено"))
-// 		return
-// 	}
+func sendFoundNews(search string, bot *tgbotapi.BotAPI, chatID int64, count int) {
+	rows, err := db.Query(fmt.Sprintf("select count(*) as total from news where tsvector_title_description @@ to_tsquery('%s:*');", search))
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при поиске и определении количества новостей"))
+		return
+	}
+	var total int
+	for rows.Next() {
+		rows.Scan(&total)
+	}
+	if total == 0 {
+		bot.Send(tgbotapi.NewMessage(chatID, "Новостей не найдено"))
+		return
+	}
 
-// 	rows, err = db.Query("select ts_rank(tsvector_title_description, to_tsquery('$1:*')) AS rank, title, description, link, published_at from news where tsvector_title_description @@ to_tsquery('$1:*') order by rank desc published_at desc limit $2;", search, count)
-// 	if err != nil {
-// 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении новостей"))
-// 		return
-// 	}
-// 	defer rows.Close()
+	rows, err = db.Query(fmt.Sprintf("select ts_rank(tsvector_title_description, to_tsquery('%s:*')) AS rank, title, description, link, published_at from news where tsvector_title_description @@ to_tsquery('%s:*') order by rank desc published_at desc limit %d;", search, count))
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении новостей"))
+		return
+	}
+	defer rows.Close()
 
-// 	message := fmt.Sprintf("Всего найдено новостей: %d\n", total)
-// 	message += fmt.Sprintf("Поиск по запросу: %s\n\n", search)
-// 	for rows.Next() {
-// 		var title, description, link string
-// 		var publishedAt time.Time
-// 		rows.Scan(&title, &description, &link, &publishedAt)
-// 		message += fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), title, link, description)
-// 	}
-// 	if message == "" {
-// 		message = "Новостей пока нет"
-// 	}
-// 	msg := tgbotapi.NewMessage(chatID, message)
-// 	msg.DisableWebPagePreview = true
-// 	msg.ParseMode = "Markdown"
-// 	bot.Send(msg)
-// }
+	message := fmt.Sprintf("Всего найдено новостей: %d\n", total)
+	message += fmt.Sprintf("Поиск по запросу: %s\n\n", search)
+	for rows.Next() {
+		var title, description, link string
+		var publishedAt time.Time
+		rows.Scan(&title, &description, &link, &publishedAt)
+		message += fmt.Sprintf("%s\n[%s](%s)\n%s", publishedAt.Format("02.01.2006 15:04"), title, link, description)
+	}
+	if message == "" {
+		message = "Новостей пока нет"
+	}
+	msg := tgbotapi.NewMessage(chatID, message)
+	msg.DisableWebPagePreview = true
+	msg.ParseMode = "Markdown"
+	bot.Send(msg)
+}
 
 // Запуск парсинга RSS лент
 func startRSSPolling(bot *tgbotapi.BotAPI) {
@@ -265,7 +267,7 @@ func startRSSPolling(bot *tgbotapi.BotAPI) {
 			parseRSS(url, bot)
 		}
 
-		time.Sleep(15 * time.Second) // Обновление каждые 15 секунд
+		time.Sleep(TIMEOUT * time.Second) // Обновление каждые 60 секунд
 	}
 }
 
@@ -284,7 +286,7 @@ func parseRSS(url string, bot *tgbotapi.BotAPI) {
 		}
 		newsSentToUser[item.Link] = struct{}{}
 
-		publishedAt := time.Now() // Если дата отсутствует, исп������льз��ем текущее время
+		publishedAt := time.Now() // Если дата отсутствует, используем текущее время
 		if item.PublishedParsed != nil {
 			publishedAt = *item.PublishedParsed
 		}
