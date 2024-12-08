@@ -93,7 +93,7 @@ func InitSchema(db *sql.DB) {
 		link VARCHAR(1024) NOT NULL UNIQUE,
 		published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		tvs tsvector NULL GENERATED ALWAYS AS (
-			to_tsvector('russian', title || ' ' || description || ' ' || link)
+			to_tsvector('russian', title || ' ' || description)
 		) STORED
 	);
 	-- Таблица пользователей
@@ -143,19 +143,24 @@ func InitSchema(db *sql.DB) {
 
 // SaveUser сохраняет нового пользователя в БД
 func SaveUser(db *sql.DB, user User) (int64, error) {
-	query := `INSERT INTO users (chat_id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING`
-	result, err := db.Exec(query, user.ChatId, user.Username)
+	query := `INSERT INTO users (chat_id, username) VALUES ($1, $2)
+	RETURNING chat_id`
+	var insertedId int64
+	err := db.QueryRow(query, user.ChatId, user.Username).Scan(&insertedId)
 	if err != nil {
-		log.Printf("SaveUser сохраняет нового пользователя в БД: %d, %s\n%v", user.ChatId, user.Username, err)
+		// Ошибка может быть вызвана тем, что пользователь уже существует
+		if err == sql.ErrNoRows {
+			return 0, nil // Конфликт: пользователь не был добавлен, но это не ошибка
+		}
+		return 0, fmt.Errorf("Ошибка при добавлении пользователя: %w", err)
 	}
-	insertId, _ := result.LastInsertId()
-	log.Printf("Добавлен новый пользователь с ID %d", insertId)
-	return insertId, err
+
+	return insertedId, nil
 }
 
 // SaveSource сохраняет новый источник в БД
 func SaveSource(db *sql.DB, source Source) error {
-	query := `INSERT INTO sources (name, url) VALUES ($1, $2) ON CONFLICT DO NOTHING`
+	query := `INSERT INTO sources (name, url) VALUES ($1, $2)`
 	_, err := db.Exec(query, source.Name, source.Url)
 	if err != nil {
 		log.Printf("SaveSource сохраняет новый источник в БД: %s, %s\n%v", source.Name, source.Url, err)
@@ -165,7 +170,7 @@ func SaveSource(db *sql.DB, source Source) error {
 
 // SaveSubscription сохраняет новую подписку в БД
 func SaveSubscription(db *sql.DB, subscription Subscription) error {
-	query := `INSERT INTO subscriptions (chat_id, source_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`
+	query := `INSERT INTO subscriptions (chat_id, source_id) VALUES ($1, $2)`
 	_, err := db.Exec(query, subscription.ChatId, subscription.SourceId)
 	if err != nil {
 		log.Printf("SaveSubscription сохраняет новую подписку в БД: %d, %d\n%v", subscription.ChatId, subscription.SourceId, err)
@@ -204,7 +209,7 @@ func GetActiveSources(db *sql.DB) ([]Source, error) {
 }
 
 func FindActiveSources(db *sql.DB) ([]Source, error) {
-	query := `SELECT id, name, url, status FROM sources WHERE status = '$1'`
+	query := `SELECT id, name, url, status FROM sources WHERE status = $1`
 	rows, err := db.Query(query, Active)
 	if err != nil {
 		return nil, err
@@ -224,7 +229,7 @@ func FindActiveSources(db *sql.DB) ([]Source, error) {
 }
 
 func FindActiveSourceById(db *sql.DB, id int64) (Source, error) {
-	query := `SELECT id, name, url, status FROM sources WHERE status = '$1' and id = $2`
+	query := `SELECT id, name, url, status FROM sources WHERE status = $1 and id = $2`
 	var source Source
 	err := db.QueryRow(query, Active, id).Scan(&source.Id, &source.Name, &source.Url, &source.Status)
 	if err != nil {
@@ -239,7 +244,7 @@ func FindActiveSourceById(db *sql.DB, id int64) (Source, error) {
 }
 
 func FindSourceActiveByUrl(db *sql.DB, url string) (Source, error) {
-	query := `SELECT id, name, url, status FROM sources WHERE status = '$1' and url = $1`
+	query := `SELECT id, name, url, status FROM sources WHERE status = $1 and url = $2`
 	var source Source
 	err := db.QueryRow(query, Active, url).Scan(&source.Id, &source.Name, &source.Url, &source.Status)
 	if err != nil {
