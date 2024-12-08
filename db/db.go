@@ -69,39 +69,70 @@ func Connect(config *config.DBConfig) (*sql.DB, error) {
 
 func InitSchema(db *sql.DB) {
 	query := `
+	-- Создание типа ENUM
+	DO $$ BEGIN
+		CREATE TYPE status_enum AS ENUM ('active', 'inactive', 'archived');
+	EXCEPTION
+		WHEN duplicate_object THEN NULL;
+	END $$;
+
+	-- Таблица источников
 	CREATE TABLE IF NOT EXISTS sources (
 		id SERIAL PRIMARY KEY,
 		name VARCHAR(100) NOT NULL,
 		url VARCHAR(1024) NOT NULL UNIQUE,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		status VARCHAR(100) NOT NULL DEFAULT 'active'
+		status status_enum NOT NULL DEFAULT 'active'
 	);
+	-- Таблица новостей
 	CREATE TABLE IF NOT EXISTS news (
 		id SERIAL PRIMARY KEY,
-		source_id BIGINT NOT NULL REFERENCES sources(id),
+		source_id INTEGER NOT NULL REFERENCES sources(id),
 		title VARCHAR(1024) NOT NULL,
 		description TEXT NOT NULL,
 		link VARCHAR(1024) NOT NULL UNIQUE,
 		published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		tvs tsvector NULL GENERATED ALWAYS AS (to_tsvector('russian', title || ' ' || description  || ' ' || link)) STORED
+		tvs tsvector NULL GENERATED ALWAYS AS (
+			to_tsvector('russian', title || ' ' || description || ' ' || link)
+		) STORED
 	);
+	-- Таблица пользователей
 	CREATE TABLE IF NOT EXISTS users (
 		chat_id BIGINT PRIMARY KEY,
 		username VARCHAR(100) NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+	-- Таблица подписок
 	CREATE TABLE IF NOT EXISTS subscriptions (
-		chat_id BIGINT NOT NULL REFERENCES users(chat_id),
-		source_id BIGINT NOT NULL REFERENCES sources(id),
+		chat_id BIGINT NOT NULL REFERENCES users(chat_id) ON DELETE CASCADE,
+		source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (chat_id, source_id)
 	);
+	-- Таблица отправленных сообщений
 	CREATE TABLE IF NOT EXISTS messages (
-		chat_id BIGINT NOT NULL REFERENCES users(chat_id),
-		news_id BIGINT NOT NULL REFERENCES news(id),
-		sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (chat_id, news_id)
+		id SERIAL PRIMARY KEY,
+		chat_id BIGINT NOT NULL REFERENCES users(chat_id) ON DELETE CASCADE,
+		news_id BIGINT NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+		sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	-- Индексы
+	CREATE UNIQUE INDEX idx_sources_url ON sources (url);
+	CREATE INDEX idx_news_published_at ON news (published_at DESC);
+	CREATE INDEX idx_news_tsvector ON news USING GIN (tvs);
+
+	CREATE OR REPLACE FUNCTION lowercase_url()
+	RETURNS TRIGGER AS $$
+	BEGIN
+		NEW.url = LOWER(NEW.url);
+		RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;
+
+	CREATE TRIGGER trg_lowercase_url
+	BEFORE INSERT OR UPDATE ON sources
+	FOR EACH ROW EXECUTE FUNCTION lowercase_url();
 	`
 	_, err := db.Exec(query)
 	if err != nil {
@@ -154,6 +185,26 @@ func DeleteSubscription(db *sql.DB, subscription Subscription) error {
 
 func GetActiveSources(db *sql.DB) ([]Source, error) {
 	query := `SELECT id, name, url, status FROM sources WHERE status = '$1' order by id`
+	rows, err := db.Query(query, Active)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sources []Source
+	for rows.Next() {
+		var item Source
+		if err := rows.Scan(&item.Id, &item.Name, &item.Url, &item.Status); err != nil {
+			return nil, err
+		}
+		sources = append(sources, item)
+	}
+
+	return sources, nil
+}
+
+func FindActiveSources(db *sql.DB) ([]Source, error) {
+	query := `SELECT id, name, url, status FROM sources WHERE status = '$1'`
 	rows, err := db.Query(query, Active)
 	if err != nil {
 		return nil, err

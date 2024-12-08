@@ -31,9 +31,11 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 			handleStart(bot, dbConn, update.Message.Chat.UserName, update.Message.Chat.ID)
 		case "add":
 			handleAddSource(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
-		case "add-sub":
+		case "sources":
+			handleShowSources(bot, dbConn, update.Message.Chat.ID)
+		case "addsub":
 			handleAddSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
-		case "del-sub":
+		case "delsub":
 			handleDelSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
 		case "news":
 			handleLatestNews(bot, dbConn, update.Message.Chat.ID, 10)
@@ -100,6 +102,24 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	}
 
 	err = db.SaveSubscription(dbConn, subscription)
+}
+
+// handleShowSources обрабатывает команду /sources для вывода списка источников
+func handleShowSources(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
+	sources, err := db.FindActiveSources(dbConn)
+	if err != nil {
+		log.Printf("Ошибка при получении списка источников: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "Не удалось получить список источников")
+		bot.Send(msg)
+		return
+	}
+	msgText := "ID: Название\n"
+	for _, source := range sources {
+		msgText += fmt.Sprintf("%d: %s\n", source.Id, source.Name)
+	}
+	msg := tgbotapi.NewMessage(chatId, msgText)
+	bot.Send(msg)
+
 }
 
 // handleAddSubscription обрабатывает команду /add-sub для добавления подписки на источник
