@@ -30,13 +30,13 @@ jobs:
       
       # Сборка приложения
       - name: Build application
-        run: go build -ldflags='-s -w -extldflags "-static"' -o ./bot
+        run: go build -ldflags='-s -w -extldflags "-static"' -o ./tg-rss-app
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bot
-          path: bot
+          name: tg-rss-app
+          path: tg-rss-app
 
       # Запуск тестов
       - name: Run tests
@@ -55,7 +55,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: bot
+          name: tg-rss-app
 
       # Логин в Docker Hub
       - name: Log in to Docker Hub

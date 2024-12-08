@@ -17,7 +17,7 @@ RUN go mod download
 COPY . ./
 
 # Build the Go application
-RUN go build -ldflags='-s -w -extldflags "-static"' -o ./bot
+RUN go build -ldflags='-s -w -extldflags "-static"' -o ./tg-rss-app
 
 # Test Go application
 RUN go test -v ./...
@@ -31,11 +31,11 @@ RUN export CGO_ENABLED=1
 WORKDIR /root/
 
 # Copy the binary from the builder stage
-COPY --from=builder /app/bot /root/bot
+COPY --from=builder /app/tg-rss-app /root/tg-rss-app
 
 # Expose the application port
 EXPOSE 8080
 
 # Run the application
-CMD ["/root/bot"]
+CMD ["/root/tg-rss-app"]
 

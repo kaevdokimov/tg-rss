@@ -30,3 +30,23 @@ up:
 3. /add https://rssexport.rbc.ru/rbcnews/news/30/full.rss
 4. /add https://tass.ru/rss/v2.xml
 5. /add http://government.ru/all/rss/
+
+### Структура проекта
+
+news-bot/
+│
+├── main.go                # Точка входа
+├── go.mod
+├── go.sum
+├── config/
+│   └── config.go          # Конфигурация приложения
+├── db/
+│   ├── db.go              # Работа с базой данных
+│   ├── migrations.sql     # SQL миграции
+├── bot/
+│   ├── bot.go             # Telegram Bot логика
+│   ├── handlers.go        # Обработка команд
+├── rss/
+│   ├── rss.go             # Парсинг RSS
+└── utils/
+    └── utils.go           # Утилиты (например, getEnv)
