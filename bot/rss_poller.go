@@ -21,32 +21,30 @@ func StartRSSPolling(dbConn *sql.DB, bot *tgbotapi.BotAPI, interval time.Duratio
 			continue
 		}
 
-		users, err := fetchUsers(dbConn)
-		if err != nil {
-			log.Printf("Ошибка при получении пользователей: %v", err)
-			time.Sleep(interval)
-			continue
-		}
-
 		for _, source := range sources {
 			sourceNewsList, _ := rss.ParseRSS(source.Url, tz)
-
 			for _, item := range sourceNewsList {
-
 				// Сохранение новости в БД
-				query := `INSERT INTO news (title, description, link, published_at) 
-						  VALUES ($1, $2, $3, $4) 
-						  ON CONFLICT DO NOTHING`
-				_, err := dbConn.Exec(query, item.Title, item.Description, item.Link, item.PublishedAt)
+				query := `INSERT INTO news (title, description, link, published_at, source_id) 
+						  VALUES ($1, $2, $3, $4, $5) 
+						  ON CONFLICT (link) DO UPDATE SET title = $1, description = $2, published_at = $4`
+				_, err := dbConn.Exec(query, item.Title, item.Description, item.Link, item.PublishedAt, source.Id)
 				if err != nil {
 					log.Printf("Ошибка при сохранении новости: %v", err)
 					continue
 				}
 
+				// Получение списка пользователей, подписанных на источник
+				supscriptions, err := db.GetSubscriptions(dbConn, source.Id)
+				if err != nil {
+					log.Printf("Ошибка при получении подписок: %v", err)
+					continue
+				}
+				// @ToDo: Переписать на отправку через очередь
 				// Отправка новости всем пользователям
-				for _, userID := range users {
-					msg := tgbotapi.NewMessage(userID, formatNewsMessage(item.Title, item.Link, item.Description, item.PublishedAt))
-					msg.ParseMode = "Markdown"
+				for _, subscription := range supscriptions {
+					msg := tgbotapi.NewMessage(subscription.ChatId, formatNewsMessage(item.Title, item.Link, item.Description, item.PublishedAt))
+					msg.ParseMode = tgbotapi.ModeMarkdown
 					msg.DisableWebPagePreview = true
 					bot.Send(msg)
 				}
@@ -59,7 +57,7 @@ func StartRSSPolling(dbConn *sql.DB, bot *tgbotapi.BotAPI, interval time.Duratio
 
 // fetchSources получает список источников из БД
 func fetchSources(dbConn *sql.DB) ([]db.Source, error) {
-	rows, err := dbConn.Query("SELECT id, url FROM sources WHERE status = '$1'", db.Active)
+	rows, err := dbConn.Query("SELECT id, url FROM sources WHERE status = $1", db.Active)
 	if err != nil {
 		return nil, err
 	}

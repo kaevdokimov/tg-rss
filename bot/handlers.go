@@ -51,15 +51,30 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 		Username: username,
 		ChatId:   chatId,
 	}
-	_, err := db.SaveUser(dbConn, user)
+
+	insertedId, err := db.SaveUser(dbConn, user)
+	var errText string
 	if err != nil {
-		log.Printf("Ошибка при сохранении пользователя: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Ошибка при подключении к боту. Попробуйте позже")
+		errText = fmt.Sprintf("Ошибка добавления пользователя: %v", err)
+		log.Print(errText)
+		msg := tgbotapi.NewMessage(chatId, "Ошибка при подключении к боту. Попробуйте позже 😫")
+		bot.Send(msg)
+		return
+	} else if insertedId != 0 {
+		log.Printf("Добавлен новый пользователь с chatId %d", insertedId)
+		msg := tgbotapi.NewMessage(chatId, "Вы успешно подключились к боту! 🎉")
+		bot.Send(msg)
+	} else {
+		errText = fmt.Sprintf("Пользователь уже существует с chatId %d", user.ChatId)
+		log.Printf(errText)
+		msg := tgbotapi.NewMessage(chatId, "Вы уже были подключены к боту 😎")
 		bot.Send(msg)
 		return
 	}
+	log.Printf("Пользователь %s подключился к боту", user.Username)
 
-	msg := tgbotapi.NewMessage(chatId, "Вы успешно подключились к боту!")
+	// @ToDo: добавить обработку команды /help
+	msg := tgbotapi.NewMessage(chatId, "👋 Привет, я бот для получения новостей с сайтов. Чтобы посмотреть список доступных команд, наберите /help")
 	bot.Send(msg)
 }
 
@@ -91,7 +106,9 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 		return
 	}
 
-	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("Источник %s успешно добавлен!", link))
+	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("Источник [%s](%s) успешно добавлен!", source.Name, source.Url))
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.DisableWebPagePreview = true
 	bot.Send(msg)
 
 	source, err = db.FindSourceActiveByUrl(dbConn, link)
@@ -213,7 +230,8 @@ func handleLatestNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count 
 		return
 	}
 
-	message := "Последние новости:\n\n"
+	// @ToDo: При сохранении заменяются буквы на кракозябры, вероятно проблема в VSCode
+	message := "Последние нов��сти:\n\n"
 	for i, item := range news {
 		message += formatMessage(i+1, item.Title, item.Link, item.Description, item.PublishedAt)
 	}
