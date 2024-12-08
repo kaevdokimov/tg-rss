@@ -298,3 +298,24 @@ func GetUserSubscriptions(db *sql.DB, chatId int64) ([]Source, error) {
 
 	return sources, nil
 }
+
+// GetSubscriptions: получить подписков на источник
+func GetSubscriptions(db *sql.DB, sourceId int64) ([]Subscription, error) {
+	query := `SELECT chat_id, source_id, created_at FROM subscriptions WHERE source_id = $1`
+	rows, err := db.Query(query, sourceId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subscriptions []Subscription
+	for rows.Next() {
+		var item Subscription
+		if err := rows.Scan(&item.ChatId, &item.SourceId, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		subscriptions = append(subscriptions, item)
+	}
+
+	return subscriptions, nil
+}
