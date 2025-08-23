@@ -1,5 +1,5 @@
 # Use the official Go image as the base image
-FROM golang:1.23-alpine3.21 AS builder
+FROM golang:1.25-alpine3.22 AS builder
 
 ENV CGO_ENABLED=1
 RUN apk add --no-cache gcc musl-dev
@@ -23,7 +23,7 @@ RUN go build -ldflags='-s -w -extldflags "-static"' -o ./tg-rss-app
 RUN go test -v ./...
 
 # Create a minimal runtime image
-FROM alpine:3.21
+FROM alpine:3.22
 
 RUN export CGO_ENABLED=1
 
