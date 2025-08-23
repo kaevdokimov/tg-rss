@@ -2,13 +2,9 @@ module tg-rss
 
 go 1.25
 
-require (
-	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
-	github.com/mattn/go-sqlite3 v1.14.24
-)
+require github.com/IBM/sarama v1.45.2
 
 require (
-	github.com/IBM/sarama v1.45.2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -40,5 +36,4 @@ require (
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/lib/pq v1.10.9
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 )

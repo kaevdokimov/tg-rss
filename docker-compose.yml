@@ -4,6 +4,7 @@ services:
     container_name: news_bot
     depends_on:
       - db
+      - redpanda
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
       POSTGRES_HOST: ${POSTGRES_HOST}
@@ -11,6 +12,30 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
+      REDPANDA_BROKERS: ${REDPANDA_BROKERS:-"redpanda:9092"}
+      REDPANDA_NEWS_TOPIC: ${REDPANDA_NEWS_TOPIC:-"news-items"}
+      REDPANDA_NOTIFY_TOPIC: ${REDPANDA_NOTIFY_TOPIC:-"news-notifications"}
+    restart: always
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: news_redpanda
+    command:
+      - redpanda
+      - start
+      - --smp 1
+      - --memory 256M
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - "9092:9092"
+      - "8082:8082"
     restart: always
 
   db:

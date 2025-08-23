@@ -20,6 +20,12 @@ type TgBotConfig struct {
 	Timeout int
 }
 
+type RedpandaConfig struct {
+	Brokers     []string
+	NewsTopic   string
+	NotifyTopic string
+}
+
 func LoadDBConfig() *DBConfig {
 	port, err := strconv.Atoi(getEnv("POSTGRES_PORT", "5432"))
 	if err != nil {
@@ -30,7 +36,7 @@ func LoadDBConfig() *DBConfig {
 		DBPort: port,
 		DBUser: getEnv("POSTGRES_USER", "postgres"),
 		DBPass: getEnv("POSTGRES_PASSWORD", "password"),
-		DBName: getEnv("POSTGRES_NAME", "news_bot"),
+		DBName: getEnv("POSTGRES_DB", "news_bot"),
 	}
 }
 
@@ -47,6 +53,16 @@ func LoadTgBotConfig() *TgBotConfig {
 		ApiKey:  TelegramApiKey,
 		TZ:      getEnv("TZ", "Europe/Moscow"),
 		Timeout: Timeout,
+	}
+}
+
+func LoadRedpandaConfig() *RedpandaConfig {
+	brokers := getEnv("REDPANDA_BROKERS", "localhost:9092")
+	log.Printf("Redpanda brokers: %s", brokers)
+	return &RedpandaConfig{
+		Brokers:     []string{brokers},
+		NewsTopic:   getEnv("REDPANDA_NEWS_TOPIC", "news-items"),
+		NotifyTopic: getEnv("REDPANDA_NOTIFY_TOPIC", "news-notifications"),
 	}
 }
 

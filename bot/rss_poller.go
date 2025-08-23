@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"tg-rss/db"
+	"tg-rss/redpanda"
 	"tg-rss/rss"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // StartRSSPolling запускает регулярный опрос RSS-источников
-func StartRSSPolling(dbConn *sql.DB, bot *tgbotapi.BotAPI, interval time.Duration, tz *time.Location) {
+func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, redpandaProducer *redpanda.Producer) {
 	for {
 		sources, err := fetchSources(dbConn)
 		if err != nil {
@@ -24,32 +23,23 @@ func StartRSSPolling(dbConn *sql.DB, bot *tgbotapi.BotAPI, interval time.Duratio
 		for _, source := range sources {
 			sourceNewsList, _ := rss.ParseRSS(source.Url, tz)
 			for _, item := range sourceNewsList {
-				// Сохранение новости в БД
-				query := `INSERT INTO news (title, description, link, published_at, source_id) 
-						  VALUES ($1, $2, $3, $4, $5) 
-						  ON CONFLICT (link) DO UPDATE SET title = $1, description = $2, published_at = $4`
-				_, err := dbConn.Exec(query, item.Title, item.Description, item.Link, item.PublishedAt, source.Id)
-				if err != nil {
-					log.Printf("Ошибка при сохранении новости: %v", err)
+				// Создаем объект новости для отправки в Redpanda
+				newsItem := redpanda.NewsItem{
+					SourceID:    source.Id,
+					SourceName:  source.Name,
+					Title:       item.Title,
+					Description: item.Description,
+					Link:        item.Link,
+					PublishedAt: item.PublishedAt.Format("2006-01-02 15:04:05"),
+				}
+
+				// Отправляем новость в Redpanda для обработки
+				if err := redpandaProducer.SendNewsItem(newsItem); err != nil {
+					log.Printf("Ошибка отправки новости в Redpanda: %v", err)
 					continue
 				}
 
-				// Получение списка пользователей, подписанных на источник
-				supscriptions, err := db.GetSubscriptions(dbConn, source.Id)
-				if err != nil {
-					log.Printf("Ошибка при получении подписок: %v", err)
-					continue
-				}
-				// @ToDo: Переписать на отправку через очередь
-				// Отправка новости всем пользователям
-				for _, subscription := range supscriptions {
-					msg := tgbotapi.NewMessage(subscription.ChatId, formatNewsMessage(item.Title, item.Description, item.PublishedAt, source.Name))
-					msg.ParseMode = tgbotapi.ModeMarkdown
-					msg.DisableWebPagePreview = true
-					// Добавляем inline кнопки для новости
-					msg.ReplyMarkup = createNewsKeyboard(item.Link, 0) // 0 - временный ID новости
-					bot.Send(msg)
-				}
+				log.Printf("Новость отправлена в очередь: %s", item.Title)
 			}
 		}
 
@@ -59,7 +49,7 @@ func StartRSSPolling(dbConn *sql.DB, bot *tgbotapi.BotAPI, interval time.Duratio
 
 // fetchSources получает список источников из БД
 func fetchSources(dbConn *sql.DB) ([]db.Source, error) {
-	rows, err := dbConn.Query("SELECT id, url FROM sources WHERE status = $1", db.Active)
+	rows, err := dbConn.Query("SELECT id, name, url FROM sources WHERE status = $1", db.Active)
 	if err != nil {
 		return nil, err
 	}
@@ -68,13 +58,14 @@ func fetchSources(dbConn *sql.DB) ([]db.Source, error) {
 	var sources []db.Source
 	for rows.Next() {
 		var id int
-		var url string
-		if err := rows.Scan(&id, &url); err != nil {
+		var name, url string
+		if err := rows.Scan(&id, &name, &url); err != nil {
 			return nil, err
 		}
 		sources = append(sources, db.Source{
-			Id:  int64(id),
-			Url: url,
+			Id:   int64(id),
+			Name: name,
+			Url:  url,
 		})
 	}
 	return sources, nil

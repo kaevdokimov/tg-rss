@@ -124,9 +124,9 @@ func InitSchema(db *sql.DB) {
 	);
 
 	-- Индексы
-	CREATE UNIQUE INDEX idx_sources_url ON sources (url);
-	CREATE INDEX idx_news_published_at ON news (published_at DESC);
-	CREATE INDEX idx_news_tsvector ON news USING GIN (tvs);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_url ON sources (url);
+	CREATE INDEX IF NOT EXISTS idx_news_published_at ON news (published_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_news_tsvector ON news USING GIN (tvs);
 
 	CREATE OR REPLACE FUNCTION lowercase_url()
 	RETURNS TRIGGER AS $$
@@ -136,6 +136,7 @@ func InitSchema(db *sql.DB) {
 	END;
 	$$ LANGUAGE plpgsql;
 
+	DROP TRIGGER IF EXISTS trg_lowercase_url ON sources;
 	CREATE TRIGGER trg_lowercase_url
 	BEFORE INSERT OR UPDATE ON sources
 	FOR EACH ROW EXECUTE FUNCTION lowercase_url();
