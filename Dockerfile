@@ -1,41 +1,58 @@
-# Use the official Go image as the base image
+# Build stage
 FROM golang:1.25-alpine3.22 AS builder
 
-ENV CGO_ENABLED=1
+# Устанавливаем необходимые зависимости для сборки
 RUN apk add --no-cache gcc musl-dev
 
-# Set the working directory inside the container
+# Создаем непривилегированного пользователя
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Copy go.mod and go.sum files
+# Копируем файлы зависимостей для лучшего кэширования слоев
 COPY go.mod go.sum ./
 
-# Download all dependencies
+# Загружаем зависимости
 RUN go mod download
 
-# Copy the application source code
-COPY . ./
+# Копируем исходный код
+COPY . .
 
-# Build the Go application
-RUN go build -ldflags='-s -w -extldflags "-static"' -o ./tg-rss-app
+# Собираем приложение с оптимизациями
+RUN CGO_ENABLED=1 go build \
+    -ldflags='-s -w -extldflags "-static"' \
+    -o tg-rss-app \
+    -trimpath
 
-# Test Go application
+# Запускаем тесты
 RUN go test -v ./...
 
-# Create a minimal runtime image
+# Runtime stage
 FROM alpine:3.22
 
-RUN export CGO_ENABLED=1
+# Устанавливаем необходимые runtime зависимости
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
-# Set the working directory
-WORKDIR /root/
+# Устанавливаем рабочую директорию
+WORKDIR /app
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/tg-rss-app /root/tg-rss-app
+# Копируем бинарный файл из builder stage
+COPY --from=builder --chown=appuser:appgroup /app/tg-rss-app .
 
-# Expose the application port
+# Переключаемся на непривилегированного пользователя
+USER appuser
+
+# Добавляем health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD pgrep tg-rss-app || exit 1
+
+# Экспортируем порт (если приложение использует HTTP)
 EXPOSE 8080
 
-# Run the application
-CMD ["/root/tg-rss-app"]
+# Запускаем приложение
+CMD ["./tg-rss-app"]
 

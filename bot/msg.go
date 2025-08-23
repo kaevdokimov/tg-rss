@@ -2,21 +2,90 @@ package bot
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
 // formatNewsMessage форматирует сообщение для отправки
-func formatNewsMessage(title, link, description string, publishedAt time.Time) string {
+func formatNewsMessage(title, description string, publishedAt time.Time, sourceName string) string {
+	// Обрезаем описание если оно слишком длинное
+	trimmedDesc := trimDescription(description, 200)
+
+	// Форматируем относительное время
+	relativeTime := formatRelativeTime(publishedAt)
+
 	return fmt.Sprintf(
-		"[*%s*](%s)\n%s\n🕔 %s",
-		title, link, description, publishedAt.Format("02.01.2006 15:04"),
+		"📰 *%s*\n\n%s\n\n⏰ %s \t📰 Источник: %s",
+		title, trimmedDesc, relativeTime, sourceName,
 	)
 }
 
 // formatMessage форматирует сообщение в списке для отправки
-func formatMessage(i int, title, link, description string, publishedAt time.Time) string {
+func formatMessage(i int, title, description string, publishedAt time.Time, sourceName string) string {
+	// Обрезаем описание если оно слишком длинное
+	trimmedDesc := trimDescription(description, 150)
+
+	// Форматируем относительное время
+	relativeTime := formatRelativeTime(publishedAt)
+
 	return fmt.Sprintf(
-		"%d. [*%s*](%s)\n%s\n🕔 %s",
-		i, title, link, description, publishedAt.Format("02.01.2006 15:04"),
+		"%d. 📰 *%s*\n\n%s\n\n ⏰ %s \t📰 Источник: %s\n\n",
+		i, title, trimmedDesc, relativeTime, sourceName,
 	)
+}
+
+// trimDescription обрезает описание до указанной длины
+func trimDescription(description string, maxLength int) string {
+	if len(description) <= maxLength {
+		return description
+	}
+
+	// Обрезаем до последнего пробела перед maxLength
+	trimmed := description[:maxLength]
+	lastSpace := strings.LastIndex(trimmed, " ")
+	if lastSpace > maxLength*3/4 { // Если пробел находится в последней четверти
+		trimmed = trimmed[:lastSpace]
+	}
+
+	return trimmed + "..."
+}
+
+// formatRelativeTime форматирует время в относительном виде
+func formatRelativeTime(t time.Time) string {
+	now := time.Now()
+	duration := now.Sub(t)
+
+	if duration < time.Minute {
+		return "только что"
+	} else if duration < time.Hour {
+		minutes := int(duration.Minutes())
+		if minutes == 1 {
+			return "1 минуту назад"
+		} else if minutes < 5 {
+			return fmt.Sprintf("%d минуты назад", minutes)
+		} else {
+			return fmt.Sprintf("%d минут назад", minutes)
+		}
+	} else if duration < 24*time.Hour {
+		hours := int(duration.Hours())
+		if hours == 1 {
+			return "1 час назад"
+		} else if hours < 5 {
+			return fmt.Sprintf("%d часа назад", hours)
+		} else {
+			return fmt.Sprintf("%d часов назад", hours)
+		}
+	} else if duration < 7*24*time.Hour {
+		days := int(duration.Hours() / 24)
+		if days == 1 {
+			return "1 день назад"
+		} else if days < 5 {
+			return fmt.Sprintf("%d дня назад", days)
+		} else {
+			return fmt.Sprintf("%d дней назад", days)
+		}
+	} else {
+		// Если больше недели, показываем дату
+		return t.Format("02.01.2006 15:04")
+	}
 }

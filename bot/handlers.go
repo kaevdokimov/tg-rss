@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"tg-rss/db"
 
@@ -50,7 +51,7 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 			case "delsub":
 				handleDelSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
 			case "news":
-				handleLatestNews(bot, dbConn, update.Message.Chat.ID, 10)
+				handleLatestNewsImproved(bot, dbConn, update.Message.Chat.ID, 10)
 			default:
 				handleUnknownCommand(bot, update.Message.Chat.ID)
 			}
@@ -69,25 +70,14 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 	}
 
 	insertedId, err := db.SaveUser(dbConn, user)
-	var errText string
 	if err != nil {
-		errText = fmt.Sprintf("Ошибка добавления пользователя: %v", err)
-		log.Print(errText)
+		log.Printf("Ошибка добавления пользователя: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "Ошибка при подключении к боту. Попробуйте позже 😫")
 		bot.Send(msg)
 		return
-	} else if insertedId != 0 {
-		log.Printf("Добавлен новый пользователь с chatId %d", insertedId)
-		msg := tgbotapi.NewMessage(chatId, "Вы успешно подключились к боту! 🎉")
-		bot.Send(msg)
-	} else {
-		errText = fmt.Sprintf("Пользователь уже существует с chatId %d", user.ChatId)
-		log.Print(errText)
-		msg := tgbotapi.NewMessage(chatId, "Вы уже были подключены к боту 😎")
-		bot.Send(msg)
 	}
-	log.Printf("Пользователь %s подключился к боту", user.Username)
 
+	log.Printf("Пользователь %s подключился к боту с chatId %d", user.Username, insertedId)
 	msg := tgbotapi.NewMessage(chatId, "👋 Привет, я бот для получения новостей с сайтов!\n\nИспользуйте кнопки ниже для навигации:")
 	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
@@ -110,8 +100,23 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 		return
 	}
 
+	// Создаем более читаемое название источника
+	sourceName := u.Host
+	if u.Host == "" {
+		sourceName = "Неизвестный источник"
+	} else {
+		// Убираем www. если есть
+		if strings.HasPrefix(u.Host, "www.") {
+			sourceName = u.Host[4:]
+		}
+		// Делаем первую букву заглавной
+		if len(sourceName) > 0 {
+			sourceName = strings.ToUpper(sourceName[:1]) + sourceName[1:]
+		}
+	}
+
 	var source = db.Source{
-		Name: u.Host,
+		Name: sourceName,
 		Url:  link,
 	}
 
@@ -137,6 +142,33 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
+	}
+
+	// Проверяем, существует ли пользователь, если нет - регистрируем его
+	exists, err := db.UserExists(dbConn, chatId)
+	if err != nil {
+		log.Printf("Ошибка при проверке существования пользователя: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	if !exists {
+		// Регистрируем пользователя
+		user := db.User{
+			ChatId:   chatId,
+			Username: "unknown", // Будет обновлено при следующем /start
+		}
+		_, err = db.SaveUser(dbConn, user)
+		if err != nil {
+			log.Printf("Ошибка при регистрации пользователя: %v", err)
+			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя")
+			msg.ReplyMarkup = createMainKeyboard()
+			bot.Send(msg)
+			return
+		}
+		log.Printf("Автоматически зарегистрирован пользователь с chatId %d", chatId)
 	}
 
 	var subscription = db.Subscription{
@@ -207,6 +239,33 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 		return
 	}
 
+	// Проверяем, существует ли пользователь, если нет - регистрируем его
+	exists, err := db.UserExists(dbConn, chatId)
+	if err != nil {
+		log.Printf("Ошибка при проверке существования пользователя: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	if !exists {
+		// Регистрируем пользователя
+		user := db.User{
+			ChatId:   chatId,
+			Username: "unknown", // Будет обновлено при следующем /start
+		}
+		_, err = db.SaveUser(dbConn, user)
+		if err != nil {
+			log.Printf("Ошибка при регистрации пользователя: %v", err)
+			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя")
+			msg.ReplyMarkup = createMainKeyboard()
+			bot.Send(msg)
+			return
+		}
+		log.Printf("Автоматически зарегистрирован пользователь с chatId %d", chatId)
+	}
+
 	var subscription = db.Subscription{
 		ChatId:   chatId,
 		SourceId: sourceIdInt,
@@ -271,8 +330,8 @@ func handleDelSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	bot.Send(msg)
 }
 
-// handleLatestNews обрабатывает команду /news для вывода последних новостей
-func handleLatestNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count int) {
+// handleLatestNewsImproved обрабатывает команду /news с улучшенным форматированием
+func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count int) {
 	news, err := db.GetLatestNewsByUser(dbConn, chatId, count)
 	if err != nil {
 		log.Printf("Ошибка при получении новостей: %v", err)
@@ -289,16 +348,15 @@ func handleLatestNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count 
 		return
 	}
 
-	// @ToDo: При сохранении заменяются буквы на кракозябры, вероятно проблема в VSCode
-	message := "Последние нов��сти:\n\n"
+	message := "📰 *Последние новости:*\n\n"
 	for i, item := range news {
-		message += formatMessage(i+1, item.Title, item.Link, item.Description, item.PublishedAt)
+		message += formatMessage(i+1, item.Title, item.Description, item.PublishedAt, item.SourceName)
 	}
 
 	msg := tgbotapi.NewMessage(chatId, message)
 	msg.ParseMode = "Markdown"
 	msg.DisableWebPagePreview = true
-	msg.ReplyMarkup = createMainKeyboard()
+	msg.ReplyMarkup = createNewsListKeyboard(1, 1, false)
 	bot.Send(msg)
 }
 

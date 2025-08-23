@@ -43,9 +43,11 @@ func StartRSSPolling(dbConn *sql.DB, bot *tgbotapi.BotAPI, interval time.Duratio
 				// @ToDo: Переписать на отправку через очередь
 				// Отправка новости всем пользователям
 				for _, subscription := range supscriptions {
-					msg := tgbotapi.NewMessage(subscription.ChatId, formatNewsMessage(item.Title, item.Link, item.Description, item.PublishedAt))
+					msg := tgbotapi.NewMessage(subscription.ChatId, formatNewsMessage(item.Title, item.Description, item.PublishedAt, source.Name))
 					msg.ParseMode = tgbotapi.ModeMarkdown
 					msg.DisableWebPagePreview = true
+					// Добавляем inline кнопки для новости
+					msg.ReplyMarkup = createNewsKeyboard(item.Link, 0) // 0 - временный ID новости
 					bot.Send(msg)
 				}
 			}

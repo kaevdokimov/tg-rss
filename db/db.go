@@ -39,6 +39,12 @@ type News struct {
 	PublishedAt time.Time
 }
 
+// NewsWithSource содержит новость с информацией об источнике
+type NewsWithSource struct {
+	News
+	SourceName string
+}
+
 type Subscription struct {
 	ChatId    int64
 	SourceId  int64
@@ -57,11 +63,11 @@ func Connect(config *config.DBConfig) (*sql.DB, error) {
 	)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка подключения к БД: %v", err)
+		return nil, fmt.Errorf("ошибка подключения к БД: %v", err)
 	}
 
 	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("Ошибка соединения с БД: %v", err)
+		return nil, fmt.Errorf("ошибка соединения с БД: %v", err)
 	}
 	log.Println("Подключение к БД установлено")
 	return db, nil
@@ -136,7 +142,7 @@ func InitSchema(db *sql.DB) {
 	`
 	_, err := db.Exec(query)
 	if err != nil {
-		log.Fatalf("Ошибка при создании схемы БД: %v", err)
+		log.Fatalf("ошибка при создании схемы БД: %v", err)
 	}
 	log.Println("Схема базы данных инициализирована")
 }
@@ -144,15 +150,12 @@ func InitSchema(db *sql.DB) {
 // SaveUser сохраняет нового пользователя в БД
 func SaveUser(db *sql.DB, user User) (int64, error) {
 	query := `INSERT INTO users (chat_id, username) VALUES ($1, $2)
+	ON CONFLICT (chat_id) DO UPDATE SET username = $2
 	RETURNING chat_id`
 	var insertedId int64
 	err := db.QueryRow(query, user.ChatId, user.Username).Scan(&insertedId)
 	if err != nil {
-		// Ошибка может быть вызвана тем, что пользователь уже существует
-		if err == sql.ErrNoRows {
-			return 0, nil // Конфликт: пользователь не был добавлен, но это не ошибка
-		}
-		return 0, fmt.Errorf("Ошибка при добавлении пользователя: %w", err)
+		return 0, fmt.Errorf("ошибка при добавлении пользователя: %w", err)
 	}
 
 	return insertedId, nil
@@ -170,12 +173,32 @@ func SaveSource(db *sql.DB, source Source) error {
 
 // SaveSubscription сохраняет новую подписку в БД
 func SaveSubscription(db *sql.DB, subscription Subscription) error {
+	// Сначала проверяем, существует ли пользователь
+	exists, err := UserExists(db, subscription.ChatId)
+	if err != nil {
+		return fmt.Errorf("ошибка при проверке существования пользователя: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("пользователь с chat_id %d не существует", subscription.ChatId)
+	}
+
 	query := `INSERT INTO subscriptions (chat_id, source_id) VALUES ($1, $2)`
-	_, err := db.Exec(query, subscription.ChatId, subscription.SourceId)
+	_, err = db.Exec(query, subscription.ChatId, subscription.SourceId)
 	if err != nil {
 		log.Printf("SaveSubscription сохраняет новую подписку в БД: %d, %d\n%v", subscription.ChatId, subscription.SourceId, err)
 	}
 	return err
+}
+
+// UserExists проверяет, существует ли пользователь в БД
+func UserExists(db *sql.DB, chatId int64) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE chat_id = $1)`
+	var exists bool
+	err := db.QueryRow(query, chatId).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 // DeleteSubscription удаляет подписку из БД
@@ -235,7 +258,7 @@ func FindActiveSourceById(db *sql.DB, id int64) (Source, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Если источник не найден
-			return Source{}, fmt.Errorf("Источник с ID %d не найден", id)
+			return Source{}, fmt.Errorf("источник с ID %d не найден", id)
 		}
 		// Другие ошибки
 		return Source{}, err
@@ -250,7 +273,7 @@ func FindSourceActiveByUrl(db *sql.DB, url string) (Source, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Если источник не найден
-			return Source{}, fmt.Errorf("Источник с URL %s не найден", url)
+			return Source{}, fmt.Errorf("источник с URL %s не найден", url)
 		}
 		// Другие ошибки
 		return Source{}, err
@@ -258,10 +281,38 @@ func FindSourceActiveByUrl(db *sql.DB, url string) (Source, error) {
 	return source, nil
 }
 
-// GetLatestNews возвращает последние новости
-func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]News, error) {
-	query := `SELECT id, title, description, link, published_at FROM news n WHERE source_id IN (SELECT source_id FROM subscriptions WHERE chat_id = $1) ORDER BY n.published_at DESC LIMIT $1`
-	rows, err := db.Query(query, count)
+// GetLatestNews возвращает последние новости с информацией об источнике
+func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]NewsWithSource, error) {
+	query := `SELECT n.id, n.title, n.description, n.link, n.published_at, s.name 
+			  FROM news n 
+			  JOIN sources s ON n.source_id = s.id 
+			  WHERE n.source_id IN (SELECT source_id FROM subscriptions WHERE chat_id = $1) 
+			  ORDER BY n.published_at DESC LIMIT $2`
+	rows, err := db.Query(query, chatId, count)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var news []NewsWithSource
+	for rows.Next() {
+		var item NewsWithSource
+		if err := rows.Scan(&item.Id, &item.Title, &item.Description, &item.Link, &item.PublishedAt, &item.SourceName); err != nil {
+			return nil, err
+		}
+		news = append(news, item)
+	}
+
+	return news, nil
+}
+
+// GetLatestNewsByUserSimple возвращает последние новости без информации об источнике
+func GetLatestNewsByUserSimple(db *sql.DB, chatId int64, count int) ([]News, error) {
+	query := `SELECT n.id, n.title, n.description, n.link, n.published_at 
+			  FROM news n 
+			  WHERE n.source_id IN (SELECT source_id FROM subscriptions WHERE chat_id = $1) 
+			  ORDER BY n.published_at DESC LIMIT $2`
+	rows, err := db.Query(query, chatId, count)
 	if err != nil {
 		return nil, err
 	}
@@ -350,4 +401,29 @@ func GetUserSubscriptionsWithDetails(db *sql.DB, chatId int64) ([]Subscription, 
 	}
 
 	return subscriptions, nil
+}
+
+// UpdateSourceNames обновляет названия источников, которые пустые или содержат только хост
+func UpdateSourceNames(db *sql.DB) error {
+	query := `
+	UPDATE sources 
+	SET name = CASE 
+		WHEN name = '' OR name IS NULL THEN 
+			CASE 
+				WHEN url LIKE '%www.%' THEN 
+					UPPER(SUBSTRING(REPLACE(url, 'https://', ''), 5, 1)) || 
+					LOWER(SUBSTRING(REPLACE(url, 'https://', ''), 6))
+				WHEN url LIKE '%http://%' THEN 
+					UPPER(SUBSTRING(REPLACE(url, 'http://', ''), 1, 1)) || 
+					LOWER(SUBSTRING(REPLACE(url, 'http://', ''), 2))
+				ELSE 
+					UPPER(SUBSTRING(REPLACE(REPLACE(url, 'https://', ''), 'http://', ''), 1, 1)) || 
+					LOWER(SUBSTRING(REPLACE(REPLACE(url, 'https://', ''), 'http://', ''), 2))
+			END
+		ELSE name
+	END
+	WHERE name = '' OR name IS NULL OR name = url`
+
+	_, err := db.Exec(query)
+	return err
 }
