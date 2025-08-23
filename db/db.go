@@ -319,3 +319,35 @@ func GetSubscriptions(db *sql.DB, sourceId int64) ([]Subscription, error) {
 
 	return subscriptions, nil
 }
+
+// IsUserSubscribed: проверить, подписан ли пользователь на источник
+func IsUserSubscribed(db *sql.DB, chatId int64, sourceId int64) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM subscriptions WHERE chat_id = $1 AND source_id = $2)`
+	var exists bool
+	err := db.QueryRow(query, chatId, sourceId).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// GetUserSubscriptionsWithDetails: получить подписки пользователя с деталями
+func GetUserSubscriptionsWithDetails(db *sql.DB, chatId int64) ([]Subscription, error) {
+	query := `SELECT chat_id, source_id, created_at FROM subscriptions WHERE chat_id = $1`
+	rows, err := db.Query(query, chatId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subscriptions []Subscription
+	for rows.Next() {
+		var item Subscription
+		if err := rows.Scan(&item.ChatId, &item.SourceId, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		subscriptions = append(subscriptions, item)
+	}
+
+	return subscriptions, nil
+}

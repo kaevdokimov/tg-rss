@@ -20,29 +20,43 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
+		// Обработка callback-запросов от inline кнопок
+		if update.CallbackQuery != nil {
+			log.Printf("[%s] Callback: %s", update.CallbackQuery.From.UserName, update.CallbackQuery.Data)
+			handleCallback(bot, dbConn, update.CallbackQuery)
+			continue
+		}
+
+		// Обработка обычных сообщений
 		if update.Message == nil {
 			continue
 		}
 
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
-		switch update.Message.Command() {
-		case "start":
-			handleStart(bot, dbConn, update.Message.Chat.UserName, update.Message.Chat.ID)
-		case "help":
-			handleHelp(bot, update.Message.Chat.ID)
-		case "add":
-			handleAddSource(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
-		case "sources":
-			handleShowSources(bot, dbConn, update.Message.Chat.ID)
-		case "addsub":
-			handleAddSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
-		case "delsub":
-			handleDelSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
-		case "news":
-			handleLatestNews(bot, dbConn, update.Message.Chat.ID, 10)
-		default:
-			handleUnknownCommand(bot, update.Message.Chat.ID)
+		// Проверяем, является ли сообщение командой
+		if update.Message.IsCommand() {
+			switch update.Message.Command() {
+			case "start":
+				handleStart(bot, dbConn, update.Message.Chat.UserName, update.Message.Chat.ID)
+			case "help":
+				handleHelp(bot, update.Message.Chat.ID)
+			case "add":
+				handleAddSource(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
+			case "sources":
+				handleShowSources(bot, dbConn, update.Message.Chat.ID)
+			case "addsub":
+				handleAddSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
+			case "delsub":
+				handleDelSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
+			case "news":
+				handleLatestNews(bot, dbConn, update.Message.Chat.ID, 10)
+			default:
+				handleUnknownCommand(bot, update.Message.Chat.ID)
+			}
+		} else {
+			// Обработка обычных текстовых сообщений (например, URL для добавления источника)
+			handleTextMessage(bot, dbConn, update.Message)
 		}
 	}
 }
@@ -71,25 +85,27 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 		log.Print(errText)
 		msg := tgbotapi.NewMessage(chatId, "Вы уже были подключены к боту 😎")
 		bot.Send(msg)
-		return
 	}
 	log.Printf("Пользователь %s подключился к боту", user.Username)
 
-	msg := tgbotapi.NewMessage(chatId, "👋 Привет, я бот для получения новостей с сайтов. Чтобы посмотреть список доступных команд, наберите /help")
+	msg := tgbotapi.NewMessage(chatId, "👋 Привет, я бот для получения новостей с сайтов!\n\nИспользуйте кнопки ниже для навигации:")
+	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
 }
 
 // handleAddSource обрабатывает команду /add для добавления нового источника
 func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link string) {
 	if link == "" {
-		msg := tgbotapi.NewMessage(chatId, "Укажите URL источника после команды /add")
+		msg := tgbotapi.NewMessage(chatId, "❌ Укажите URL источника после команды /add")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
 	u, err := url.Parse(link)
 	if err != nil {
-		msg := tgbotapi.NewMessage(chatId, "Укажите валидный URL источника после команды /add")
+		msg := tgbotapi.NewMessage(chatId, "❌ Укажите валидный URL источника после команды /add")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -102,20 +118,23 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	err = db.SaveSource(dbConn, source)
 	if err != nil {
 		log.Printf("Ошибка при добавлении источника: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Не удалось добавить источник. Возможно, он уже существует")
+		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось добавить источник. Возможно, он уже существует")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
-	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("Источник [%s](%s) успешно добавлен!", source.Name, source.Url))
+	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Источник [%s](%s) успешно добавлен!", source.Name, source.Url))
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.DisableWebPagePreview = true
+	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
 
 	source, err = db.FindSourceActiveByUrl(dbConn, link)
 	if err != nil {
 		log.Printf("Ошибка при поиске источника: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Не удалось найти добавленный источник")
+		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось найти добавленный источник")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -128,12 +147,14 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	err = db.SaveSubscription(dbConn, subscription)
 	if err != nil {
 		log.Printf("Ошибка при добавлении подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Не удалось добавить подписку. Возможно, она уже существует")
+		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось добавить подписку. Возможно, она уже существует")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
-	successMsg := tgbotapi.NewMessage(chatId, "Подписка на источник успешно добавлена!")
+	successMsg := tgbotapi.NewMessage(chatId, "✅ Подписка на источник успешно добавлена!")
+	successMsg.ReplyMarkup = createMainKeyboard()
 	bot.Send(successMsg)
 }
 
@@ -142,35 +163,37 @@ func handleShowSources(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	sources, err := db.FindActiveSources(dbConn)
 	if err != nil {
 		log.Printf("Ошибка при получении списка источников: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Не удалось получить список источников")
+		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось получить список источников")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 	if len(sources) == 0 {
-		msg := tgbotapi.NewMessage(chatId, "Источников пока нет")
+		msg := tgbotapi.NewMessage(chatId, "📋 Источников пока нет.\n\nДобавьте первый источник через кнопку «Добавить источник»")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
-	msgText := "ID: Название\n"
-	for _, source := range sources {
-		msgText += fmt.Sprintf("%d: %s\n", source.Id, source.Name)
-	}
-	msg := tgbotapi.NewMessage(chatId, msgText)
-	bot.Send(msg)
 
+	msg := tgbotapi.NewMessage(chatId, "📋 *Доступные источники:*\n\nНажмите на источник, чтобы подписаться или отписаться от него")
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.ReplyMarkup = createSourcesKeyboard(sources)
+	bot.Send(msg)
 }
 
 // handleAddSubscription обрабатывает команду /add-sub для добавления подписки на источник
 func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, sourceId string) {
 	if sourceId == "" {
-		msg := tgbotapi.NewMessage(chatId, "Укажите ID источника после команды /add-sub")
+		msg := tgbotapi.NewMessage(chatId, "❌ Укажите ID источника после команды /add-sub")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
 	sourceIdInt, err := strconv.ParseInt(sourceId, 10, 64)
 	if err != nil {
-		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ID источника не выглядит как число: %q.\n Укажите ID источника после команды /add-sub", sourceId))
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ ID источника не выглядит как число: %q.\n Укажите ID источника после команды /add-sub", sourceId))
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -178,7 +201,8 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	_, err = db.FindActiveSourceById(dbConn, sourceIdInt)
 
 	if err != nil {
-		msg := tgbotapi.NewMessage(chatId, "Укажите существующий ID источника после команды /add-sub")
+		msg := tgbotapi.NewMessage(chatId, "❌ Укажите существующий ID источника после команды /add-sub")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -191,24 +215,30 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	err = db.SaveSubscription(dbConn, subscription)
 	if err != nil {
 		log.Printf("Ошибка при добавлении подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Не удалось добавить подписку. Возможно, она уже существует")
+		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось добавить подписку. Возможно, она уже существует")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
+	msg := tgbotapi.NewMessage(chatId, "✅ Подписка успешно добавлена!")
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
 }
 
 // handleDelSubscription обрабатывает команду /del-sub для удаления подписки на источник
 func handleDelSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, sourceId string) {
 	if sourceId == "" {
-		msg := tgbotapi.NewMessage(chatId, "Укажите ID источника после команды /add-sub")
+		msg := tgbotapi.NewMessage(chatId, "❌ Укажите ID источника после команды /delsub")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
 	sourceIdInt, err := strconv.ParseInt(sourceId, 10, 64)
 	if err != nil {
-		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ID источника не выглядит как число: %q.\n Укажите ID источника после команды /add-sub", sourceId))
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ ID источника не выглядит как число: %q.\n Укажите ID источника после команды /delsub", sourceId))
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -216,7 +246,8 @@ func handleDelSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	_, err = db.FindActiveSourceById(dbConn, sourceIdInt)
 
 	if err != nil {
-		msg := tgbotapi.NewMessage(chatId, "Укажите существующий ID источника после команды /add-sub")
+		msg := tgbotapi.NewMessage(chatId, "❌ Укажите существующий ID источника после команды /delsub")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -229,10 +260,15 @@ func handleDelSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	err = db.DeleteSubscription(dbConn, subscription)
 	if err != nil {
 		log.Printf("Ошибка при удалении подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Не удалось удалить подписку. Возможно, она не существует")
+		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось удалить подписку. Возможно, она не существует")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
+
+	msg := tgbotapi.NewMessage(chatId, "✅ Подписка успешно удалена!")
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
 }
 
 // handleLatestNews обрабатывает команду /news для вывода последних новостей
@@ -240,13 +276,15 @@ func handleLatestNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count 
 	news, err := db.GetLatestNewsByUser(dbConn, chatId, count)
 	if err != nil {
 		log.Printf("Ошибка при получении новостей: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Ошибка при получении новостей. Попробуйте позже")
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении новостей. Попробуйте позже")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
 	if len(news) == 0 {
-		msg := tgbotapi.NewMessage(chatId, "Новостей пока нет")
+		msg := tgbotapi.NewMessage(chatId, "📰 Новостей пока нет.\n\nПодпишитесь на источники, чтобы получать новости")
+		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
@@ -260,6 +298,7 @@ func handleLatestNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count 
 	msg := tgbotapi.NewMessage(chatId, message)
 	msg.ParseMode = "Markdown"
 	msg.DisableWebPagePreview = true
+	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
 }
 
@@ -285,15 +324,43 @@ func handleHelp(bot *tgbotapi.BotAPI, chatId int64) {
 *Примеры использования:*
 /add https://tass.ru/rss/v2.xml
 /addsub 1
-/delsub 1`
+/delsub 1
+
+💡 *Совет:* Используйте кнопки меню для более удобной навигации!`
 
 	msg := tgbotapi.NewMessage(chatId, helpText)
 	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
+}
+
+// handleTextMessage обрабатывает обычные текстовые сообщения
+func handleTextMessage(bot *tgbotapi.BotAPI, dbConn *sql.DB, message *tgbotapi.Message) {
+	text := message.Text
+	chatId := message.Chat.ID
+
+	// Проверяем, является ли текст URL
+	if isValidURL(text) {
+		handleAddSource(bot, dbConn, chatId, text)
+		return
+	}
+
+	// Если это не URL, показываем главное меню
+	msg := tgbotapi.NewMessage(chatId, "🏠 *Главное меню*\n\nВыберите действие:")
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
+}
+
+// isValidURL проверяет, является ли строка валидным URL
+func isValidURL(text string) bool {
+	u, err := url.Parse(text)
+	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
 // handleUnknownCommand обрабатывает неизвестные команды
 func handleUnknownCommand(bot *tgbotapi.BotAPI, chatId int64) {
-	msg := tgbotapi.NewMessage(chatId, "Неизвестная команда. Попробуйте /start, /add или /news")
+	msg := tgbotapi.NewMessage(chatId, "Неизвестная команда. Попробуйте /start или используйте кнопки меню")
+	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
 }
