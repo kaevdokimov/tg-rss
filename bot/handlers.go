@@ -29,6 +29,8 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 		switch update.Message.Command() {
 		case "start":
 			handleStart(bot, dbConn, update.Message.Chat.UserName, update.Message.Chat.ID)
+		case "help":
+			handleHelp(bot, update.Message.Chat.ID)
 		case "add":
 			handleAddSource(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
 		case "sources":
@@ -66,14 +68,13 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 		bot.Send(msg)
 	} else {
 		errText = fmt.Sprintf("Пользователь уже существует с chatId %d", user.ChatId)
-		log.Printf(errText)
+		log.Print(errText)
 		msg := tgbotapi.NewMessage(chatId, "Вы уже были подключены к боту 😎")
 		bot.Send(msg)
 		return
 	}
 	log.Printf("Пользователь %s подключился к боту", user.Username)
 
-	// @ToDo: добавить обработку команды /help
 	msg := tgbotapi.NewMessage(chatId, "👋 Привет, я бот для получения новостей с сайтов. Чтобы посмотреть список доступных команд, наберите /help")
 	bot.Send(msg)
 }
@@ -112,6 +113,12 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	bot.Send(msg)
 
 	source, err = db.FindSourceActiveByUrl(dbConn, link)
+	if err != nil {
+		log.Printf("Ошибка при поиске источника: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "Не удалось найти добавленный источник")
+		bot.Send(msg)
+		return
+	}
 
 	var subscription = db.Subscription{
 		ChatId:   chatId,
@@ -119,6 +126,15 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	}
 
 	err = db.SaveSubscription(dbConn, subscription)
+	if err != nil {
+		log.Printf("Ошибка при добавлении подписки: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "Не удалось добавить подписку. Возможно, она уже существует")
+		bot.Send(msg)
+		return
+	}
+
+	successMsg := tgbotapi.NewMessage(chatId, "Подписка на источник успешно добавлена!")
+	bot.Send(successMsg)
 }
 
 // handleShowSources обрабатывает команду /sources для вывода списка источников
@@ -244,6 +260,35 @@ func handleLatestNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count 
 	msg := tgbotapi.NewMessage(chatId, message)
 	msg.ParseMode = "Markdown"
 	msg.DisableWebPagePreview = true
+	bot.Send(msg)
+}
+
+// handleHelp обрабатывает команду /help для вывода справки
+func handleHelp(bot *tgbotapi.BotAPI, chatId int64) {
+	helpText := `📚 *Справка по командам бота*
+
+*Основные команды:*
+/start - Начать работу с ботом
+/help - Показать эту справку
+
+*Работа с источниками:*
+/add <URL> - Добавить новый RSS источник
+/sources - Показать список всех источников
+
+*Управление подписками:*
+/addsub <ID> - Подписаться на источник по ID
+/delsub <ID> - Отписаться от источника по ID
+
+*Получение новостей:*
+/news - Показать последние 10 новостей
+
+*Примеры использования:*
+/add https://tass.ru/rss/v2.xml
+/addsub 1
+/delsub 1`
+
+	msg := tgbotapi.NewMessage(chatId, helpText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
 	bot.Send(msg)
 }
 
