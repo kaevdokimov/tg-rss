@@ -130,6 +130,11 @@ func handleShowSources(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 		bot.Send(msg)
 		return
 	}
+	if len(sources) == 0 {
+		msg := tgbotapi.NewMessage(chatId, "Источников пока нет")
+		bot.Send(msg)
+		return
+	}
 	msgText := "ID: Название\n"
 	for _, source := range sources {
 		msgText += fmt.Sprintf("%d: %s\n", source.Id, source.Name)
