@@ -11,18 +11,121 @@ Telegram-бот для чтения RSS-лент с удобным интерф�
 - 📱 **Удобный интерфейс** - inline-кнопки для навигации
 - 📋 **Управление подписками** - добавление/удаление источников
 - 🗄️ **PostgreSQL** - надежное хранение данных
+- 🚀 **Redpanda** - высокопроизводительная очередь сообщений
 - 🐳 **Docker** - простое развертывание
+
+## 🏗️ Архитектура
+
+```
+RSS Sources → RSS Poller → Redpanda (news-items) → News Processor → PostgreSQL + Telegram Users
+```
+
+1. **RSS Poller** парсит RSS источники и отправляет новости в Redpanda (топик `news-items`)
+2. **News Processor** читает новости из очереди, записывает в БД и отправляет подписанным пользователям
+3. Уведомления отправляются через топик `news-notifications`
+
+### Топики Redpanda:
+- **news-items** - для новых новостей из RSS источников
+- **news-notifications** - для уведомлений пользователям
 
 ## 🛠️ Технологии
 
 - **Go 1.25** - основной язык разработки
 - **PostgreSQL 17.6** - база данных
-- **Redpanda** - очередь сообщений (Kafka-compatible)
+- **Redpanda** - высокопроизводительная очередь сообщений (Kafka-compatible)
 - **Telegram Bot API** - интеграция с Telegram
 - **Docker & Docker Compose** - контейнеризация
 - **gofeed** - парсинг RSS-лент
 
-## 📋 Требования
+## 🚀 Быстрый старт
+
+### Требования
+
+- Docker и Docker Compose
+- Go 1.25+ (для локальной разработки)
+- Telegram Bot Token от [@BotFather](https://t.me/botfather)
+
+### Настройка окружения
+
+1. Скопируйте файл `.env.example` в `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Отредактируйте `.env` файл, указав необходимые настройки:
+   ```env
+   # Telegram Bot Token
+   TELEGRAM_API_KEY=your_telegram_bot_token_here
+
+   # Database Configuration
+   POSTGRES_HOST=news_db
+   POSTGRES_PORT=5432
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=your_secure_password
+   POSTGRES_DB=tg_rss
+
+   # Redpanda Configuration
+   REDPANDA_BROKERS=news_redpanda:9092
+   REDPANDA_NEWS_TOPIC=news-items
+   REDPANDA_NOTIFY_TOPIC=news-notifications
+   ```
+
+### Запуск с Docker Compose
+
+```bash
+# Запуск всех сервисов
+docker-compose up -d
+
+# Просмотр логов
+docker-compose logs -f
+```
+
+### Локальная разработка
+
+1. Запустите зависимости:
+   ```bash
+   docker-compose up -d redpanda db
+   ```
+
+2. Запустите бота локально:
+   ```bash
+   go run main.go
+   ```
+
+## 🔍 Мониторинг и отладка
+
+### Redpanda Web UI
+Доступен по адресу: http://localhost:8082
+- Просмотр топиков и сообщений
+- Мониторинг производительности
+
+### Команды для отладки
+
+```bash
+# Проверить статус Redpanda
+docker exec -it news_redpanda rpk cluster info
+
+# Список топиков
+docker exec -it news_redpanda rpk topic list
+
+# Просмотр сообщений в топике новостей
+docker exec -it news_redpanda rpk topic consume news-items
+
+# Просмотр уведомлений
+docker exec -it news_redpanda rpk topic consume news-notifications
+```
+
+## 🏗️ Архитектурные преимущества
+
+- **Масштабируемость**: Возможность запуска нескольких экземпляров Message Processor
+- **Надежность**: Сообщения сохраняются в Redpanda и не теряются при сбоях
+- **Изоляция**: RSS парсинг и отправка сообщений разделены
+- **Фильтрация**: Отправляются только подписанным пользователям
+- **Производительность**: Асинхронная обработка новостей через брокер сообщений
+
+## 📝 Лицензия
+
+MIT
 
 - Docker и Docker Compose
 - Telegram Bot Token (получить у [@BotFather](https://t.me/BotFather))
@@ -45,14 +148,14 @@ cd tg-rss
 TELEGRAM_API_KEY=your_telegram_bot_token_here
 
 # PostgreSQL Configuration
-POSTGRES_HOST=db
+POSTGRES_HOST=news_db
 POSTGRES_PORT=5432
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_secure_password
 POSTGRES_DB=news_bot
 
 # Redpanda Configuration
-REDPANDA_BROKERS=redpanda:9092
+REDPANDA_BROKERS=news_redpanda:9092
 REDPANDA_NEWS_TOPIC=news-items
 REDPANDA_NOTIFY_TOPIC=news-notifications
 
