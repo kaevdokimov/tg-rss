@@ -40,8 +40,6 @@ func handleCallback(bot *tgbotapi.BotAPI, dbConn *sql.DB, callback *tgbotapi.Cal
 		handleSubscribe(bot, dbConn, chatId, data)
 	case strings.HasPrefix(data, "unsubscribe_"):
 		handleUnsubscribe(bot, dbConn, chatId, data)
-	case strings.HasPrefix(data, "share_link_"):
-		handleShareNews(bot, dbConn, chatId, data)
 	case strings.HasPrefix(data, "copy_link_"):
 		handleCopyLink(bot, chatId, data)
 	case strings.HasPrefix(data, "news_page_"):
@@ -274,30 +272,6 @@ func handleUnknownCallback(bot *tgbotapi.BotAPI, chatId int64) {
 	bot.Send(msg)
 }
 
-// handleShareNews обрабатывает запрос на поделиться новостью
-func handleShareNews(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data string) {
-	parts := strings.Split(data, "_")
-	if len(parts) < 3 {
-		handleUnknownCallback(bot, chatId)
-		return
-	}
-
-	// Восстанавливаем ссылку из частей (share_link_https://example.com -> https://example.com)
-	link := strings.Join(parts[2:], "_")
-
-	// Получаем заголовок новости из БД по ссылке
-	title, err := getNewsTitleByLink(dbConn, link)
-	if err != nil {
-		log.Printf("Ошибка при получении заголовка новости: %v", err)
-		title = "Новость" // fallback заголовок
-	}
-
-	msg := tgbotapi.NewMessage(chatId, "📤 *Поделиться новостью:*\n\nИспользуйте кнопку ниже для шаринга")
-	msg.ParseMode = tgbotapi.ModeMarkdown
-	msg.ReplyMarkup = createShareKeyboard(link, title)
-	bot.Send(msg)
-}
-
 // handleCopyLink обрабатывает запрос на копирование ссылки
 func handleCopyLink(bot *tgbotapi.BotAPI, chatId int64, data string) {
 	parts := strings.Split(data, "_")
@@ -331,15 +305,4 @@ func handleNewsPage(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data str
 	// Пока что просто показываем первые 10 новостей
 	// В будущем можно добавить настоящую пагинацию
 	handleLatestNewsImproved(bot, dbConn, chatId, 10)
-}
-
-// getNewsTitleByLink получает заголовок новости по ссылке из БД
-func getNewsTitleByLink(dbConn *sql.DB, link string) (string, error) {
-	var title string
-	query := "SELECT title FROM news WHERE link = $1 LIMIT 1"
-	err := dbConn.QueryRow(query, link).Scan(&title)
-	if err != nil {
-		return "", err
-	}
-	return title, nil
 }

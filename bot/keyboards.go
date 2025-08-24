@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"net/url"
 	"tg-rss/db"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -122,7 +121,6 @@ func createNewsKeyboard(link string, _ int64) tgbotapi.InlineKeyboardMarkup {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL("📖 Читать", link),
-			tgbotapi.NewInlineKeyboardButtonData("📤 Поделиться", fmt.Sprintf("share_link_%s", link)),
 			tgbotapi.NewInlineKeyboardButtonData("🏠 Меню", "main_menu"),
 		),
 	)
@@ -167,42 +165,4 @@ func createNewsListKeyboard(currentPage, totalPages int, hasMore bool) tgbotapi.
 	rows = append(rows, refreshRow)
 
 	return tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
-}
-
-// createShareKeyboard создает клавиатуру для поделиться новостью
-func createShareKeyboard(link, title string) tgbotapi.InlineKeyboardMarkup {
-	// URL-кодируем параметры для безопасной передачи
-	encodedLink := url.QueryEscape(link)
-	encodedTitle := url.QueryEscape(title)
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("📤 Поделиться в Telegram", fmt.Sprintf("https://t.me/share/url?url=%s&text=%s", encodedLink, encodedTitle)),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📋 Скопировать ссылку", fmt.Sprintf("copy_link_%s", link)),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔙 Назад", "back_to_news"),
-		),
-	)
-	return keyboard
-}
-
-// createNewsFilterKeyboard создает клавиатуру для фильтрации новостей
-func createNewsFilterKeyboard() tgbotapi.InlineKeyboardMarkup {
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📰 Все новости", "news_all"),
-			tgbotapi.NewInlineKeyboardButtonData("⭐ Избранные", "news_favorites"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🕐 Сегодня", "news_today"),
-			tgbotapi.NewInlineKeyboardButtonData("📅 Неделя", "news_week"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔙 Назад", "main_menu"),
-		),
-	)
-	return keyboard
 }
