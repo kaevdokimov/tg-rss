@@ -14,9 +14,16 @@ func formatNewsMessage(title, description string, publishedAt time.Time, sourceN
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
+	if trimmedDesc == "" {
+		return fmt.Sprintf(
+			"📰 *%s* | %s\n\n⏰ %s",
+			title, sourceName, relativeTime,
+		)
+	}
+
 	return fmt.Sprintf(
-		"📰 *%s*\n\n%s\n\n⏰ %s \t📰 Источник: %s",
-		title, trimmedDesc, relativeTime, sourceName,
+		"📰 *%s* | %s\n\n%s\n\n⏰ %s",
+		title, sourceName, trimmedDesc, relativeTime,
 	)
 }
 
@@ -28,9 +35,16 @@ func formatMessage(i int, title, description string, publishedAt time.Time, sour
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
+	if trimmedDesc == "" {
+		return fmt.Sprintf(
+			"%d. 📰 *%s* | %s\n\n⏰ %s\n\n\n",
+			i, title, sourceName, relativeTime,
+		)
+	}
+
 	return fmt.Sprintf(
-		"%d. 📰 *%s*\n\n%s\n\n ⏰ %s \t📰 Источник: %s\n\n",
-		i, title, trimmedDesc, relativeTime, sourceName,
+		"%d. 📰 *%s* | %s\n\n%s\n\n ⏰ %s\n\n\n",
+		i, title, sourceName, trimmedDesc, relativeTime,
 	)
 }
 

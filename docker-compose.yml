@@ -1,46 +1,74 @@
 services:
   bot:
     build: .
-    container_name: news_bot
+    container_name: bot
     depends_on:
       - db
-      - redpanda
+      - kafka
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
-      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_HOST: ${POSTGRES_HOST:-"db"}
       POSTGRES_PORT: ${POSTGRES_PORT:-"5432"}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
-      REDPANDA_BROKERS: ${REDPANDA_BROKERS:-"redpanda:9092"}
-      REDPANDA_NEWS_TOPIC: ${REDPANDA_NEWS_TOPIC:-"news-items"}
-      REDPANDA_NOTIFY_TOPIC: ${REDPANDA_NOTIFY_TOPIC:-"news-notifications"}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-"kafka:29092"}
+      KAFKA_NEWS_TOPIC: ${KAFKA_NEWS_TOPIC:-"news-items"}
+      KAFKA_NOTIFY_TOPIC: ${KAFKA_NOTIFY_TOPIC:-"news-notifications"}
     restart: always
 
-  redpanda:
-    image: redpandadata/redpanda:latest
-    container_name: news_redpanda
-    command:
-      - redpanda
-      - start
-      - --smp 1
-      - --memory 256M
-      - --reserve-memory 0M
-      - --overprovisioned
-      - --node-id 0
-      - --check=false
-      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
-      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
-      - --pandaproxy-addr 0.0.0.0:8082
-      - --advertise-pandaproxy-addr localhost:8082
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.10
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.10
+    container_name: kafka
+    depends_on:
+      - zookeeper
+      - db
     ports:
       - "9092:9092"
-      - "8082:8082"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     restart: always
 
   db:
     image: postgres:17.6-alpine3.22
-    container_name: news_db
+    container_name: db
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}

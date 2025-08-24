@@ -404,7 +404,7 @@ func handleTextMessage(bot *tgbotapi.BotAPI, dbConn *sql.DB, message *tgbotapi.M
 	}
 
 	// Если это не URL, показываем главное меню
-	msg := tgbotapi.NewMessage(chatId, "🏠 *Главное меню*\n\nВыберите действие:")
+	msg := tgbotapi.NewMessage(chatId, "🏠\n\nВыберите действие:")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)

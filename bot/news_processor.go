@@ -4,13 +4,13 @@ import (
 	"database/sql"
 	"log"
 	"tg-rss/db"
-	"tg-rss/redpanda"
+	"tg-rss/kafka"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// NewsProcessor обрабатывает новости из Redpanda и записывает в БД
+// NewsProcessor обрабатывает новости из Kafka и записывает в БД
 type NewsProcessor struct {
 	db  *sql.DB
 	bot *tgbotapi.BotAPI
@@ -24,8 +24,8 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 	}
 }
 
-// ProcessNewsItem обрабатывает новость из Redpanda
-func (np *NewsProcessor) ProcessNewsItem(newsItem redpanda.NewsItem) error {
+// ProcessNewsItem обрабатывает новость из Kafka
+func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 	// Парсим время публикации
 	publishedAt, err := time.Parse("2006-01-02 15:04:05", newsItem.PublishedAt)
 	if err != nil {

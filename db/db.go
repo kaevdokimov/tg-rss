@@ -52,8 +52,119 @@ type Subscription struct {
 }
 
 type Message struct {
-	ChatId int64
-	NewsId int64
+	ChatId    int64     `json:"chat_id"`
+	NewsId    int64     `json:"news_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SaveNews сохраняет новость в БД и возвращает её ID
+func SaveNews(db *sql.DB, sourceID int64, title, description, link string, publishedAt time.Time) (int64, error) {
+	var id int64
+	err := db.QueryRow(`
+		INSERT INTO news (source_id, title, description, link, published_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (link) DO UPDATE 
+		SET updated_at = NOW()
+		RETURNING id
+	`, sourceID, title, description, link, publishedAt).Scan(&id)
+
+	if err != nil {
+		return 0, fmt.Errorf("ошибка при сохранении новости: %v", err)
+	}
+
+	return id, nil
+}
+
+// SaveMessage сохраняет информацию об отправленном уведомлении
+func SaveMessage(tx *sql.Tx, chatID, newsID int64) error {
+	_, err := tx.Exec(`
+		INSERT INTO messages (chat_id, news_id)
+		VALUES ($1, $2)
+		ON CONFLICT (chat_id, news_id) DO NOTHING
+	`, chatID, newsID)
+
+	if err != nil {
+		return fmt.Errorf("ошибка при сохранении сообщения: %v", err)
+	}
+
+	return nil
+}
+
+// SendNewsToSubscribers отправляет новость подписчикам, если они ещё не получали её
+func SendNewsToSubscribers(db *sql.DB, chatIDs []int64, sourceID int64, title, description, link string, publishedAt time.Time) ([]int64, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("не удалось начать транзакцию: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Проверяем, есть ли уже такая новость в базе
+	var existingNewsID int64
+	err = tx.QueryRow(`
+		SELECT id FROM news 
+		WHERE source_id = $1 AND link = $2
+	`, sourceID, link).Scan(&existingNewsID)
+
+	var newsID int64
+	if err == sql.ErrNoRows {
+		// Новости нет в базе, сохраняем её
+		newsID, err = SaveNews(db, sourceID, title, description, link, publishedAt)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка при сохранении новости: %v", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("ошибка при проверке существующей новости: %v", err)
+	} else {
+		// Используем существующую новость
+		newsID = existingNewsID
+	}
+
+	var sentTo []int64
+
+	// Отправляем уведомления
+	for _, chatID := range chatIDs {
+		// Проверяем, не отправляли ли уже эту новость пользователю
+		sent, err := IsNewsSentToUser(db, chatID, sourceID, link)
+		if err != nil {
+			log.Printf("Ошибка при проверке отправленной новости: %v", err)
+			continue
+		}
+		if sent {
+			log.Printf("Новость уже была отправлена пользователю %d", chatID)
+			continue
+		}
+
+		// Сохраняем сообщение
+		if err := SaveMessage(tx, chatID, newsID); err != nil {
+			log.Printf("Ошибка при сохранении уведомления: %v", err)
+			continue
+		}
+
+		sentTo = append(sentTo, chatID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("ошибка при фиксации транзакции: %v", err)
+	}
+
+	return sentTo, nil
+}
+
+// IsNewsSentToUser проверяет, была ли уже отправлена новость пользователю
+func IsNewsSentToUser(db *sql.DB, chatID, sourceID int64, link string) (bool, error) {
+	var count int
+	err := db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM messages m
+		JOIN news n ON m.news_id = n.id
+		WHERE m.chat_id = $1 AND n.source_id = $2 AND n.link = $3
+	`, chatID, sourceID, link).Scan(&count)
+
+	if err != nil {
+		return false, fmt.Errorf("ошибка при проверке отправленной новости: %v", err)
+	}
+
+	return count > 0, nil
 }
 
 func Connect(config *config.DBConfig) (*sql.DB, error) {
@@ -140,6 +251,13 @@ func InitSchema(db *sql.DB) {
 	CREATE TRIGGER trg_lowercase_url
 	BEFORE INSERT OR UPDATE ON sources
 	FOR EACH ROW EXECUTE FUNCTION lowercase_url();
+
+	INSERT INTO public.sources ("name",url,created_at,status) VALUES
+	 ('Lenta.ru','https://lenta.ru/rss/google-newsstand/main/','2025-08-24 02:26:05.39313','active'::public."status_enum"),
+	 ('Ria.ru','https://ria.ru/export/rss2/index.xml?page_type=google_newsstand','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+	 ('Rssexport.rbc.ru','https://rssexport.rbc.ru/rbcnews/news/30/full.rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
+	 ('Tass.ru','https://tass.ru/rss/v2.xml','2025-08-24 02:26:11.897401','active'::public."status_enum"),
+	 ('Government.ru','http://government.ru/all/rss/','2025-08-24 02:26:14.245899','active'::public."status_enum");
 	`
 	_, err := db.Exec(query)
 	if err != nil {

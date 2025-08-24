@@ -41,7 +41,7 @@ func createSourcesKeyboard(sources []db.Source) tgbotapi.InlineKeyboardMarkup {
 
 	// Добавляем кнопку "Назад"
 	backRow := tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🔙 Назад", "main_menu"),
+		tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),
 	)
 	rows = append(rows, backRow)
 
@@ -69,7 +69,7 @@ func createSubscriptionKeyboard(sourceId int64, isSubscribed bool) tgbotapi.Inli
 			tgbotapi.NewInlineKeyboardButtonData("🔙 Назад к источникам", "sources"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 Главное меню", "main_menu"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),
 		),
 	)
 	return keyboard
@@ -79,7 +79,7 @@ func createSubscriptionKeyboard(sourceId int64, isSubscribed bool) tgbotapi.Inli
 func createAddSourceKeyboard() tgbotapi.InlineKeyboardMarkup {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔙 Назад", "main_menu"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),
 		),
 	)
 	return keyboard
@@ -109,7 +109,7 @@ func createMySubscriptionsKeyboard(subscriptions []db.Subscription, sources []db
 
 	// Добавляем кнопку "Назад"
 	backRow := tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🔙 Назад", "main_menu"),
+		tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),
 	)
 	rows = append(rows, backRow)
 
@@ -121,7 +121,7 @@ func createNewsKeyboard(link string, _ int64) tgbotapi.InlineKeyboardMarkup {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL("📖 Читать", link),
-			tgbotapi.NewInlineKeyboardButtonData("🏠 Меню", "main_menu"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),
 		),
 	)
 	return keyboard
@@ -160,7 +160,7 @@ func createNewsListKeyboard(currentPage, totalPages int, hasMore bool) tgbotapi.
 	// Кнопка обновления
 	refreshRow := tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("🔄 Обновить", "news"),
-		tgbotapi.NewInlineKeyboardButtonData("🏠 Главное меню", "main_menu"),
+		tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),
 	)
 	rows = append(rows, refreshRow)
 

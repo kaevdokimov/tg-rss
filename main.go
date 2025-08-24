@@ -8,7 +8,7 @@ import (
 	"tg-rss/bot"
 	"tg-rss/config"
 	"tg-rss/db"
-	"tg-rss/redpanda"
+	"tg-rss/kafka"
 	"time"
 )
 
@@ -16,7 +16,7 @@ func main() {
 	// Настройки
 	cfgDB := config.LoadDBConfig()
 	cfgTgBot := config.LoadTgBotConfig()
-	cfgRedpanda := config.LoadRedpandaConfig()
+	cfgKafka := config.LoadKafkaConfig()
 
 	// Инициализация базы данных
 	dbConn, err := db.Connect(cfgDB)
@@ -33,41 +33,41 @@ func main() {
 		log.Printf("Предупреждение: не удалось обновить названия источников: %v", err)
 	}
 
-	// Инициализация Redpanda producer с retry
-	var redpandaProducer *redpanda.Producer
+	// Инициализация Kafka producer с retry
+	var kafkaProducer *kafka.Producer
 	maxRetries := 5
 	for i := 0; i < maxRetries; i++ {
-		redpandaProducer, err = redpanda.NewProducer(cfgRedpanda)
+		kafkaProducer, err = kafka.NewProducer(cfgKafka)
 		if err != nil {
-			log.Printf("Ошибка создания Redpanda producer (попытка %d/%d): %v", i+1, maxRetries, err)
+			log.Printf("Ошибка создания Kafka producer (попытка %d/%d): %v", i+1, maxRetries, err)
 			if i < maxRetries-1 {
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			log.Fatalf("Не удалось создать Redpanda producer после %d попыток", maxRetries)
+			log.Fatalf("Не удалось создать Kafka producer после %d попыток", maxRetries)
 		}
 		break
 	}
-	defer redpandaProducer.Close()
+	defer kafkaProducer.Close()
 
-	// Инициализация Redpanda consumer с retry
-	var redpandaConsumer *redpanda.Consumer
+	// Инициализация Kafka consumer с retry
+	var kafkaConsumer *kafka.Consumer
 	for i := 0; i < maxRetries; i++ {
-		redpandaConsumer, err = redpanda.NewConsumer(cfgRedpanda)
+		kafkaConsumer, err = kafka.NewConsumer(cfgKafka)
 		if err != nil {
-			log.Printf("Ошибка создания Redpanda consumer (попытка %d/%d): %v", i+1, maxRetries, err)
+			log.Printf("Ошибка создания Kafka consumer (попытка %d/%d): %v", i+1, maxRetries, err)
 			if i < maxRetries-1 {
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			log.Fatalf("Не удалось создать Redpanda consumer после %d попыток", maxRetries)
+			log.Fatalf("Не удалось создать Kafka consumer после %d попыток", maxRetries)
 		}
 		break
 	}
-	defer redpandaConsumer.Close()
+	defer kafkaConsumer.Close()
 
-	// Запуск бота с Redpanda
-	bot.StartBotWithRedpanda(cfgTgBot, dbConn, redpandaProducer, redpandaConsumer)
+	// Запуск бота с Kafka
+	bot.StartBotWithKafka(cfgTgBot, dbConn, kafkaProducer, kafkaConsumer)
 
 	// Ожидание сигнала завершения
 	sigChan := make(chan os.Signal, 1)

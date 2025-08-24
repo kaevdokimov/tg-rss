@@ -20,7 +20,7 @@ type TgBotConfig struct {
 	Timeout int
 }
 
-type RedpandaConfig struct {
+type KafkaConfig struct {
 	Brokers     []string
 	NewsTopic   string
 	NotifyTopic string
@@ -32,7 +32,7 @@ func LoadDBConfig() *DBConfig {
 		log.Fatalf("Некорректный порт БД: %v", err)
 	}
 	return &DBConfig{
-		DBHost: getEnv("POSTGRES_HOST", ""),
+		DBHost: getEnv("POSTGRES_HOST", "db"),
 		DBPort: port,
 		DBUser: getEnv("POSTGRES_USER", "postgres"),
 		DBPass: getEnv("POSTGRES_PASSWORD", "password"),
@@ -56,13 +56,13 @@ func LoadTgBotConfig() *TgBotConfig {
 	}
 }
 
-func LoadRedpandaConfig() *RedpandaConfig {
-	brokers := getEnv("REDPANDA_BROKERS", "localhost:9092")
-	log.Printf("Redpanda brokers: %s", brokers)
-	return &RedpandaConfig{
+func LoadKafkaConfig() *KafkaConfig {
+	brokers := getEnv("KAFKA_BROKERS", "kafka:29092")
+	log.Printf("Kafka brokers: %s", brokers)
+	return &KafkaConfig{
 		Brokers:     []string{brokers},
-		NewsTopic:   getEnv("REDPANDA_NEWS_TOPIC", "news-items"),
-		NotifyTopic: getEnv("REDPANDA_NOTIFY_TOPIC", "news-notifications"),
+		NewsTopic:   getEnv("KAFKA_NEWS_TOPIC", "news-items"),
+		NotifyTopic: getEnv("KAFKA_NOTIFY_TOPIC", "news-notifications"),
 	}
 }
 

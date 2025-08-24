@@ -53,7 +53,7 @@ func handleCallback(bot *tgbotapi.BotAPI, dbConn *sql.DB, callback *tgbotapi.Cal
 
 // handleMainMenu показывает главное меню
 func handleMainMenu(bot *tgbotapi.BotAPI, chatId int64) {
-	msg := tgbotapi.NewMessage(chatId, "🏠 *Главное меню*\n\nВыберите действие:")
+	msg := tgbotapi.NewMessage(chatId, "🏠\n\nВыберите действие:")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMainKeyboard()
 	bot.Send(msg)
