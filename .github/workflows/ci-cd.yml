@@ -129,6 +129,9 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p $SSH_PORT $SSH_HOST >> ~/.ssh/known_hosts
 
+          # Копируем docker-compose.yml на сервер
+          scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:/tmp/docker-compose.yml
+
           # Выполнение команд на сервере
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
             set -e
@@ -137,36 +140,31 @@ jobs:
             # Логин в GitHub Container Registry
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Останавливаем старый контейнер
-            docker stop bot || true
-            docker rm bot || true
+            # Создаем .env файл с переменными окружения
+            cat > /tmp/.env << 'EOL'
+            TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }}
+            POSTGRES_HOST=db
+            POSTGRES_PORT=5432
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            KAFKA_BROKERS=kafka:29092
+            KAFKA_NEWS_TOPIC=news-items
+            KAFKA_NOTIFY_TOPIC=news-notifications
+            TZ=Europe/Moscow
+            TIMEOUT=60
+            EOL
 
-            # Загружаем новый образ
-            docker pull $DOCKER_IMAGE
+            # Останавливаем и удаляем все контейнеры
+            docker-compose -f /tmp/docker-compose.yml --env-file /tmp/.env down -v --remove-orphans || true
 
-            # Запускаем новый контейнер
-            docker run -d --name bot \
-              --restart=always \
-              --network=host \
-              -e TELEGRAM_API_KEY='${{ secrets.TELEGRAM_API_KEY }}' \
-              -e POSTGRES_HOST='${{ secrets.POSTGRES_HOST || 'localhost' }}' \
-              -e POSTGRES_PORT='${{ secrets.POSTGRES_PORT || '5432' }}' \
-              -e POSTGRES_USER='${{ secrets.POSTGRES_USER }}' \
-              -e POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}' \
-              -e POSTGRES_DB='${{ secrets.POSTGRES_DB }}' \
-              -e KAFKA_BROKERS='${{ secrets.KAFKA_BROKERS || 'localhost:29092' }}' \
-              -e KAFKA_NEWS_TOPIC='${{ secrets.KAFKA_NEWS_TOPIC || 'news-items' }}' \
-              -e KAFKA_NOTIFY_TOPIC='${{ secrets.KAFKA_NOTIFY_TOPIC || 'news-notifications' }}' \
-              -e TZ='${{ secrets.TZ || 'Europe/Moscow' }}' \
-              -e TIMEOUT='${{ secrets.TIMEOUT || '60' }}' \
-              --log-opt max-size=10m \
-              --log-opt max-file=5 \
-              $DOCKER_IMAGE
+            # Запускаем все сервисы через docker-compose
+            docker-compose -f /tmp/docker-compose.yml --env-file /tmp/.env up -d
 
-            # Проверяем, что контейнер запустился
-            sleep 10
-            docker ps | grep bot || exit 1
-            echo '✅ Деплой успешно завершен'
+            # Проверяем, что контейнеры запустились
+            sleep 15
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper|kafka-ui)' || exit 1
+            echo '✅ Все сервисы успешно запущены'
 
             # Очищаем неиспользуемые образы
             docker image prune -af
