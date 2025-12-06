@@ -12,27 +12,27 @@ func TestParseRSS(t *testing.T) {
 	
 	// Пропускаем тест, если нет интернета или RSS недоступен
 	// В production лучше использовать mock
-	t.Skip("Skipping integration test - requires network access")
+	t.Skip("Пропуск интеграционного теста - требуется доступ к сети")
 	
 	url := "https://lenta.ru/rss/google-newsstand/main/"
 	newsList, err := ParseRSS(url, tz)
 	
 	if err != nil {
-		t.Fatalf("Failed to parse RSS: %v", err)
+		t.Fatalf("Ошибка парсинга RSS: %v", err)
 	}
 	
 	if len(newsList) == 0 {
-		t.Error("Expected at least one news item")
+		t.Error("Ожидалась хотя бы одна новость")
 	}
 	
 	// Проверяем структуру первой новости
 	if len(newsList) > 0 {
 		news := newsList[0]
 		if news.Title == "" {
-			t.Error("Expected non-empty title")
+			t.Error("Ожидался непустой заголовок")
 		}
 		if news.Link == "" {
-			t.Error("Expected non-empty link")
+			t.Error("Ожидалась непустая ссылка")
 		}
 	}
 }
@@ -44,6 +44,6 @@ func TestParseRSSInvalidURL(t *testing.T) {
 	_, err := ParseRSS(invalidURL, tz)
 	
 	if err == nil {
-		t.Error("Expected error for invalid URL")
+		t.Error("Ожидалась ошибка для невалидного URL")
 	}
 }

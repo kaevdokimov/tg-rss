@@ -2,11 +2,9 @@ package kafka
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
-	"sort"
 	"time"
 
 	"tg-rss/config"
@@ -106,82 +104,6 @@ func (p *Producer) SendNewsNotification(notification NewsNotification) error {
 	}
 
 	log.Printf("Сообщение отправлено в Kafka: topic=%s, partition=%d, offset=%d", p.notifyTopic, partition, offset)
-	return nil
-}
-
-// SendNewsToSubscribers отправляет новость всем подписчикам источника с проверкой на дубликаты
-func (p *Producer) SendNewsToSubscribers(db *sql.DB, chatIDs []int64, news NewsItem, sourceID int64, sourceName string) error {
-	// Сортируем chatIDs для детерминированного порядка
-	sort.Slice(chatIDs, func(i, j int) bool { return chatIDs[i] < chatIDs[j] })
-
-	// Получаем ID новости по ссылке или создаем новую запись
-	var newsID int64
-	err := db.QueryRow(
-		`INSERT INTO news (title, description, link, published_at, source_id) 
-		  VALUES ($1, $2, $3, $4, $5) 
-		  ON CONFLICT (link) DO UPDATE SET title = $1, description = $2, published_at = $4
-		  RETURNING id`,
-		news.Title,
-		news.Description,
-		news.Link,
-		time.Now(), // Используем текущее время, так как PublishedAt уже парсится в rss.ParseRSS
-		sourceID,
-	).Scan(&newsID)
-
-	if err != nil {
-		return fmt.Errorf("ошибка сохранения новости в БД: %v", err)
-	}
-
-	// Отправляем уведомления каждому подписчику
-	for _, chatID := range chatIDs {
-		// Проверяем, не отправляли ли уже эту новость пользователю
-		var count int
-		err := db.QueryRow(
-			`SELECT COUNT(*) FROM messages 
-			 WHERE chat_id = $1 AND news_id = $2`,
-			chatID, newsID,
-		).Scan(&count)
-
-		if err != nil {
-			log.Printf("Ошибка проверки отправленной новости: %v", err)
-			continue
-		}
-
-		if count > 0 {
-			log.Printf("Новость %d уже отправлялась пользователю %d, пропускаем", newsID, chatID)
-			continue
-		}
-
-		// Отправляем уведомление
-		notification := NewsNotification{
-			ChatID:      chatID,
-			NewsID:      newsID,
-			SourceID:    sourceID,
-			SourceName:  sourceName,
-			Title:       news.Title,
-			Description: news.Description,
-			Link:        news.Link,
-			PublishedAt: news.PublishedAt,
-		}
-
-		if err := p.SendNewsNotification(notification); err != nil {
-			log.Printf("Ошибка отправки уведомления пользователю %d: %v", chatID, err)
-			continue
-		}
-
-		// Помечаем новость как отправленную
-		_, err = db.Exec(
-			`INSERT INTO messages (chat_id, news_id, sent_at) 
-			 VALUES ($1, $2, $3) 
-			 ON CONFLICT (chat_id, news_id) DO NOTHING`,
-			chatID, newsID, time.Now(),
-		)
-
-		if err != nil {
-			log.Printf("Ошибка пометки новости как отправленной: %v", err)
-		}
-	}
-
 	return nil
 }
 

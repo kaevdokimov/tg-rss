@@ -51,16 +51,16 @@ func TestLoadDBConfig(t *testing.T) {
 
 	cfg := LoadDBConfig()
 	if cfg.DBHost != "db" {
-		t.Errorf("Expected DBHost 'db', got '%s'", cfg.DBHost)
+		t.Errorf("Ожидался DBHost 'db', получено '%s'", cfg.DBHost)
 	}
 	if cfg.DBPort != 5432 {
-		t.Errorf("Expected DBPort 5432, got %d", cfg.DBPort)
+		t.Errorf("Ожидался DBPort 5432, получено %d", cfg.DBPort)
 	}
 	if cfg.DBUser != "postgres" {
-		t.Errorf("Expected DBUser 'postgres', got '%s'", cfg.DBUser)
+		t.Errorf("Ожидался DBUser 'postgres', получено '%s'", cfg.DBUser)
 	}
 	if cfg.DBName != "news_bot" {
-		t.Errorf("Expected DBName 'news_bot', got '%s'", cfg.DBName)
+		t.Errorf("Ожидался DBName 'news_bot', получено '%s'", cfg.DBName)
 	}
 
 	// Тест с кастомными значениями
@@ -72,19 +72,19 @@ func TestLoadDBConfig(t *testing.T) {
 
 	cfg = LoadDBConfig()
 	if cfg.DBHost != "test-host" {
-		t.Errorf("Expected DBHost 'test-host', got '%s'", cfg.DBHost)
+		t.Errorf("Ожидался DBHost 'test-host', получено '%s'", cfg.DBHost)
 	}
 	if cfg.DBPort != 3306 {
-		t.Errorf("Expected DBPort 3306, got %d", cfg.DBPort)
+		t.Errorf("Ожидался DBPort 3306, получено %d", cfg.DBPort)
 	}
 	if cfg.DBUser != "test-user" {
-		t.Errorf("Expected DBUser 'test-user', got '%s'", cfg.DBUser)
+		t.Errorf("Ожидался DBUser 'test-user', получено '%s'", cfg.DBUser)
 	}
 	if cfg.DBPass != "test-pass" {
-		t.Errorf("Expected DBPass 'test-pass', got '%s'", cfg.DBPass)
+		t.Errorf("Ожидался DBPass 'test-pass', получено '%s'", cfg.DBPass)
 	}
 	if cfg.DBName != "test-db" {
-		t.Errorf("Expected DBName 'test-db', got '%s'", cfg.DBName)
+		t.Errorf("Ожидался DBName 'test-db', получено '%s'", cfg.DBName)
 	}
 }
 
@@ -118,12 +118,12 @@ func TestLoadKafkaConfig(t *testing.T) {
 
 	cfg := LoadKafkaConfig()
 	if len(cfg.Brokers) == 0 || cfg.Brokers[0] != "kafka:29092" {
-		t.Errorf("Expected default broker 'kafka:29092', got '%v'", cfg.Brokers)
+		t.Errorf("Ожидался брокер по умолчанию 'kafka:29092', получено '%v'", cfg.Brokers)
 	}
 	if cfg.NewsTopic != "news-items" {
-		t.Errorf("Expected NewsTopic 'news-items', got '%s'", cfg.NewsTopic)
+		t.Errorf("Ожидался NewsTopic 'news-items', получено '%s'", cfg.NewsTopic)
 	}
 	if cfg.NotifyTopic != "news-notifications" {
-		t.Errorf("Expected NotifyTopic 'news-notifications', got '%s'", cfg.NotifyTopic)
+		t.Errorf("Ожидался NotifyTopic 'news-notifications', получено '%s'", cfg.NotifyTopic)
 	}
 }

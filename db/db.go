@@ -331,26 +331,6 @@ func DeleteSubscription(db *sql.DB, subscription Subscription) error {
 	return err
 }
 
-func GetActiveSources(db *sql.DB) ([]Source, error) {
-	query := `SELECT id, name, url, status FROM sources WHERE status = $1 order by id`
-	rows, err := db.Query(query, Active)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var sources []Source
-	for rows.Next() {
-		var item Source
-		if err := rows.Scan(&item.Id, &item.Name, &item.Url, &item.Status); err != nil {
-			return nil, err
-		}
-		sources = append(sources, item)
-	}
-
-	return sources, nil
-}
-
 func FindActiveSources(db *sql.DB) ([]Source, error) {
 	query := `SELECT id, name, url, status FROM sources WHERE status = $1`
 	rows, err := db.Query(query, Active)
@@ -424,50 +404,6 @@ func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]NewsWithSource,
 	}
 
 	return news, nil
-}
-
-// GetLatestNewsByUserSimple возвращает последние новости без информации об источнике
-func GetLatestNewsByUserSimple(db *sql.DB, chatId int64, count int) ([]News, error) {
-	query := `SELECT n.id, n.title, n.description, n.link, n.published_at 
-			  FROM news n 
-			  WHERE n.source_id IN (SELECT source_id FROM subscriptions WHERE chat_id = $1) 
-			  ORDER BY n.published_at DESC LIMIT $2`
-	rows, err := db.Query(query, chatId, count)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var news []News
-	for rows.Next() {
-		var item News
-		if err := rows.Scan(&item.Id, &item.Title, &item.Description, &item.Link, &item.PublishedAt); err != nil {
-			return nil, err
-		}
-		news = append(news, item)
-	}
-
-	return news, nil
-}
-
-func GetUserSubscriptions(db *sql.DB, chatId int64) ([]Source, error) {
-	query := `SELECT id, name, url FROM sources WHERE id IN (SELECT source_id FROM subscriptions WHERE chat_id = $1)`
-	rows, err := db.Query(query, chatId)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var sources []Source
-	for rows.Next() {
-		var item Source
-		if err := rows.Scan(&item.Id, &item.Name, &item.Url); err != nil {
-			return nil, err
-		}
-		sources = append(sources, item)
-	}
-
-	return sources, nil
 }
 
 // GetSubscriptions: получить подписков на источник

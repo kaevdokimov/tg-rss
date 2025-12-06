@@ -20,25 +20,25 @@ func TestMetrics(t *testing.T) {
 	metrics := GetMetrics()
 
 	if metrics.RSSPollsTotal != 1 {
-		t.Errorf("Expected RSSPollsTotal=1, got %d", metrics.RSSPollsTotal)
+		t.Errorf("Ожидался RSSPollsTotal=1, получено %d", metrics.RSSPollsTotal)
 	}
 	if metrics.RSSItemsProcessed != 1 {
-		t.Errorf("Expected RSSItemsProcessed=1, got %d", metrics.RSSItemsProcessed)
+		t.Errorf("Ожидался RSSItemsProcessed=1, получено %d", metrics.RSSItemsProcessed)
 	}
 	if metrics.KafkaMessagesProduced != 1 {
-		t.Errorf("Expected KafkaMessagesProduced=1, got %d", metrics.KafkaMessagesProduced)
+		t.Errorf("Ожидался KafkaMessagesProduced=1, получено %d", metrics.KafkaMessagesProduced)
 	}
 	if metrics.KafkaMessagesConsumed != 1 {
-		t.Errorf("Expected KafkaMessagesConsumed=1, got %d", metrics.KafkaMessagesConsumed)
+		t.Errorf("Ожидался KafkaMessagesConsumed=1, получено %d", metrics.KafkaMessagesConsumed)
 	}
 	if metrics.TelegramMessagesSent != 1 {
-		t.Errorf("Expected TelegramMessagesSent=1, got %d", metrics.TelegramMessagesSent)
+		t.Errorf("Ожидался TelegramMessagesSent=1, получено %d", metrics.TelegramMessagesSent)
 	}
 	if metrics.TelegramCommandsTotal != 1 {
-		t.Errorf("Expected TelegramCommandsTotal=1, got %d", metrics.TelegramCommandsTotal)
+		t.Errorf("Ожидался TelegramCommandsTotal=1, получено %d", metrics.TelegramCommandsTotal)
 	}
 	if metrics.DBQueriesTotal != 1 {
-		t.Errorf("Expected DBQueriesTotal=1, got %d", metrics.DBQueriesTotal)
+		t.Errorf("Ожидался DBQueriesTotal=1, получено %d", metrics.DBQueriesTotal)
 	}
 }
 
@@ -53,16 +53,16 @@ func TestMetricsErrors(t *testing.T) {
 	metrics := GetMetrics()
 
 	if metrics.RSSPollsErrors != 1 {
-		t.Errorf("Expected RSSPollsErrors=1, got %d", metrics.RSSPollsErrors)
+		t.Errorf("Ожидался RSSPollsErrors=1, получено %d", metrics.RSSPollsErrors)
 	}
 	if metrics.KafkaErrors != 1 {
-		t.Errorf("Expected KafkaErrors=1, got %d", metrics.KafkaErrors)
+		t.Errorf("Ожидался KafkaErrors=1, получено %d", metrics.KafkaErrors)
 	}
 	if metrics.TelegramMessagesErrors != 1 {
-		t.Errorf("Expected TelegramMessagesErrors=1, got %d", metrics.TelegramMessagesErrors)
+		t.Errorf("Ожидался TelegramMessagesErrors=1, получено %d", metrics.TelegramMessagesErrors)
 	}
 	if metrics.DBQueriesErrors != 1 {
-		t.Errorf("Expected DBQueriesErrors=1, got %d", metrics.DBQueriesErrors)
+		t.Errorf("Ожидался DBQueriesErrors=1, получено %d", metrics.DBQueriesErrors)
 	}
 }
 
@@ -86,10 +86,10 @@ func TestMetricsConcurrency(t *testing.T) {
 
 	metrics := GetMetrics()
 	if metrics.RSSPollsTotal != 10 {
-		t.Errorf("Expected RSSPollsTotal=10, got %d", metrics.RSSPollsTotal)
+		t.Errorf("Ожидался RSSPollsTotal=10, получено %d", metrics.RSSPollsTotal)
 	}
 	if metrics.KafkaMessagesProduced != 10 {
-		t.Errorf("Expected KafkaMessagesProduced=10, got %d", metrics.KafkaMessagesProduced)
+		t.Errorf("Ожидался KafkaMessagesProduced=10, получено %d", metrics.KafkaMessagesProduced)
 	}
 }
 
@@ -101,6 +101,6 @@ func TestMetricsLastUpdate(t *testing.T) {
 
 	metrics := GetMetrics()
 	if metrics.LastUpdate.IsZero() {
-		t.Error("Expected LastUpdate to be set")
+		t.Error("Ожидалось, что LastUpdate будет установлено")
 	}
 }

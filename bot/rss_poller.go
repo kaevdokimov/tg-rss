@@ -83,22 +83,3 @@ func fetchSources(dbConn *sql.DB) ([]db.Source, error) {
 	}
 	return sources, nil
 }
-
-// fetchUsers получает список пользователей из БД
-// func fetchUsers(dbConn *sql.DB) ([]int64, error) {
-// 	rows, err := dbConn.Query("SELECT chat_id FROM users")
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-
-// 	var users []int64
-// 	for rows.Next() {
-// 		var chatID int64
-// 		if err := rows.Scan(&chatID); err != nil {
-// 			return nil, err
-// 		}
-// 		users = append(users, chatID)
-// 	}
-// 	return users, nil
-// }

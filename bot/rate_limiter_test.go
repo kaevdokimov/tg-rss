@@ -13,18 +13,18 @@ func TestRateLimiter(t *testing.T) {
 	
 	// Первый запрос должен быть разрешен
 	if !limiter.Allow(chatID) {
-		t.Error("First request should be allowed")
+		t.Error("Первый запрос должен быть разрешен")
 	}
 	
 	// Второй запрос сразу после первого должен быть отклонен
 	if limiter.Allow(chatID) {
-		t.Error("Second request immediately after first should be denied")
+		t.Error("Второй запрос сразу после первого должен быть отклонен")
 	}
 	
 	// После периода времени запрос должен быть разрешен
 	time.Sleep(period + 10*time.Millisecond)
 	if !limiter.Allow(chatID) {
-		t.Error("Request after period should be allowed")
+		t.Error("Запрос после периода времени должен быть разрешен")
 	}
 }
 
@@ -37,28 +37,28 @@ func TestRateLimiterDifferentChats(t *testing.T) {
 	
 	// Оба чата должны иметь независимые лимиты
 	if !limiter.Allow(chatID1) {
-		t.Error("First chat should be allowed")
+		t.Error("Первый чат должен быть разрешен")
 	}
 	if !limiter.Allow(chatID2) {
-		t.Error("Second chat should be allowed independently")
+		t.Error("Второй чат должен быть разрешен независимо")
 	}
 	
 	// Первый чат должен быть заблокирован
 	if limiter.Allow(chatID1) {
-		t.Error("First chat should be blocked")
+		t.Error("Первый чат должен быть заблокирован")
 	}
 	
 	// Второй чат тоже должен быть заблокирован (так как он тоже только что использовался)
 	if limiter.Allow(chatID2) {
-		t.Error("Second chat should also be blocked after immediate use")
+		t.Error("Второй чат также должен быть заблокирован после немедленного использования")
 	}
 	
 	// После периода времени оба чата должны быть разрешены
 	time.Sleep(period + 10*time.Millisecond)
 	if !limiter.Allow(chatID1) {
-		t.Error("First chat should be allowed after period")
+		t.Error("Первый чат должен быть разрешен после периода")
 	}
 	if !limiter.Allow(chatID2) {
-		t.Error("Second chat should be allowed after period")
+		t.Error("Второй чат должен быть разрешен после периода")
 	}
 }

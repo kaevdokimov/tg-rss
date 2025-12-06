@@ -8,22 +8,22 @@ import (
 func TestLogLevel(t *testing.T) {
 	SetLogLevel(DEBUG)
 	if currentLevel != DEBUG {
-		t.Errorf("Expected DEBUG level, got %d", currentLevel)
+		t.Errorf("Ожидался уровень DEBUG, получено %d", currentLevel)
 	}
 
 	SetLogLevel(INFO)
 	if currentLevel != INFO {
-		t.Errorf("Expected INFO level, got %d", currentLevel)
+		t.Errorf("Ожидался уровень INFO, получено %d", currentLevel)
 	}
 
 	SetLogLevel(WARN)
 	if currentLevel != WARN {
-		t.Errorf("Expected WARN level, got %d", currentLevel)
+		t.Errorf("Ожидался уровень WARN, получено %d", currentLevel)
 	}
 
 	SetLogLevel(ERROR)
 	if currentLevel != ERROR {
-		t.Errorf("Expected ERROR level, got %d", currentLevel)
+		t.Errorf("Ожидался уровень ERROR, получено %d", currentLevel)
 	}
 }
 
@@ -48,7 +48,7 @@ func TestSetLogLevelFromString(t *testing.T) {
 	for _, tt := range tests {
 		SetLogLevelFromString(tt.input)
 		if currentLevel != tt.expected {
-			t.Errorf("For input '%s', expected level %d, got %d", tt.input, tt.expected, currentLevel)
+			t.Errorf("Для ввода '%s' ожидался уровень %d, получено %d", tt.input, tt.expected, currentLevel)
 		}
 	}
 }
@@ -58,10 +58,10 @@ func TestLogger(t *testing.T) {
 	
 	// Тест что логгер создается
 	if logger == nil {
-		t.Error("Expected logger to be created")
+		t.Error("Ожидалось создание логгера")
 	}
 	if logger.prefix != "TEST" {
-		t.Errorf("Expected prefix 'TEST', got '%s'", logger.prefix)
+		t.Errorf("Ожидался префикс 'TEST', получено '%s'", logger.prefix)
 	}
 }
 
@@ -103,6 +103,6 @@ func TestLoggerFromEnv(t *testing.T) {
 	// Переинициализируем (в реальности это делается в init)
 	SetLogLevelFromString(os.Getenv("LOG_LEVEL"))
 	if currentLevel != WARN {
-		t.Errorf("Expected WARN level from env, got %d", currentLevel)
+		t.Errorf("Ожидался уровень WARN из переменной окружения, получено %d", currentLevel)
 	}
 }
