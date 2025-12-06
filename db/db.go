@@ -231,7 +231,8 @@ func InitSchema(db *sql.DB) {
 		id SERIAL PRIMARY KEY,
 		chat_id BIGINT NOT NULL REFERENCES users(chat_id) ON DELETE CASCADE,
 		news_id BIGINT NOT NULL REFERENCES news(id) ON DELETE CASCADE,
-		sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE (chat_id, news_id)
 	);
 
 	-- Индексы
@@ -331,7 +332,7 @@ func DeleteSubscription(db *sql.DB, subscription Subscription) error {
 }
 
 func GetActiveSources(db *sql.DB) ([]Source, error) {
-	query := `SELECT id, name, url, status FROM sources WHERE status = '$1' order by id`
+	query := `SELECT id, name, url, status FROM sources WHERE status = $1 order by id`
 	rows, err := db.Query(query, Active)
 	if err != nil {
 		return nil, err

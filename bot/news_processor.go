@@ -2,13 +2,15 @@ package bot
 
 import (
 	"database/sql"
-	"log"
 	"tg-rss/db"
 	"tg-rss/kafka"
+	"tg-rss/monitoring"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+var newsLogger = monitoring.NewLogger("NewsProcessor")
 
 // NewsProcessor обрабатывает новости из Kafka и записывает в БД
 type NewsProcessor struct {
@@ -29,7 +31,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 	// Парсим время публикации
 	publishedAt, err := time.Parse("2006-01-02 15:04:05", newsItem.PublishedAt)
 	if err != nil {
-		log.Printf("Ошибка парсинга времени: %v", err)
+		newsLogger.Warn("Ошибка парсинга времени: %v", err)
 		publishedAt = time.Now()
 	}
 
@@ -39,18 +41,22 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 			  ON CONFLICT (link) DO UPDATE SET title = $1, description = $2, published_at = $4
 			  RETURNING id`
 
+	monitoring.IncrementDBQueries()
 	var newsID int64
 	err = np.db.QueryRow(query, newsItem.Title, newsItem.Description, newsItem.Link, publishedAt, newsItem.SourceID).Scan(&newsID)
 	if err != nil {
+		monitoring.IncrementDBQueriesErrors()
 		return err
 	}
 
-	log.Printf("Новость сохранена в БД: ID=%d, Title=%s", newsID, newsItem.Title)
+	newsLogger.Debug("Новость сохранена в БД: ID=%d, Title=%s", newsID, newsItem.Title)
 
 	// Получение списка пользователей, подписанных на источник
+	monitoring.IncrementDBQueries()
 	subscriptions, err := db.GetSubscriptions(np.db, newsItem.SourceID)
 	if err != nil {
-		log.Printf("Ошибка при получении подписок: %v", err)
+		monitoring.IncrementDBQueriesErrors()
+		newsLogger.Error("Ошибка при получении подписок: %v", err)
 		return err
 	}
 
@@ -62,11 +68,13 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		msg.ReplyMarkup = createNewsKeyboard(newsItem.Link, newsID)
 
 		if _, err := np.bot.Send(msg); err != nil {
-			log.Printf("Ошибка отправки новости пользователю %d: %v", subscription.ChatId, err)
+			monitoring.IncrementTelegramMessagesErrors()
+			newsLogger.Error("Ошибка отправки новости пользователю %d: %v", subscription.ChatId, err)
 			continue
 		}
 
-		log.Printf("Новость отправлена пользователю %d: %s", subscription.ChatId, newsItem.Title)
+		monitoring.IncrementTelegramMessagesSent()
+		newsLogger.Debug("Новость отправлена пользователю %d: %s", subscription.ChatId, newsItem.Title)
 	}
 
 	return nil

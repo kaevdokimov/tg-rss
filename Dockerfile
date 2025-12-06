@@ -46,12 +46,10 @@ COPY --from=builder --chown=appuser:appgroup /app/tg-rss-app .
 # Переключаемся на непривилегированного пользователя
 USER appuser
 
-# Добавляем health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD pgrep tg-rss-app || exit 1
-
-# Экспортируем порт (если приложение использует HTTP)
-EXPOSE 8080
+# Добавляем health check (проверяем наличие процесса)
+# Примечание: pgrep может отсутствовать в Alpine, поэтому используем ps
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD ps aux | grep -v grep | grep tg-rss-app || exit 1
 
 # Запускаем приложение
 CMD ["./tg-rss-app"]

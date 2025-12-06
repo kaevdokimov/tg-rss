@@ -7,7 +7,7 @@ restart: down up
 # DOCKER
 ############################
 docker-up:
-	docker-compose --env-file .env.local up -d
+	docker-compose --env-file .env up -d
 docker-down:
 	docker-compose down
 # Will delete all volumes

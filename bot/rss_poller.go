@@ -2,27 +2,38 @@ package bot
 
 import (
 	"database/sql"
-	"log"
 	"time"
 
 	"tg-rss/db"
 	"tg-rss/kafka"
+	"tg-rss/monitoring"
 	"tg-rss/rss"
 )
+
+var rssLogger = monitoring.NewLogger("RSS")
 
 // StartRSSPolling запускает регулярный опрос RSS-источников
 func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, kafkaProducer *kafka.Producer) {
 	for {
+		monitoring.IncrementRSSPolls()
 		sources, err := fetchSources(dbConn)
 		if err != nil {
-			log.Printf("Ошибка при получении источников: %v", err)
+			monitoring.IncrementRSSPollsErrors()
+			rssLogger.Error("Ошибка при получении источников: %v", err)
 			time.Sleep(interval)
 			continue
 		}
 
 		for _, source := range sources {
-			sourceNewsList, _ := rss.ParseRSS(source.Url, tz)
+			sourceNewsList, err := rss.ParseRSS(source.Url, tz)
+			if err != nil {
+				monitoring.IncrementRSSPollsErrors()
+				rssLogger.Warn("Ошибка парсинга RSS для источника %s: %v", source.Name, err)
+				continue
+			}
+
 			for _, item := range sourceNewsList {
+				monitoring.IncrementRSSItemsProcessed()
 				// Создаем объект новости для отправки в Kafka
 				newsItem := kafka.NewsItem{
 					SourceID:    source.Id,
@@ -35,11 +46,13 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 
 				// Отправляем новость в Kafka для обработки
 				if err := kafkaProducer.SendNewsItem(newsItem); err != nil {
-					log.Printf("Ошибка отправки новости в Kafka: %v", err)
+					monitoring.IncrementKafkaErrors()
+					rssLogger.Error("Ошибка отправки новости в Kafka: %v", err)
 					continue
 				}
 
-				log.Printf("Новость отправлена в очередь: %s", item.Title)
+				monitoring.IncrementKafkaMessagesProduced()
+				rssLogger.Debug("Новость отправлена в очередь: %s", item.Title)
 			}
 		}
 

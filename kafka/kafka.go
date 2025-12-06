@@ -9,8 +9,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/IBM/sarama"
 	"tg-rss/config"
+
+	"github.com/IBM/sarama"
 )
 
 type NewsNotification struct {
@@ -136,8 +137,8 @@ func (p *Producer) SendNewsToSubscribers(db *sql.DB, chatIDs []int64, news NewsI
 		// Проверяем, не отправляли ли уже эту новость пользователю
 		var count int
 		err := db.QueryRow(
-			`SELECT COUNT(*) FROM user_news 
-			 WHERE user_id = $1 AND news_id = $2`,
+			`SELECT COUNT(*) FROM messages 
+			 WHERE chat_id = $1 AND news_id = $2`,
 			chatID, newsID,
 		).Scan(&count)
 
@@ -170,9 +171,9 @@ func (p *Producer) SendNewsToSubscribers(db *sql.DB, chatIDs []int64, news NewsI
 
 		// Помечаем новость как отправленную
 		_, err = db.Exec(
-			`INSERT INTO user_news (user_id, news_id, sent_at) 
+			`INSERT INTO messages (chat_id, news_id, sent_at) 
 			 VALUES ($1, $2, $3) 
-			 ON CONFLICT (user_id, news_id) DO NOTHING`,
+			 ON CONFLICT (chat_id, news_id) DO NOTHING`,
 			chatID, newsID, time.Now(),
 		)
 
