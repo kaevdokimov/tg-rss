@@ -59,7 +59,11 @@ func (l *Logger) log(level LogLevel, levelStr string, format string, args ...int
 	}
 
 	message := prefix + "[" + levelStr + "] " + format
-	log.Printf(message, args...)
+	if len(args) > 0 {
+		log.Printf(message, args...)
+	} else {
+		log.Print(message)
+	}
 }
 
 // Debug логирует сообщение уровня DEBUG
