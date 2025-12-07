@@ -29,6 +29,7 @@ func StartBotWithKafka(cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProduc
 	go StartCommandHandler(bot, dbConn, cfgTgBot.Timeout)
 
 	// Запуск опроса RSS-источников (отправка в Kafka)
+	log.Printf("Запуск RSS парсера с интервалом %v", interval)
 	go StartRSSPolling(dbConn, interval, time.Local, kafkaProducer)
 
 	// Запуск обработчика новостей из Kafka с retry логикой

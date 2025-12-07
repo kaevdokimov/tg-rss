@@ -14,8 +14,25 @@ var rssLogger = monitoring.NewLogger("RSS")
 
 // StartRSSPolling запускает регулярный опрос RSS-источников
 func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, kafkaProducer *kafka.Producer) {
+	rssLogger.Info("Запуск RSS парсера с интервалом %v", interval)
+	
+	// Запускаем первый цикл сразу, без ожидания
+	firstRun := true
+	
+	// Защита от паники - если произойдет ошибка, парсер продолжит работу
+	defer func() {
+		if r := recover(); r != nil {
+			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере: %v. Перезапуск через %v", r, interval)
+			time.Sleep(interval)
+			// Рекурсивно перезапускаем парсер
+			go StartRSSPolling(dbConn, interval, tz, kafkaProducer)
+		}
+	}()
+	
 	for {
 		monitoring.IncrementRSSPolls()
+		rssLogger.Info("Начало цикла парсинга RSS-источников")
+		
 		sources, err := fetchSources(dbConn)
 		if err != nil {
 			monitoring.IncrementRSSPollsErrors()
@@ -24,13 +41,25 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 			continue
 		}
 
+		rssLogger.Info("Найдено активных источников: %d", len(sources))
+		
+		totalNewsFound := 0
+		totalNewsSent := 0
+		sourcesProcessed := 0
+		sourcesWithErrors := 0
+
 		for _, source := range sources {
 			sourceNewsList, err := rss.ParseRSS(source.Url, tz)
 			if err != nil {
 				monitoring.IncrementRSSPollsErrors()
-				rssLogger.Warn("Ошибка парсинга RSS для источника %s: %v", source.Name, err)
+				sourcesWithErrors++
+				rssLogger.Warn("Ошибка парсинга RSS для источника %s (%s): %v", source.Name, source.Url, err)
 				continue
 			}
+
+			sourcesProcessed++
+			totalNewsFound += len(sourceNewsList)
+			rssLogger.Debug("Источник %s: найдено новостей %d", source.Name, len(sourceNewsList))
 
 			for _, item := range sourceNewsList {
 				// Пропускаем старые новости (старше 24 часов)
@@ -77,10 +106,22 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 				}
 
 				monitoring.IncrementKafkaMessagesProduced()
-				rssLogger.Debug("Новость отправлена в очередь: %s", item.Title)
+				totalNewsSent++
+				rssLogger.Info("Новость отправлена в Kafka: %s (источник: %s)", item.Title, source.Name)
 			}
 		}
 
+		rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Kafka %d, ошибок %d", 
+			sourcesProcessed, len(sources), totalNewsFound, totalNewsSent, sourcesWithErrors)
+		
+		// Первый цикл выполняется сразу, последующие - с интервалом
+		if firstRun {
+			firstRun = false
+			rssLogger.Info("Первый цикл парсинга выполнен. Следующие циклы будут выполняться с интервалом %v", interval)
+		} else {
+			rssLogger.Debug("Ожидание следующего цикла парсинга (%v)", interval)
+		}
+		
 		time.Sleep(interval)
 	}
 }
