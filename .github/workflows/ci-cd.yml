@@ -159,10 +159,11 @@ jobs:
             # Логин в GitHub Container Registry
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Останавливаем и удаляем все контейнеры (включая те, что могли быть запущены вручную)
-            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down -v --remove-orphans || true
-            docker stop bot db kafka zookeeper kafka-ui 2>/dev/null || true
-            docker rm bot db kafka zookeeper kafka-ui 2>/dev/null || true
+            # Останавливаем контейнеры БЕЗ удаления volumes (чтобы сохранить данные)
+            # Флаг -v удаляет volumes, поэтому его убираем для сохранения данных
+            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down --remove-orphans || true
+            docker stop bot db kafka zookeeper 2>/dev/null || true
+            docker rm bot db kafka zookeeper 2>/dev/null || true
 
             # Принудительно обновляем образ бота
             docker pull ghcr.io/${{ github.repository_owner }}/news-bot:latest || true
@@ -173,7 +174,7 @@ jobs:
 
             # Проверяем, что контейнеры запустились
             sleep 15
-            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper|kafka-ui)' || exit 1
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper)' || exit 1
             echo '✅ Все сервисы успешно запущены'
 
             # Очищаем неиспользуемые образы

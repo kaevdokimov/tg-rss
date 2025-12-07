@@ -22,9 +22,19 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.7
     container_name: zookeeper
+    # Ограничения ресурсов для Zookeeper (для docker-compose без swarm используйте mem_limit и cpus)
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: 0.3
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      # Оптимизация для малых ресурсов
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_MAX_CLIENT_CNXNS: 60
+      # Ограничение памяти JVM для Zookeeper
+      KAFKA_HEAP_OPTS: "-Xmx128M -Xms128M"
     ports:
       - "2181:2181"
     volumes:
@@ -39,6 +49,10 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.7.7
     container_name: kafka
+    # Ограничения ресурсов для Kafka (для docker-compose без swarm используйте mem_limit и cpus)
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.5
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -52,34 +66,69 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      # Настройки для сохранения данных
+      
+      # Ограничение памяти JVM для Kafka (512MB максимум, 256MB минимум)
+      KAFKA_HEAP_OPTS: "-Xmx384M -Xms256M"
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15 -Djava.awt.headless=true"
+      
+      # Настройки для сохранения данных (агрессивная очистка для экономии места)
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_LOG_RETENTION_HOURS: 168  # 7 дней
-      KAFKA_LOG_RETENTION_BYTES: 1073741824  # 1GB
+      KAFKA_LOG_RETENTION_HOURS: 24  # 1 день вместо 7
+      KAFKA_LOG_RETENTION_BYTES: 536870912  # 512MB вместо 1GB
+      KAFKA_LOG_SEGMENT_BYTES: 104857600  # 100MB сегменты (меньше для быстрой очистки)
+      KAFKA_LOG_CLEANUP_POLICY: delete
+      KAFKA_LOG_CLEANER_THREADS: 1  # Меньше потоков для очистки
+      
+      # Оптимизация производительности для малых ресурсов
+      KAFKA_NUM_NETWORK_THREADS: 3  # Минимум потоков
+      KAFKA_NUM_IO_THREADS: 4  # Минимум потоков
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400  # 100KB буферы
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400  # 100KB буферы
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600  # 100MB максимум
+      
+      # Настройки для экономии памяти
+      KAFKA_NUM_PARTITIONS: 1  # Минимум партиций
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      
+      # Настройки для быстрой обработки (меньше буферизации)
+      KAFKA_COMPRESSION_TYPE: snappy  # Сжатие для экономии места
+      KAFKA_MESSAGE_MAX_BYTES: 1048576  # 1MB максимум на сообщение
     volumes:
       - kafka_data:/var/lib/kafka/data
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    depends_on:
-      kafka:
-        condition: service_started
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-    restart: always
+  # Kafka UI отключен для экономии ресурсов (можно включить при необходимости)
+  # Для продакшена рекомендуется отключить или запускать только при необходимости
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: kafka-ui
+  #   mem_limit: 128m
+  #   cpus: 0.1
+  #   depends_on:
+  #     kafka:
+  #       condition: service_started
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+  #     KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+  #   restart: always
 
   db:
     image: postgres:18.1-alpine3.23
     container_name: db
+    # Ограничения ресурсов для PostgreSQL (для docker-compose без swarm используйте mem_limit и cpus)
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: 0.2
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
+      # Оптимизация PostgreSQL для малых ресурсов
+      # Ограничения памяти применяются через docker-compose (mem_limit: 256m)
+      # PostgreSQL автоматически адаптируется под доступную память
     ports:
       - "5432:5432"
     restart: always
