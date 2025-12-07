@@ -30,9 +30,9 @@ func formatMessage(i int, title, description string, publishedAt time.Time, sour
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
-	// Компактный формат: номер, заголовок, источник и время в одну строку
+	// Минималистичный формат: номер, заголовок, источник и время без отступов
 	return fmt.Sprintf(
-		"%d. *%s*\n   %s • %s\n",
+		"%d. *%s*\n%s • %s\n",
 		i, title, sourceName, relativeTime,
 	)
 }
@@ -62,33 +62,15 @@ func formatRelativeTime(t time.Time) string {
 		return "только что"
 	} else if duration < time.Hour {
 		minutes := int(duration.Minutes())
-		if minutes == 1 {
-			return "1 минуту назад"
-		} else if minutes < 5 {
-			return fmt.Sprintf("%d минуты назад", minutes)
-		} else {
-			return fmt.Sprintf("%d минут назад", minutes)
-		}
+		return fmt.Sprintf("%d мин", minutes)
 	} else if duration < 24*time.Hour {
 		hours := int(duration.Hours())
-		if hours == 1 {
-			return "1 час назад"
-		} else if hours < 5 {
-			return fmt.Sprintf("%d часа назад", hours)
-		} else {
-			return fmt.Sprintf("%d часов назад", hours)
-		}
+		return fmt.Sprintf("%d ч", hours)
 	} else if duration < 7*24*time.Hour {
 		days := int(duration.Hours() / 24)
-		if days == 1 {
-			return "1 день назад"
-		} else if days < 5 {
-			return fmt.Sprintf("%d дня назад", days)
-		} else {
-			return fmt.Sprintf("%d дней назад", days)
-		}
+		return fmt.Sprintf("%d дн", days)
 	} else {
-		// Если больше недели, показываем дату
-		return t.Format("02.01.2006 15:04")
+		// Если больше недели, показываем дату в коротком формате
+		return t.Format("02.01")
 	}
 }

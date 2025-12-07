@@ -501,7 +501,7 @@ func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64
 		return
 	}
 
-	message := "📰 *Последние новости:*\n\n"
+	message := "📰 *Последние новости:*\n"
 	for i, item := range news {
 		message += formatMessage(i+1, item.Title, item.Description, item.PublishedAt, item.SourceName)
 	}

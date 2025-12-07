@@ -25,7 +25,7 @@ func TestFormatMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-30 * time.Minute),
 			sourceName:  "Test Source",
-			wantContains: []string{"1.", "*Test News Title*", "Test Source", "30 минут назад"},
+			wantContains: []string{"1.", "*Test News Title*", "Test Source", "30 мин"},
 		},
 		{
 			name:        "message with description",
@@ -34,7 +34,7 @@ func TestFormatMessage(t *testing.T) {
 			description: "Some description",
 			publishedAt: now.Add(-28 * time.Minute),
 			sourceName:  "Lenta.ru",
-			wantContains: []string{"7.", "*Рэпер Гуф сравнил Долину*", "Lenta.ru", "28 минут назад"},
+			wantContains: []string{"7.", "*Рэпер Гуф сравнил Долину*", "Lenta.ru", "28 мин"},
 		},
 		{
 			name:        "message with long title",
@@ -43,7 +43,7 @@ func TestFormatMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-1 * time.Hour),
 			sourceName:  "Ria.ru",
-			wantContains: []string{"10.", "Ria.ru", "1 час назад"},
+			wantContains: []string{"10.", "Ria.ru", "1 ч"},
 		},
 	}
 
@@ -58,17 +58,17 @@ func TestFormatMessage(t *testing.T) {
 				}
 			}
 			
-			// Проверяем, что формат компактный (нет лишних пустых строк)
-			lines := strings.Split(result, "\n")
+			// Проверяем, что формат компактный (нет лишних пустых строк между новостями)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
 			emptyLines := 0
 			for _, line := range lines {
 				if strings.TrimSpace(line) == "" {
 					emptyLines++
 				}
 			}
-			// Должно быть максимум 1 пустая строка (между элементами)
-			if emptyLines > 1 {
-				t.Errorf("formatMessage() содержит слишком много пустых строк. Результат: %q", result)
+			// Не должно быть пустых строк в компактном формате (кроме последнего \n)
+			if emptyLines > 0 {
+				t.Errorf("formatMessage() содержит пустые строки между элементами. Результат: %q", result)
 			}
 			
 			// Проверяем, что формат содержит номер, заголовок, источник и время
@@ -97,7 +97,7 @@ func TestFormatNewsMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-30 * time.Minute),
 			sourceName:  "Test Source",
-			wantContains: []string{"*Test News Title*", "Test Source", "30 минут назад"},
+			wantContains: []string{"*Test News Title*", "Test Source", "30 мин"},
 			wantNotContains: []string{"📰", "⏰"},
 		},
 		{
@@ -106,7 +106,7 @@ func TestFormatNewsMessage(t *testing.T) {
 			description: "This is a description of the news",
 			publishedAt: now.Add(-2 * time.Hour),
 			sourceName:  "News Source",
-			wantContains: []string{"*Important News*", "News Source", "2 часа назад", "This is a description"},
+			wantContains: []string{"*Important News*", "News Source", "2 ч", "This is a description"},
 			wantNotContains: []string{"📰", "⏰"},
 		},
 		{
@@ -115,7 +115,7 @@ func TestFormatNewsMessage(t *testing.T) {
 			description: strings.Repeat("A", 300), // Длинное описание
 			publishedAt: now.Add(-5 * time.Minute),
 			sourceName:  "Source",
-			wantContains: []string{"*Long Description News*", "Source", "5 минут назад"},
+			wantContains: []string{"*Long Description News*", "Source", "5 мин"},
 		},
 	}
 
@@ -166,17 +166,17 @@ func TestFormatRelativeTime(t *testing.T) {
 		{
 			name:     "minutes ago",
 			publishedAt: now.Add(-28 * time.Minute),
-			wantContains: "минут назад",
+			wantContains: "мин",
 		},
 		{
 			name:     "hours ago",
 			publishedAt: now.Add(-2 * time.Hour),
-			wantContains: "часа назад",
+			wantContains: "ч",
 		},
 		{
 			name:     "days ago",
 			publishedAt: now.Add(-3 * 24 * time.Hour),
-			wantContains: "дня назад",
+			wantContains: "дн",
 		},
 		{
 			name:     "old news",
