@@ -16,6 +16,7 @@ func TestFormatMessage(t *testing.T) {
 		description string
 		publishedAt time.Time
 		sourceName  string
+		link        string
 		wantContains []string
 	}{
 		{
@@ -25,7 +26,8 @@ func TestFormatMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-30 * time.Minute),
 			sourceName:  "Test Source",
-			wantContains: []string{"1.", "*Test News Title*", "Test Source", "30 мин"},
+			link:        "https://example.com/news/1",
+			wantContains: []string{"1.", "Test News Title", "https://example.com/news/1", "Test Source", "30 мин"},
 		},
 		{
 			name:        "message with description",
@@ -34,7 +36,8 @@ func TestFormatMessage(t *testing.T) {
 			description: "Some description",
 			publishedAt: now.Add(-28 * time.Minute),
 			sourceName:  "Lenta.ru",
-			wantContains: []string{"7.", "*Рэпер Гуф сравнил Долину*", "Lenta.ru", "28 мин"},
+			link:        "https://lenta.ru/news/123",
+			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "https://lenta.ru/news/123", "Lenta.ru", "28 мин"},
 		},
 		{
 			name:        "message with long title",
@@ -43,13 +46,14 @@ func TestFormatMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-1 * time.Hour),
 			sourceName:  "Ria.ru",
-			wantContains: []string{"10.", "Ria.ru", "1 ч"},
+			link:        "https://ria.ru/news/456",
+			wantContains: []string{"10.", "Ria.ru", "1 ч", "https://ria.ru/news/456"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatMessage(tt.i, tt.title, tt.description, tt.publishedAt, tt.sourceName)
+			result := formatMessage(tt.i, tt.title, tt.description, tt.publishedAt, tt.sourceName, tt.link)
 			
 			// Проверяем, что результат содержит все необходимые элементы
 			for _, want := range tt.wantContains {
@@ -74,6 +78,11 @@ func TestFormatMessage(t *testing.T) {
 			// Проверяем, что формат содержит номер, заголовок, источник и время
 			if !strings.Contains(result, "•") {
 				t.Errorf("formatMessage() должна содержать разделитель '•' между источником и временем. Результат: %q", result)
+			}
+			
+			// Проверяем, что заголовок является ссылкой в формате Markdown
+			if !strings.Contains(result, "[") || !strings.Contains(result, "](") || !strings.Contains(result, ")") {
+				t.Errorf("formatMessage() должна содержать ссылку в формате Markdown [текст](url). Результат: %q", result)
 			}
 		})
 	}

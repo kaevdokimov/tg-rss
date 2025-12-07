@@ -26,14 +26,14 @@ func formatNewsMessage(title, description string, publishedAt time.Time, sourceN
 }
 
 // formatMessage форматирует сообщение в списке для отправки
-func formatMessage(i int, title, description string, publishedAt time.Time, sourceName string) string {
+func formatMessage(i int, title, description string, publishedAt time.Time, sourceName string, link string) string {
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
-	// Минималистичный формат: номер, заголовок, источник и время без отступов
+	// Минималистичный формат: номер, заголовок со ссылкой, источник и время без отступов
 	return fmt.Sprintf(
-		"%d. *%s*\n%s • %s\n",
-		i, title, sourceName, relativeTime,
+		"%d. [%s](%s)\n%s • %s\n",
+		i, title, link, sourceName, relativeTime,
 	)
 }
 
