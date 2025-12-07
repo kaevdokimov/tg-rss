@@ -33,6 +33,31 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 			}
 
 			for _, item := range sourceNewsList {
+				// Пропускаем старые новости (старше 24 часов)
+				// Это предотвращает отправку всех старых новостей при первом запуске
+				if time.Since(item.PublishedAt) > 24*time.Hour {
+					rssLogger.Debug("Пропускаем старую новость (старше 24ч): %s от %v", item.Title, item.PublishedAt)
+					continue
+				}
+
+				// Проверяем, есть ли уже такая новость в БД
+				// Это предотвращает повторную обработку уже обработанных новостей
+				var existingNewsID int64
+				err = dbConn.QueryRow(`
+					SELECT id FROM news 
+					WHERE source_id = $1 AND link = $2
+				`, source.Id, item.Link).Scan(&existingNewsID)
+
+				if err == nil {
+					// Новость уже есть в БД, пропускаем
+					rssLogger.Debug("Новость уже есть в БД, пропускаем: %s", item.Title)
+					continue
+				} else if err != sql.ErrNoRows {
+					// Если это не "нет строк", значит произошла реальная ошибка
+					rssLogger.Warn("Ошибка при проверке существования новости: %v", err)
+					// Продолжаем обработку, так как это может быть временная ошибка
+				}
+
 				monitoring.IncrementRSSItemsProcessed()
 				// Создаем объект новости для отправки в Kafka
 				newsItem := kafka.NewsItem{

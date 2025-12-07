@@ -51,6 +51,13 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 
 	newsLogger.Debug("Новость сохранена в БД: ID=%d, Title=%s", newsID, newsItem.Title)
 
+	// Проверяем, является ли новость новой (не старше 24 часов)
+	// Это предотвращает отправку старых новостей при первом запуске или перезапуске
+	if time.Since(publishedAt) > 24*time.Hour {
+		newsLogger.Debug("Пропускаем старую новость (старше 24ч): %s от %v", newsItem.Title, publishedAt)
+		return nil
+	}
+
 	// Получение списка пользователей, подписанных на источник
 	monitoring.IncrementDBQueries()
 	subscriptions, err := db.GetSubscriptions(np.db, newsItem.SourceID)
@@ -60,8 +67,20 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		return err
 	}
 
-	// Отправка новости подписанным пользователям
+	// Отправка новости подписанным пользователям с проверкой на дубликаты
 	for _, subscription := range subscriptions {
+		// Проверяем, не отправляли ли уже эту новость пользователю
+		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsItem.SourceID, newsItem.Link)
+		if err != nil {
+			newsLogger.Error("Ошибка при проверке отправленной новости для пользователя %d: %v", subscription.ChatId, err)
+			continue
+		}
+		if sent {
+			newsLogger.Debug("Новость уже была отправлена пользователю %d: %s", subscription.ChatId, newsItem.Title)
+			continue
+		}
+
+		// Отправляем сообщение
 		msg := tgbotapi.NewMessage(subscription.ChatId, formatNewsMessage(newsItem.Title, newsItem.Description, publishedAt, newsItem.SourceName))
 		msg.ParseMode = tgbotapi.ModeMarkdown
 		msg.DisableWebPagePreview = true
@@ -70,6 +89,24 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		if _, err := np.bot.Send(msg); err != nil {
 			monitoring.IncrementTelegramMessagesErrors()
 			newsLogger.Error("Ошибка отправки новости пользователю %d: %v", subscription.ChatId, err)
+			continue
+		}
+
+		// Сохраняем информацию об отправке в таблицу messages
+		tx, err := np.db.Begin()
+		if err != nil {
+			newsLogger.Error("Ошибка начала транзакции для сохранения сообщения: %v", err)
+			continue
+		}
+
+		if err := db.SaveMessage(tx, subscription.ChatId, newsID); err != nil {
+			tx.Rollback()
+			newsLogger.Error("Ошибка сохранения сообщения: %v", err)
+			continue
+		}
+
+		if err := tx.Commit(); err != nil {
+			newsLogger.Error("Ошибка коммита транзакции: %v", err)
 			continue
 		}
 
