@@ -129,8 +129,25 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p $SSH_PORT $SSH_HOST >> ~/.ssh/known_hosts
 
-          # Копируем docker-compose.yml на сервер
-          scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:/tmp/docker-compose.yml
+          # Создаем .env файл локально
+          cat > /tmp/.env << EOF
+          TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }}
+          POSTGRES_HOST=db
+          POSTGRES_PORT=5432
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          KAFKA_BROKERS=kafka:29092
+          KAFKA_NEWS_TOPIC=news-items
+          KAFKA_NOTIFY_TOPIC=news-notifications
+          TZ=Europe/Moscow
+          TIMEOUT=60
+          GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
+          EOF
+
+          # Копируем файлы на сервер
+          scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:/home/$SSH_USER/docker-compose.yml
+          scp -P $SSH_PORT /tmp/.env $SSH_USER@$SSH_HOST:/home/$SSH_USER/.env
 
           # Выполнение команд на сервере
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
@@ -139,22 +156,6 @@ jobs:
 
             # Логин в GitHub Container Registry
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-            # Создаем .env файл с переменными окружения
-            cat > /tmp/.env << 'EOL'
-            TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }}
-            POSTGRES_HOST=db
-            POSTGRES_PORT=5432
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-            KAFKA_BROKERS=kafka:29092
-            KAFKA_NEWS_TOPIC=news-items
-            KAFKA_NOTIFY_TOPIC=news-notifications
-            TZ=Europe/Moscow
-            TIMEOUT=60
-            GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
-            EOL
 
             # Останавливаем и удаляем все контейнеры
             docker compose -f /tmp/docker-compose.yml --env-file /tmp/.env down -v --remove-orphans || true
