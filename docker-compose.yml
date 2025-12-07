@@ -35,16 +35,24 @@ services:
       ZOOKEEPER_MAX_CLIENT_CNXNS: 60
       # Ограничение памяти JVM для Zookeeper
       KAFKA_HEAP_OPTS: "-Xmx128M -Xms128M"
+      # Разрешаем 4LW команды (включая ruok) для healthcheck
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"
     ports:
       - "2181:2181"
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_logs:/var/lib/zookeeper/log
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      # Проверяем здоровье zookeeper через команду ruok
+      # KAFKA_OPTS разрешает использование ruok команды (4LW команды)
+      # Используем /dev/tcp для проверки (встроено в bash/sh, не требует дополнительных утилит)
+      # Формат: exec 3<>/dev/tcp/host/port открывает TCP соединение
+      test: ["CMD-SHELL", "sh -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      start_period: 60s
+      retries: 15
+    restart: unless-stopped
 
   kafka:
     image: confluentinc/cp-kafka:7.7.7

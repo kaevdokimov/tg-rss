@@ -172,8 +172,21 @@ jobs:
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull bot || true
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
-            # Проверяем, что контейнеры запустились
-            sleep 15
+            # Ждем запуска сервисов (zookeeper может требовать больше времени для инициализации)
+            echo '⏳ Ожидание запуска сервисов...'
+            sleep 20
+            
+            # Проверяем статус контейнеров
+            echo '📊 Статус контейнеров:'
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper)' || true
+            
+            # Проверяем логи zookeeper если он не запустился
+            if ! docker ps | grep -q zookeeper; then
+              echo '⚠️ Zookeeper не запустился, проверяем логи:'
+              docker logs zookeeper --tail 50 || true
+            fi
+            
+            # Проверяем, что все контейнеры запущены
             docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper)' || exit 1
             echo '✅ Все сервисы успешно запущены'
 
