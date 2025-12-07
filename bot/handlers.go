@@ -56,6 +56,8 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 				handleAddSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
 			case "delsub":
 				handleDelSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
+			case "subscribe_all":
+				handleSubscribeAll(bot, dbConn, update.Message.Chat.ID)
 			case "news":
 				handleLatestNewsImproved(bot, dbConn, update.Message.Chat.ID, 10)
 			case "tutorial":
@@ -382,6 +384,105 @@ func handleDelSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	bot.Send(msg)
 }
 
+// handleSubscribeAll подписывает пользователя на все активные источники
+func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
+	// Получаем все активные источники
+	sources, err := db.FindActiveSources(dbConn)
+	if err != nil {
+		handlerLogger.Error("Ошибка при получении источников: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении списка источников.\n\nПопробуйте позже или обратитесь к администратору, если проблема сохраняется.")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	if len(sources) == 0 {
+		msg := tgbotapi.NewMessage(chatId, "📋 Источников пока нет.\n\nДобавьте первый источник через кнопку «Добавить источник»")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	// Проверяем, существует ли пользователь, если нет - регистрируем его
+	exists, err := db.UserExists(dbConn, chatId)
+	if err != nil {
+		handlerLogger.Error("Ошибка при проверке существования пользователя: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя.\n\nПопробуйте позже или используйте команду /start.")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	if !exists {
+		// Регистрируем пользователя
+		user := db.User{
+			ChatId:   chatId,
+			Username: "unknown", // Будет обновлено при следующем /start
+		}
+		_, err = db.SaveUser(dbConn, user)
+		if err != nil {
+			handlerLogger.Error("Ошибка при регистрации пользователя: %v", err)
+			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя.\n\nПожалуйста, используйте команду /start для регистрации.")
+			msg.ReplyMarkup = createMainKeyboard()
+			bot.Send(msg)
+			return
+		}
+		handlerLogger.Info("Автоматически зарегистрирован пользователь с chatId %d", chatId)
+	}
+
+	// Подписываем на все источники
+	subscribedCount := 0
+	alreadySubscribedCount := 0
+	errorsCount := 0
+
+	for _, source := range sources {
+		// Проверяем, не подписан ли уже
+		isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, source.Id)
+		if err != nil {
+			handlerLogger.Error("Ошибка при проверке подписки на источник %d: %v", source.Id, err)
+			errorsCount++
+			continue
+		}
+		if isSubscribed {
+			alreadySubscribedCount++
+			continue
+		}
+
+		// Добавляем подписку
+		subscription := db.Subscription{
+			ChatId:   chatId,
+			SourceId: source.Id,
+		}
+		err = db.SaveSubscription(dbConn, subscription)
+		if err != nil {
+			handlerLogger.Error("Ошибка при добавлении подписки на источник %d: %v", source.Id, err)
+			errorsCount++
+			continue
+		}
+		subscribedCount++
+	}
+
+	// Формируем сообщение с результатами
+	var msgText string
+	if subscribedCount > 0 {
+		msgText = fmt.Sprintf("✅ Вы успешно подписались на %d источников!", subscribedCount)
+		if alreadySubscribedCount > 0 {
+			msgText += fmt.Sprintf("\n\nℹ️ Вы уже были подписаны на %d источников.", alreadySubscribedCount)
+		}
+		if errorsCount > 0 {
+			msgText += fmt.Sprintf("\n\n⚠️ Не удалось подписаться на %d источников.", errorsCount)
+		}
+	} else if alreadySubscribedCount > 0 {
+		msgText = fmt.Sprintf("ℹ️ Вы уже подписаны на все %d доступных источников.", alreadySubscribedCount)
+	} else {
+		msgText = fmt.Sprintf("❌ Не удалось подписаться на источники.\n\nОшибок: %d", errorsCount)
+	}
+
+	msg := tgbotapi.NewMessage(chatId, msgText)
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
+}
+
 // handleLatestNewsImproved обрабатывает команду /news с улучшенным форматированием
 func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count int) {
 	news, err := db.GetLatestNewsByUser(dbConn, chatId, count)
@@ -404,6 +505,8 @@ func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64
 	for i, item := range news {
 		message += formatMessage(i+1, item.Title, item.Description, item.PublishedAt, item.SourceName)
 	}
+	// Убираем лишний перенос в конце
+	message = strings.TrimRight(message, "\n")
 
 	msg := tgbotapi.NewMessage(chatId, message)
 	msg.ParseMode = "Markdown"

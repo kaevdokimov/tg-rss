@@ -137,6 +137,14 @@ func createSourcesKeyboard(sources []db.Source) tgbotapi.InlineKeyboardMarkup {
 		rows = append(rows, row)
 	}
 
+	// Добавляем кнопку "Подписаться на все" если есть источники
+	if len(sources) > 0 {
+		allRow := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Подписаться на все", "subscribe_all"),
+		)
+		rows = append(rows, allRow)
+	}
+
 	// Добавляем кнопку "Назад"
 	backRow := tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("🏠", "main_menu"),

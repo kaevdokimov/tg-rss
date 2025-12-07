@@ -14,37 +14,26 @@ func formatNewsMessage(title, description string, publishedAt time.Time, sourceN
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
+	// Компактный формат: заголовок, источник и время в одну строку
+	header := fmt.Sprintf("*%s*\n%s • %s", title, sourceName, relativeTime)
+
 	if trimmedDesc == "" {
-		return fmt.Sprintf(
-			"📰 *%s* | %s\n\n⏰ %s",
-			title, sourceName, relativeTime,
-		)
+		return header
 	}
 
-	return fmt.Sprintf(
-		"📰 *%s* | %s\n\n%s\n\n⏰ %s",
-		title, sourceName, trimmedDesc, relativeTime,
-	)
+	// Добавляем описание, если есть
+	return fmt.Sprintf("%s\n\n%s", header, trimmedDesc)
 }
 
 // formatMessage форматирует сообщение в списке для отправки
 func formatMessage(i int, title, description string, publishedAt time.Time, sourceName string) string {
-	// Обрезаем описание если оно слишком длинное
-	trimmedDesc := trimDescription(description, 150)
-
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
-	if trimmedDesc == "" {
-		return fmt.Sprintf(
-			"%d. 📰 *%s* | %s\n\n⏰ %s\n\n\n",
-			i, title, sourceName, relativeTime,
-		)
-	}
-
+	// Компактный формат: номер, заголовок, источник и время в одну строку
 	return fmt.Sprintf(
-		"%d. 📰 *%s* | %s\n\n%s\n\n ⏰ %s\n\n\n",
-		i, title, sourceName, trimmedDesc, relativeTime,
+		"%d. *%s*\n   %s • %s\n",
+		i, title, sourceName, relativeTime,
 	)
 }
 

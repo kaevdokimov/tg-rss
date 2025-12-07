@@ -44,6 +44,8 @@ func handleCallback(bot *tgbotapi.BotAPI, dbConn *sql.DB, callback *tgbotapi.Cal
 		handleTutorialComplete(bot, chatId)
 	case strings.HasPrefix(data, "tutorial_step_"):
 		handleTutorialStep(bot, dbConn, chatId, data)
+	case data == "subscribe_all":
+		handleSubscribeAll(bot, dbConn, chatId)
 	case strings.HasPrefix(data, "quick_subscribe_"):
 		handleQuickSubscribe(bot, dbConn, chatId, data)
 	case strings.HasPrefix(data, "quick_unsubscribe_"):
