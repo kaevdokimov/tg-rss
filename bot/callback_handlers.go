@@ -102,7 +102,7 @@ func handleMySubscriptions(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	sources, err := db.FindActiveSources(dbConn)
 	if err != nil {
 		log.Printf("Ошибка при получении источников: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении источников")
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении списка источников.\n\nПопробуйте позже или обратитесь к администратору, если проблема сохраняется.")
 		bot.Send(msg)
 		return
 	}
@@ -139,14 +139,16 @@ func handleSourceDetails(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, dat
 	isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, sourceId)
 	if err != nil {
 		log.Printf("Ошибка при проверке подписки: %v", err)
-		isSubscribed = false
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке статуса подписки.\n\nПопробуйте позже.")
+		bot.Send(msg)
+		return
 	}
 
 	var statusText string
 	if isSubscribed {
-		statusText = "✅ Вы подписаны на этот источник"
+		statusText = "✅ *Статус:* Вы подписаны на этот источник\n\nВы получаете новости из этого источника автоматически."
 	} else {
-		statusText = "❌ Вы не подписаны на этот источник"
+		statusText = "❌ *Статус:* Вы не подписаны на этот источник\n\nНажмите кнопку «Подписаться» чтобы начать получать новости."
 	}
 
 	msgText := fmt.Sprintf("📰 *%s*\n\n🔗 %s\n\n%s", source.Name, source.Url, statusText)
@@ -172,10 +174,10 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	}
 
 	// Проверяем существование источника
-	_, err = db.FindActiveSourceById(dbConn, sourceId)
+	source, err := db.FindActiveSourceById(dbConn, sourceId)
 	if err != nil {
 		log.Printf("Ошибка при поиске источника: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Источник не найден")
+		msg := tgbotapi.NewMessage(chatId, "❌ Источник не найден.\n\nВозможно, он был удален или деактивирован.")
 		bot.Send(msg)
 		return
 	}
@@ -184,13 +186,13 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, sourceId)
 	if err != nil {
 		log.Printf("Ошибка при проверке подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке подписки")
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке подписки.\n\nПопробуйте позже.")
 		bot.Send(msg)
 		return
 	}
 
 	if isSubscribed {
-		msg := tgbotapi.NewMessage(chatId, "ℹ️ Вы уже подписаны на этот источник")
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ℹ️ Вы уже подписаны на источник «%s».\n\nИспользуйте меню «📝 Мои подписки» для управления подписками.", source.Name))
 		bot.Send(msg)
 		return
 	}
@@ -199,7 +201,7 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	exists, err := db.UserExists(dbConn, chatId)
 	if err != nil {
 		log.Printf("Ошибка при проверке существования пользователя: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя")
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя.\n\nПопробуйте позже или используйте команду /start.")
 		bot.Send(msg)
 		return
 	}
@@ -213,7 +215,7 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 		_, err = db.SaveUser(dbConn, user)
 		if err != nil {
 			log.Printf("Ошибка при регистрации пользователя: %v", err)
-			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя")
+			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя.\n\nПожалуйста, используйте команду /start для регистрации.")
 			bot.Send(msg)
 			return
 		}
@@ -229,12 +231,19 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	err = db.SaveSubscription(dbConn, subscription)
 	if err != nil {
 		log.Printf("Ошибка при добавлении подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при добавлении подписки")
+		// Проверяем, не существует ли уже подписка
+		var msg tgbotapi.MessageConfig
+		isSubscribedCheck, _ := db.IsUserSubscribed(dbConn, chatId, sourceId)
+		if isSubscribedCheck {
+			msg = tgbotapi.NewMessage(chatId, fmt.Sprintf("ℹ️ Вы уже подписаны на источник «%s».", source.Name))
+		} else {
+			msg = tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ Не удалось добавить подписку на «%s».\n\nПопробуйте позже.", source.Name))
+		}
 		bot.Send(msg)
 		return
 	}
 
-	msg := tgbotapi.NewMessage(chatId, "✅ Вы успешно подписались на источник!")
+	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы успешно подписались на источник «%s»!\n\nТеперь вы будете получать новости из этого источника автоматически.", source.Name))
 	bot.Send(msg)
 }
 
@@ -261,6 +270,21 @@ func handleUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data 
 		return
 	}
 
+	// Проверяем, подписан ли пользователь
+	isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, sourceId)
+	if err != nil {
+		log.Printf("Ошибка при проверке подписки: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке подписки.\n\nПопробуйте позже.")
+		bot.Send(msg)
+		return
+	}
+
+	if !isSubscribed {
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ℹ️ Вы не подписаны на источник «%s».\n\nИспользуйте меню «📋 Мои источники» чтобы подписаться.", source.Name))
+		bot.Send(msg)
+		return
+	}
+
 	// Удаляем подписку
 	subscription := db.Subscription{
 		ChatId:   chatId,
@@ -270,12 +294,12 @@ func handleUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data 
 	err = db.DeleteSubscription(dbConn, subscription)
 	if err != nil {
 		log.Printf("Ошибка при удалении подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при удалении подписки")
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ Не удалось отписаться от источника «%s».\n\nПопробуйте позже.", source.Name))
 		bot.Send(msg)
 		return
 	}
 
-	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы отписались от источника «%s»", source.Name))
+	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы отписались от источника «%s».\n\nВы больше не будете получать новости из этого источника.", source.Name))
 	bot.Send(msg)
 }
 

@@ -70,11 +70,29 @@ func (mp *MessageProcessor) ProcessNewsNotification(notification kafka.NewsNotif
 
 	// Отправляем сообщение
 	if _, err := mp.bot.Send(msg); err != nil {
-		// Если получили ошибку "Too Many Requests", добавляем дополнительную задержку
-		if err.Error() == "Too Many Requests: retry after 1" {
-			mp.rateLimiter.period = 5 * time.Second // Увеличиваем задержку до 5 секунд
-			log.Printf("Обнаружено ограничение скорости, увеличиваем задержку для чата %d до 5 секунд", notification.ChatID)
+		// Улучшенная обработка rate limiting
+		if isRateLimitError(err) {
+			retryAfter := extractRetryAfter(err)
+			if retryAfter > 0 {
+				// Увеличиваем период rate limiter на основе времени ожидания
+				newPeriod := time.Duration(retryAfter+2) * time.Second
+				if newPeriod > mp.rateLimiter.period {
+					mp.rateLimiter.period = newPeriod
+					log.Printf("Обнаружено ограничение скорости для чата %d, увеличиваем задержку до %v", notification.ChatID, newPeriod)
+				}
+			} else {
+				// Если время не указано, увеличиваем до 5 секунд
+				mp.rateLimiter.period = 5 * time.Second
+				log.Printf("Обнаружено ограничение скорости для чата %d, увеличиваем задержку до 5 секунд", notification.ChatID)
+			}
+			// Не отправляем сообщение об ошибке пользователю при rate limiting
+			// Новости будут отправлены позже автоматически
+			return nil
 		}
+
+		// Для других ошибок логируем и возвращаем ошибку
+		errorMsg := handleTelegramError(err)
+		log.Printf("Ошибка отправки новости пользователю %d: %v (сообщение: %s)", notification.ChatID, err, errorMsg)
 		return fmt.Errorf("ошибка отправки сообщения: %v", err)
 	}
 

@@ -80,7 +80,7 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 	insertedId, err := db.SaveUser(dbConn, user)
 	if err != nil {
 		handlerLogger.Error("Ошибка добавления пользователя: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "Ошибка при подключении к боту. Попробуйте позже 😫")
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при подключении к боту.\n\nПожалуйста, попробуйте позже или обратитесь к администратору, если проблема сохраняется.")
 		bot.Send(msg)
 		return
 	}
@@ -159,7 +159,14 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	err = db.SaveSource(dbConn, source)
 	if err != nil {
 		handlerLogger.Error("Ошибка при добавлении источника: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось добавить источник. Возможно, он уже существует")
+		// Проверяем, существует ли уже источник
+		var msg tgbotapi.MessageConfig
+		_, existsErr := db.FindSourceActiveByUrl(dbConn, link)
+		if existsErr == nil {
+			msg = tgbotapi.NewMessage(chatId, "ℹ️ Этот источник уже существует в базе данных.\n\nВы можете подписаться на него через меню «📋 Мои источники».")
+		} else {
+			msg = tgbotapi.NewMessage(chatId, "❌ Не удалось добавить источник.\n\nВозможные причины:\n• Неверный формат URL\n• Источник недоступен\n• Проблема с подключением\n\nПопробуйте позже или проверьте правильность URL.")
+		}
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
@@ -212,16 +219,25 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 		SourceId: source.Id,
 	}
 
-	err = db.SaveSubscription(dbConn, subscription)
-	if err != nil {
-		handlerLogger.Error("Ошибка при добавлении подписки: %v", err)
-		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось добавить подписку. Возможно, она уже существует")
+	// Проверяем, не подписан ли уже пользователь
+	isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, source.Id)
+	if err == nil && isSubscribed {
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ℹ️ Вы уже подписаны на источник «%s».\n\nИспользуйте меню «📝 Мои подписки» для управления подписками.", source.Name))
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
 		return
 	}
 
-	successMsg := tgbotapi.NewMessage(chatId, "✅ Подписка на источник успешно добавлена!")
+	err = db.SaveSubscription(dbConn, subscription)
+	if err != nil {
+		handlerLogger.Error("Ошибка при добавлении подписки: %v", err)
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ Не удалось добавить подписку на «%s».\n\nВозможные причины:\n• Подписка уже существует\n• Проблема с базой данных\n\nПопробуйте позже.", source.Name))
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	successMsg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы успешно подписались на источник «%s»!\n\nТеперь вы будете получать новости из этого источника автоматически.", source.Name))
 	successMsg.ReplyMarkup = createMainKeyboard()
 	bot.Send(successMsg)
 }

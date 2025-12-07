@@ -88,7 +88,17 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 
 		if _, err := np.bot.Send(msg); err != nil {
 			monitoring.IncrementTelegramMessagesErrors()
-			newsLogger.Error("Ошибка отправки новости пользователю %d: %v", subscription.ChatId, err)
+			
+			// Улучшенная обработка ошибок
+			if isRateLimitError(err) {
+				// При rate limiting не логируем как ошибку, просто пропускаем
+				newsLogger.Warn("Rate limit для пользователя %d, новость будет отправлена позже: %s", subscription.ChatId, newsItem.Title)
+				continue
+			}
+
+			// Для других ошибок логируем с понятным сообщением
+			errorMsg := handleTelegramError(err)
+			newsLogger.Error("Ошибка отправки новости пользователю %d: %v (сообщение: %s)", subscription.ChatId, err, errorMsg)
 			continue
 		}
 
