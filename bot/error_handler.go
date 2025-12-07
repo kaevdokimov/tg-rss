@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -86,15 +88,25 @@ func isRateLimitError(err error) bool {
 }
 
 // extractRetryAfter извлекает время ожидания из ошибки rate limiting
+// Формат ошибки: "Too Many Requests: retry after 52833"
 func extractRetryAfter(err error) int {
 	if err == nil {
 		return 0
 	}
-	// Простая реализация - можно улучшить парсинг
+	
 	errStr := err.Error()
-	if strings.Contains(errStr, "retry after") {
-		// В реальной реализации можно парсить число из строки
-		return 1
+	if !strings.Contains(errStr, "retry after") {
+		return 0
 	}
+	
+	// Парсим число из строки "retry after 52833"
+	re := regexp.MustCompile(`retry after (\d+)`)
+	matches := re.FindStringSubmatch(errStr)
+	if len(matches) >= 2 {
+		if seconds, parseErr := strconv.Atoi(matches[1]); parseErr == nil {
+			return seconds
+		}
+	}
+	
 	return 0
 }

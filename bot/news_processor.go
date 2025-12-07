@@ -14,15 +14,21 @@ var newsLogger = monitoring.NewLogger("NewsProcessor")
 
 // NewsProcessor обрабатывает новости из Kafka и записывает в БД
 type NewsProcessor struct {
-	db  *sql.DB
-	bot *tgbotapi.BotAPI
+	db              *sql.DB
+	bot              *tgbotapi.BotAPI
+	globalRateLimiter *GlobalRateLimiter
 }
 
 // NewNewsProcessor создает новый обработчик новостей
 func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
+	// Глобальный rate limiter: минимум 50ms между сообщениями (20 сообщений/секунду)
+	// Это дает запас от лимита Telegram в 30 сообщений/секунду
+	globalLimiter := NewGlobalRateLimiter(50 * time.Millisecond)
+	
 	return &NewsProcessor{
-		db:  db,
-		bot: bot,
+		db:               db,
+		bot:              bot,
+		globalRateLimiter: globalLimiter,
 	}
 }
 
@@ -67,7 +73,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		return err
 	}
 
-	// Отправка новости подписанным пользователям с проверкой на дубликаты
+		// Отправка новости подписанным пользователям с проверкой на дубликаты
 	for _, subscription := range subscriptions {
 		// Проверяем, не отправляли ли уже эту новость пользователю
 		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsItem.SourceID, newsItem.Link)
@@ -78,6 +84,21 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		if sent {
 			newsLogger.Debug("Новость уже была отправлена пользователю %d: %s", subscription.ChatId, newsItem.Title)
 			continue
+		}
+
+		// Проверяем глобальный rate limit перед отправкой
+		if !np.globalRateLimiter.AllowGlobal() {
+			// Если глобальный лимит превышен, пропускаем эту новость
+			// Она будет обработана при следующем опросе RSS
+			newsLogger.Debug("Глобальный rate limit, пропускаем отправку новости пользователю %d: %s", subscription.ChatId, newsItem.Title)
+			continue
+		}
+		
+		// Небольшая задержка между отправками для предотвращения превышения лимитов
+		// Используем текущий интервал глобального rate limiter
+		currentInterval := np.globalRateLimiter.GetMinInterval()
+		if currentInterval > 0 {
+			time.Sleep(currentInterval)
 		}
 
 		// Отправляем сообщение
@@ -91,8 +112,39 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 			
 			// Улучшенная обработка ошибок
 			if isRateLimitError(err) {
-				// При rate limiting не логируем как ошибку, просто пропускаем
-				newsLogger.Warn("Rate limit для пользователя %d, новость будет отправлена позже: %s", subscription.ChatId, newsItem.Title)
+				retryAfter := extractRetryAfter(err)
+				if retryAfter > 0 {
+					// Если указано время ожидания, увеличиваем глобальный интервал
+					// Для больших значений (более часа) используем более консервативный подход
+					var newInterval time.Duration
+					if retryAfter > 3600 {
+						// Если более часа, устанавливаем интервал в 1 минуту
+						// Это позволит постепенно отправлять новости, не блокируя полностью
+						newInterval = 60 * time.Second
+						newsLogger.Warn("Критический rate limit для пользователя %d (retry after %d сек = %.1f часов). Устанавливаем интервал 1 минута между сообщениями. Новость будет отправлена позже: %s", 
+							subscription.ChatId, retryAfter, float64(retryAfter)/3600, newsItem.Title)
+					} else if retryAfter > 300 {
+						// Если более 5 минут, устанавливаем интервал в 30 секунд
+						newInterval = 30 * time.Second
+						newsLogger.Warn("Высокий rate limit для пользователя %d (retry after %d сек = %.1f минут). Устанавливаем интервал 30 секунд. Новость будет отправлена позже: %s", 
+							subscription.ChatId, retryAfter, float64(retryAfter)/60, newsItem.Title)
+					} else {
+						// Для меньших значений используем указанное время + запас
+						newInterval = time.Duration(retryAfter+5) * time.Second
+						if newInterval > 60*time.Second {
+							newInterval = 60 * time.Second
+						}
+						newsLogger.Warn("Rate limit для пользователя %d (retry after %d сек), увеличиваем глобальный интервал до %v. Новость будет отправлена позже: %s", 
+							subscription.ChatId, retryAfter, newInterval, newsItem.Title)
+					}
+					
+					np.globalRateLimiter.SetMinInterval(newInterval)
+				} else {
+					// Если время не указано, увеличиваем до 5 секунд
+					np.globalRateLimiter.SetMinInterval(5 * time.Second)
+					newsLogger.Warn("Rate limit для пользователя %d (время не указано), увеличиваем глобальный интервал до 5 секунд. Новость будет отправлена позже: %s", 
+						subscription.ChatId, newsItem.Title)
+				}
 				continue
 			}
 
@@ -122,6 +174,18 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 
 		monitoring.IncrementTelegramMessagesSent()
 		newsLogger.Debug("Новость отправлена пользователю %d: %s", subscription.ChatId, newsItem.Title)
+		
+		// После успешной отправки постепенно уменьшаем интервал, если он был увеличен
+		// Это позволяет вернуться к нормальной скорости после снятия ограничения
+		currentInterval = np.globalRateLimiter.GetMinInterval()
+		if currentInterval > 50*time.Millisecond {
+			// Уменьшаем на 10%, но не меньше базового значения (50ms)
+			newInterval := currentInterval * 90 / 100
+			if newInterval < 50*time.Millisecond {
+				newInterval = 50 * time.Millisecond
+			}
+			np.globalRateLimiter.SetMinInterval(newInterval)
+		}
 	}
 
 	return nil

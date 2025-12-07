@@ -12,11 +12,28 @@ type RateLimiter struct {
 	period time.Duration // минимальный интервал между сообщениями
 }
 
+// GlobalRateLimiter реализует глобальный rate limiter для всех сообщений
+// Защищает от превышения глобальных лимитов Telegram API (30 сообщений/секунду)
+type GlobalRateLimiter struct {
+	lastSent    time.Time
+	mu          sync.Mutex
+	minInterval time.Duration // минимальный интервал между любыми сообщениями
+}
+
 // NewRateLimiter создает новый RateLimiter с указанным периодом
 func NewRateLimiter(period time.Duration) *RateLimiter {
 	return &RateLimiter{
 		rates:  make(map[int64]time.Time),
 		period: period,
+	}
+}
+
+// NewGlobalRateLimiter создает новый глобальный rate limiter
+// Используется для защиты от превышения глобальных лимитов Telegram API
+func NewGlobalRateLimiter(minInterval time.Duration) *GlobalRateLimiter {
+	return &GlobalRateLimiter{
+		lastSent:    time.Time{},
+		minInterval: minInterval,
 	}
 }
 
@@ -34,6 +51,34 @@ func (r *RateLimiter) Allow(chatID int64) bool {
 	}
 	
 	return false
+}
+
+// AllowGlobal проверяет, можно ли отправить сообщение с учетом глобальных лимитов
+func (gr *GlobalRateLimiter) AllowGlobal() bool {
+	gr.mu.Lock()
+	defer gr.mu.Unlock()
+
+	now := time.Now()
+	if gr.lastSent.IsZero() || now.Sub(gr.lastSent) >= gr.minInterval {
+		gr.lastSent = now
+		return true
+	}
+	
+	return false
+}
+
+// SetMinInterval устанавливает минимальный интервал между сообщениями
+func (gr *GlobalRateLimiter) SetMinInterval(interval time.Duration) {
+	gr.mu.Lock()
+	defer gr.mu.Unlock()
+	gr.minInterval = interval
+}
+
+// GetMinInterval возвращает текущий минимальный интервал
+func (gr *GlobalRateLimiter) GetMinInterval() time.Duration {
+	gr.mu.Lock()
+	defer gr.mu.Unlock()
+	return gr.minInterval
 }
 
 // Cleanup удаляет устаревшие записи
