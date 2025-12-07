@@ -491,3 +491,54 @@ func UpdateSourceNames(db *sql.DB) error {
 	_, err := db.Exec(query)
 	return err
 }
+
+// AdminStats содержит статистику для администратора
+type AdminStats struct {
+	TotalNews      int
+	NewsToday      int
+	NewsYesterday  int
+	TotalUsers     int
+}
+
+// GetAdminStats возвращает статистику для администратора
+func GetAdminStats(db *sql.DB) (AdminStats, error) {
+	var stats AdminStats
+	
+	// Получаем текущую дату и дату вчера
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	yesterdayStart := todayStart.Add(-24 * time.Hour)
+	todayEnd := todayStart.Add(24 * time.Hour)
+	
+	// Общее количество новостей
+	err := db.QueryRow("SELECT COUNT(*) FROM news").Scan(&stats.TotalNews)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении общего количества новостей: %w", err)
+	}
+	
+	// Новости за сегодня
+	err = db.QueryRow(`
+		SELECT COUNT(*) FROM news 
+		WHERE published_at >= $1 AND published_at < $2
+	`, todayStart, todayEnd).Scan(&stats.NewsToday)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении новостей за сегодня: %w", err)
+	}
+	
+	// Новости за вчера
+	err = db.QueryRow(`
+		SELECT COUNT(*) FROM news 
+		WHERE published_at >= $1 AND published_at < $2
+	`, yesterdayStart, todayStart).Scan(&stats.NewsYesterday)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении новостей за вчера: %w", err)
+	}
+	
+	// Общее количество пользователей
+	err = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&stats.TotalUsers)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении количества пользователей: %w", err)
+	}
+	
+	return stats, nil
+}

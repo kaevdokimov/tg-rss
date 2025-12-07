@@ -62,6 +62,8 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 				handleLatestNewsImproved(bot, dbConn, update.Message.Chat.ID, 10)
 			case "tutorial":
 				handleTutorial(bot, dbConn, update.Message.Chat.ID)
+			case "stats":
+				handleAdminStats(bot, dbConn, update.Message.Chat.ID)
 			default:
 				handleUnknownCommand(bot, update.Message.Chat.ID)
 			}
@@ -534,6 +536,9 @@ func handleHelp(bot *tgbotapi.BotAPI, chatId int64) {
 *Получение новостей:*
 /news - Показать последние 10 новостей
 
+*Административные команды:*
+/stats - Статистика бота (только для администратора)
+
 *Примеры использования:*
 /add https://tass.ru/rss/v2.xml
 /addsub 1
@@ -582,6 +587,51 @@ func handleUnknownCommand(bot *tgbotapi.BotAPI, chatId int64) {
 func handleTutorial(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	// Начинаем с первого шага
 	showTutorialStep(bot, dbConn, chatId, 1)
+}
+
+// AdminChatID - ChatID администратора
+const AdminChatID int64 = 234501916
+
+// handleAdminStats обрабатывает команду /stats для администратора
+func handleAdminStats(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
+	// Проверяем, является ли пользователь администратором
+	if chatId != AdminChatID {
+		msg := tgbotapi.NewMessage(chatId, "❌ У вас нет доступа к этой команде.")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	// Получаем статистику
+	stats, err := db.GetAdminStats(dbConn)
+	if err != nil {
+		handlerLogger.Error("Ошибка при получении статистики: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении статистики.\n\nПопробуйте позже.")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	// Форматируем сообщение со статистикой
+	statsText := fmt.Sprintf(`📊 *Статистика бота*
+
+📰 *Новости:*
+• Всего новостей: %d
+• За сегодня: %d
+• За вчера: %d
+
+👥 *Пользователи:*
+• Всего пользователей: %d`,
+		stats.TotalNews,
+		stats.NewsToday,
+		stats.NewsYesterday,
+		stats.TotalUsers,
+	)
+
+	msg := tgbotapi.NewMessage(chatId, statsText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
 }
 
 // showTutorialStep показывает шаг туториала
