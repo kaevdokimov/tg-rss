@@ -6,7 +6,7 @@ services:
       db:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
       POSTGRES_HOST: ${POSTGRES_HOST:-"db"}
@@ -50,16 +50,18 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list"]
+      test: ["CMD-SHELL", "nc -z localhost 29092 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
     ports:
       - "8080:8080"
     environment:
