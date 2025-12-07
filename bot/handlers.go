@@ -56,7 +56,7 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 				handleAddSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
 			case "delsub":
 				handleDelSubscription(bot, dbConn, update.Message.Chat.ID, update.Message.CommandArguments())
-			case "subscribe_all":
+			case "subscribe_all", "subscribeall":
 				handleSubscribeAll(bot, dbConn, update.Message.Chat.ID)
 			case "news":
 				handleLatestNewsImproved(bot, dbConn, update.Message.Chat.ID, 10)
@@ -531,7 +531,7 @@ func handleHelp(bot *tgbotapi.BotAPI, chatId int64) {
 /sources - Показать список всех источников
 
 *Управление подписками:*
-/subscribe_all - Подписаться на все источники сразу
+/subscribe_all или /subscribeall - Подписаться на все источники сразу
 
 💡 *Совет по подпискам:*
 Используйте кнопки в меню для удобного управления:
@@ -547,7 +547,7 @@ func handleHelp(bot *tgbotapi.BotAPI, chatId int64) {
 
 *Примеры использования:*
 /add https://tass.ru/rss/v2.xml
-/subscribe_all
+/subscribe_all или /subscribeall
 
 💡 *Совет:* Используйте кнопки меню для более удобной навигации!
 
