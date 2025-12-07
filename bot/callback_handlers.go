@@ -34,6 +34,20 @@ func handleCallback(bot *tgbotapi.BotAPI, dbConn *sql.DB, callback *tgbotapi.Cal
 		handleMySubscriptions(bot, dbConn, chatId)
 	case data == "help":
 		handleHelp(bot, chatId)
+	case data == "quick_start":
+		handleQuickStart(bot, dbConn, chatId)
+	case data == "tutorial":
+		handleTutorial(bot, dbConn, chatId)
+	case data == "tutorial_skip":
+		handleTutorialSkip(bot, chatId)
+	case data == "tutorial_complete":
+		handleTutorialComplete(bot, chatId)
+	case strings.HasPrefix(data, "tutorial_step_"):
+		handleTutorialStep(bot, dbConn, chatId, data)
+	case strings.HasPrefix(data, "quick_subscribe_"):
+		handleQuickSubscribe(bot, dbConn, chatId, data)
+	case strings.HasPrefix(data, "quick_unsubscribe_"):
+		handleQuickUnsubscribe(bot, dbConn, chatId, data)
 	case strings.HasPrefix(data, "source_"):
 		handleSourceDetails(bot, dbConn, chatId, data)
 	case strings.HasPrefix(data, "subscribe_"):
@@ -305,4 +319,162 @@ func handleNewsPage(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data str
 	// Пока что просто показываем первые 10 новостей
 	// В будущем можно добавить настоящую пагинацию
 	handleLatestNewsImproved(bot, dbConn, chatId, 10)
+}
+
+// handleQuickStart обрабатывает быстрый старт - подписка на популярные источники
+func handleQuickStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
+	// Получаем все активные источники
+	sources, err := db.FindActiveSources(dbConn)
+	if err != nil {
+		log.Printf("Ошибка при получении источников: %v", err)
+		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении источников")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	if len(sources) == 0 {
+		msg := tgbotapi.NewMessage(chatId, "📋 Источников пока нет.\n\nДобавьте первый источник через кнопку «Добавить источник»")
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	// Получаем текущие подписки пользователя
+	subscriptions, err := db.GetUserSubscriptionsWithDetails(dbConn, chatId)
+	subscribedIds := make(map[int64]bool)
+	if err == nil {
+		for _, sub := range subscriptions {
+			subscribedIds[sub.SourceId] = true
+		}
+	}
+
+	msgText := `🚀 *Быстрый старт*
+
+Выберите популярные источники, на которые хотите подписаться:
+
+*Доступные источники:*`
+	
+	msg := tgbotapi.NewMessage(chatId, msgText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.ReplyMarkup = createQuickStartKeyboard(sources, subscribedIds)
+	bot.Send(msg)
+}
+
+// handleQuickSubscribe обрабатывает подписку через быстрый старт
+func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data string) {
+	parts := strings.Split(data, "_")
+	if len(parts) < 3 {
+		handleUnknownCallback(bot, chatId)
+		return
+	}
+
+	if parts[2] == "all" {
+		// Подписка на все источники
+		sources, err := db.FindActiveSources(dbConn)
+		if err != nil {
+			log.Printf("Ошибка при получении источников: %v", err)
+			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении источников")
+			bot.Send(msg)
+			return
+		}
+
+		subscribedCount := 0
+		for _, source := range sources {
+			// Проверяем, не подписан ли уже
+			isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, source.Id)
+			if err != nil || isSubscribed {
+				continue
+			}
+
+			// Проверяем существование пользователя
+			exists, err := db.UserExists(dbConn, chatId)
+			if err == nil && !exists {
+				user := db.User{
+					ChatId:   chatId,
+					Username: "unknown",
+				}
+				db.SaveUser(dbConn, user)
+			}
+
+			subscription := db.Subscription{
+				ChatId:   chatId,
+				SourceId: source.Id,
+			}
+			if err := db.SaveSubscription(dbConn, subscription); err == nil {
+				subscribedCount++
+			}
+		}
+
+		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы успешно подписались на %d источников!", subscribedCount))
+		msg.ReplyMarkup = createMainKeyboard()
+		bot.Send(msg)
+		return
+	}
+
+	// Подписка на один источник
+	sourceId, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		handleUnknownCallback(bot, chatId)
+		return
+	}
+
+	// Используем существующую логику подписки
+	handleSubscribe(bot, dbConn, chatId, fmt.Sprintf("subscribe_%d", sourceId))
+	
+	// Обновляем клавиатуру быстрого старта
+	handleQuickStart(bot, dbConn, chatId)
+}
+
+// handleQuickUnsubscribe обрабатывает отписку через быстрый старт
+func handleQuickUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data string) {
+	parts := strings.Split(data, "_")
+	if len(parts) != 3 {
+		handleUnknownCallback(bot, chatId)
+		return
+	}
+
+	sourceId, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		handleUnknownCallback(bot, chatId)
+		return
+	}
+
+	// Используем существующую логику отписки
+	handleUnsubscribe(bot, dbConn, chatId, fmt.Sprintf("unsubscribe_%d", sourceId))
+	
+	// Обновляем клавиатуру быстрого старта
+	handleQuickStart(bot, dbConn, chatId)
+}
+
+// handleTutorialStep обрабатывает переход к шагу туториала
+func handleTutorialStep(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data string) {
+	parts := strings.Split(data, "_")
+	if len(parts) != 3 {
+		handleUnknownCallback(bot, chatId)
+		return
+	}
+
+	step, err := strconv.Atoi(parts[2])
+	if err != nil {
+		handleUnknownCallback(bot, chatId)
+		return
+	}
+
+	showTutorialStep(bot, dbConn, chatId, step)
+}
+
+// handleTutorialSkip пропускает туториал
+func handleTutorialSkip(bot *tgbotapi.BotAPI, chatId int64) {
+	msg := tgbotapi.NewMessage(chatId, "✅ Туториал пропущен.\n\nИспользуйте кнопки меню для навигации. Если нужна помощь, нажмите /help")
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
+}
+
+// handleTutorialComplete завершает туториал
+func handleTutorialComplete(bot *tgbotapi.BotAPI, chatId int64) {
+	msg := tgbotapi.NewMessage(chatId, "🎉 *Туториал завершен!*\n\nТеперь вы готовы использовать бота. Нажмите «🚀 Быстрый старт» чтобы подписаться на популярные источники, или используйте меню для других действий.")
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.ReplyMarkup = createMainKeyboard()
+	bot.Send(msg)
 }
