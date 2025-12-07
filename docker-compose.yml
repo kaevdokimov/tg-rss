@@ -3,8 +3,10 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-kaevdokimov}/news-bot:latest
     container_name: bot
     depends_on:
-      - db
-      - kafka
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
       POSTGRES_HOST: ${POSTGRES_HOST:-"db"}
@@ -35,8 +37,8 @@ services:
     image: confluentinc/cp-kafka:7.7.7
     container_name: kafka
     depends_on:
-      - zookeeper
-      - db
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
     environment:
@@ -78,6 +80,11 @@ services:
     restart: always
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db_data:

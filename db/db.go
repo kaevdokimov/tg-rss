@@ -258,7 +258,8 @@ func InitSchema(db *sql.DB) {
 	 ('Ria.ru','https://ria.ru/export/rss2/index.xml?page_type=google_newsstand','2025-08-24 02:26:07.792288','active'::public."status_enum"),
 	 ('Rssexport.rbc.ru','https://rssexport.rbc.ru/rbcnews/news/30/full.rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
 	 ('Tass.ru','https://tass.ru/rss/v2.xml','2025-08-24 02:26:11.897401','active'::public."status_enum"),
-	 ('Government.ru','http://government.ru/all/rss/','2025-08-24 02:26:14.245899','active'::public."status_enum");
+	 ('Government.ru','http://government.ru/all/rss/','2025-08-24 02:26:14.245899','active'::public."status_enum")
+	ON CONFLICT (url) DO NOTHING;
 	`
 	_, err := db.Exec(query)
 	if err != nil {
