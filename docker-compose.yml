@@ -17,7 +17,7 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS:-"kafka:29092"}
       KAFKA_NEWS_TOPIC: ${KAFKA_NEWS_TOPIC:-"news-items"}
       KAFKA_NOTIFY_TOPIC: ${KAFKA_NOTIFY_TOPIC:-"news-notifications"}
-    restart: always
+    restart: unless-stopped
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.7

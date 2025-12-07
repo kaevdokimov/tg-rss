@@ -67,6 +67,7 @@ jobs:
         with:
           context: .
           push: true
+          no-cache: false
           tags: |
             ghcr.io/${{ github.repository_owner }}/news-bot:latest
             ghcr.io/${{ github.repository_owner }}/news-bot:${{ github.sha }}
@@ -163,7 +164,11 @@ jobs:
             docker stop bot db kafka zookeeper kafka-ui 2>/dev/null || true
             docker rm bot db kafka zookeeper kafka-ui 2>/dev/null || true
 
-            # Запускаем все сервисы через docker compose
+            # Принудительно обновляем образ бота
+            docker pull ghcr.io/${{ github.repository_owner }}/news-bot:latest || true
+
+            # Запускаем все сервисы через docker compose с принудительным обновлением образов
+            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull bot || true
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
             # Проверяем, что контейнеры запустились
