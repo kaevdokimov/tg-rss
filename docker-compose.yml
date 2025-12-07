@@ -1,6 +1,6 @@
 services:
   bot:
-    build: .
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-kaevdokimov}/news-bot:latest
     container_name: bot
     depends_on:
       - db
@@ -18,7 +18,7 @@ services:
     restart: always
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.10
+    image: confluentinc/cp-zookeeper:7.7.7
     container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -32,7 +32,7 @@ services:
       retries: 5
 
   kafka:
-    image: confluentinc/cp-kafka:7.4.10
+    image: confluentinc/cp-kafka:7.7.7
     container_name: kafka
     depends_on:
       - zookeeper
@@ -67,7 +67,7 @@ services:
     restart: always
 
   db:
-    image: postgres:17.6-alpine3.22
+    image: postgres:18.1-alpine3.23
     container_name: db
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

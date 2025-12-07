@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine3.22 AS builder
+FROM golang:1.25-alpine3.23 AS builder
 
 # Устанавливаем необходимые зависимости для сборки
 RUN apk add --no-cache gcc musl-dev
@@ -30,7 +30,7 @@ RUN CGO_ENABLED=1 go build \
 RUN go test -v ./...
 
 # Runtime stage
-FROM alpine:3.22
+FROM alpine:3.23
 
 # Устанавливаем необходимые runtime зависимости
 RUN apk add --no-cache ca-certificates tzdata && \
