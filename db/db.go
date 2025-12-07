@@ -44,6 +44,7 @@ type News struct {
 type NewsWithSource struct {
 	News
 	SourceName string
+	SourceUrl  string
 }
 
 type Subscription struct {
@@ -391,7 +392,7 @@ func FindSourceActiveByUrl(db *sql.DB, url string) (Source, error) {
 
 // GetLatestNews возвращает последние новости с информацией об источнике
 func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]NewsWithSource, error) {
-	query := `SELECT n.id, n.title, n.description, n.link, n.published_at, s.name 
+	query := `SELECT n.id, n.title, n.description, n.link, n.published_at, s.name, s.url 
 			  FROM news n 
 			  JOIN sources s ON n.source_id = s.id 
 			  WHERE n.source_id IN (SELECT source_id FROM subscriptions WHERE chat_id = $1) 
@@ -405,7 +406,7 @@ func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]NewsWithSource,
 	var news []NewsWithSource
 	for rows.Next() {
 		var item NewsWithSource
-		if err := rows.Scan(&item.Id, &item.Title, &item.Description, &item.Link, &item.PublishedAt, &item.SourceName); err != nil {
+		if err := rows.Scan(&item.Id, &item.Title, &item.Description, &item.Link, &item.PublishedAt, &item.SourceName, &item.SourceUrl); err != nil {
 			return nil, err
 		}
 		news = append(news, item)

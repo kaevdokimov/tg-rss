@@ -505,7 +505,7 @@ func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64
 
 	message := "📰 *Последние новости:*\n"
 	for i, item := range news {
-		message += formatMessage(i+1, item.Title, item.Description, item.PublishedAt, item.SourceName, item.Link)
+		message += formatMessage(i+1, item.Title, item.Description, item.PublishedAt, item.SourceName, item.Link, item.SourceUrl)
 	}
 	// Убираем лишний перенос в конце
 	message = strings.TrimRight(message, "\n")
@@ -553,8 +553,9 @@ func handleHelp(bot *tgbotapi.BotAPI, chatId int64) {
 
 📖 *Формат новостей:*
 Новости отображаются в компактном формате:
-• Заголовок является кликабельной ссылкой
-• Источник и время публикации в одной строке
+• Заголовок обычным текстом для лучшей читаемости
+• 🔗 - заметная иконка для ссылки на новость
+• 📰 - менее заметная иконка для ссылки на источник
 • Время в формате: "N мин", "N ч", "N дн"`
 
 	msg := tgbotapi.NewMessage(chatId, helpText)

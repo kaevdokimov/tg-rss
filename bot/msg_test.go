@@ -16,7 +16,8 @@ func TestFormatMessage(t *testing.T) {
 		description string
 		publishedAt time.Time
 		sourceName  string
-		link        string
+		newsLink    string
+		sourceUrl   string
 		wantContains []string
 	}{
 		{
@@ -26,8 +27,9 @@ func TestFormatMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-30 * time.Minute),
 			sourceName:  "Test Source",
-			link:        "https://example.com/news/1",
-			wantContains: []string{"1.", "Test News Title", "https://example.com/news/1", "Test Source", "30 мин"},
+			newsLink:    "https://example.com/news/1",
+			sourceUrl:   "https://example.com",
+			wantContains: []string{"1.", "Test News Title", "🔗", "📰", "Test Source", "30 мин"},
 		},
 		{
 			name:        "message with description",
@@ -36,8 +38,9 @@ func TestFormatMessage(t *testing.T) {
 			description: "Some description",
 			publishedAt: now.Add(-28 * time.Minute),
 			sourceName:  "Lenta.ru",
-			link:        "https://lenta.ru/news/123",
-			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "https://lenta.ru/news/123", "Lenta.ru", "28 мин"},
+			newsLink:    "https://lenta.ru/news/123",
+			sourceUrl:   "https://lenta.ru",
+			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "🔗", "📰", "Lenta.ru", "28 мин"},
 		},
 		{
 			name:        "message with long title",
@@ -46,14 +49,15 @@ func TestFormatMessage(t *testing.T) {
 			description: "",
 			publishedAt: now.Add(-1 * time.Hour),
 			sourceName:  "Ria.ru",
-			link:        "https://ria.ru/news/456",
-			wantContains: []string{"10.", "Ria.ru", "1 ч", "https://ria.ru/news/456"},
+			newsLink:    "https://ria.ru/news/456",
+			sourceUrl:   "https://ria.ru",
+			wantContains: []string{"10.", "Ria.ru", "1 ч", "🔗", "📰"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatMessage(tt.i, tt.title, tt.description, tt.publishedAt, tt.sourceName, tt.link)
+			result := formatMessage(tt.i, tt.title, tt.description, tt.publishedAt, tt.sourceName, tt.newsLink, tt.sourceUrl)
 			
 			// Проверяем, что результат содержит все необходимые элементы
 			for _, want := range tt.wantContains {
@@ -80,9 +84,22 @@ func TestFormatMessage(t *testing.T) {
 				t.Errorf("formatMessage() должна содержать разделитель '•' между источником и временем. Результат: %q", result)
 			}
 			
-			// Проверяем, что заголовок является ссылкой в формате Markdown
-			if !strings.Contains(result, "[") || !strings.Contains(result, "](") || !strings.Contains(result, ")") {
-				t.Errorf("formatMessage() должна содержать ссылку в формате Markdown [текст](url). Результат: %q", result)
+			// Проверяем, что есть иконки для ссылок
+			if !strings.Contains(result, "🔗") {
+				t.Errorf("formatMessage() должна содержать иконку 🔗 для ссылки на новость. Результат: %q", result)
+			}
+			if !strings.Contains(result, "📰") {
+				t.Errorf("formatMessage() должна содержать иконку 📰 для ссылки на источник. Результат: %q", result)
+			}
+			
+			// Проверяем, что заголовок НЕ является ссылкой (обычный текст)
+			// Заголовок должен быть без квадратных скобок в начале
+			titleIndex := strings.Index(result, tt.title)
+			if titleIndex > 0 {
+				beforeTitle := result[:titleIndex]
+				if strings.Contains(beforeTitle, "[") {
+					t.Errorf("formatMessage() заголовок не должен быть ссылкой. Результат: %q", result)
+				}
 			}
 		})
 	}
