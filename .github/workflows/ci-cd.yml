@@ -159,10 +159,10 @@ jobs:
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Останавливаем и удаляем все контейнеры
-            docker compose -f ~/deploy/docker-compose.yml --env-file ~/deploy/.env down -v --remove-orphans || true
+            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down -v --remove-orphans || true
 
             # Запускаем все сервисы через docker compose
-            docker compose -f ~/deploy/docker-compose.yml --env-file ~/deploy/.env up -d
+            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
             # Проверяем, что контейнеры запустились
             sleep 15
