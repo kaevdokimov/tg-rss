@@ -158,8 +158,10 @@ jobs:
             # Логин в GitHub Container Registry
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Останавливаем и удаляем все контейнеры
+            # Останавливаем и удаляем все контейнеры (включая те, что могли быть запущены вручную)
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down -v --remove-orphans || true
+            docker stop bot db kafka zookeeper kafka-ui 2>/dev/null || true
+            docker rm bot db kafka zookeeper kafka-ui 2>/dev/null || true
 
             # Запускаем все сервисы через docker compose
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
