@@ -29,7 +29,7 @@ func TestFormatMessage(t *testing.T) {
 			sourceName:  "Test Source",
 			newsLink:    "https://example.com/news/1",
 			sourceUrl:   "https://example.com",
-			wantContains: []string{"1.", "Test News Title", "🔗", "📰", "Test Source", "30 мин"},
+			wantContains: []string{"1.", "Test News Title", "🔗", "Test Source", "30 мин"},
 		},
 		{
 			name:        "message with description",
@@ -40,7 +40,7 @@ func TestFormatMessage(t *testing.T) {
 			sourceName:  "Lenta.ru",
 			newsLink:    "https://lenta.ru/news/123",
 			sourceUrl:   "https://lenta.ru",
-			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "🔗", "📰", "Lenta.ru", "28 мин"},
+			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "🔗", "Lenta.ru", "28 мин"},
 		},
 		{
 			name:        "message with long title",
@@ -51,7 +51,7 @@ func TestFormatMessage(t *testing.T) {
 			sourceName:  "Ria.ru",
 			newsLink:    "https://ria.ru/news/456",
 			sourceUrl:   "https://ria.ru",
-			wantContains: []string{"10.", "Ria.ru", "1 ч", "🔗", "📰"},
+			wantContains: []string{"10.", "Ria.ru", "1 ч", "🔗"},
 		},
 	}
 
@@ -84,12 +84,13 @@ func TestFormatMessage(t *testing.T) {
 				t.Errorf("formatMessage() должна содержать разделитель '•' между источником и временем. Результат: %q", result)
 			}
 			
-			// Проверяем, что есть иконки для ссылок
+			// Проверяем, что есть иконка для ссылки на новость
 			if !strings.Contains(result, "🔗") {
 				t.Errorf("formatMessage() должна содержать иконку 🔗 для ссылки на новость. Результат: %q", result)
 			}
-			if !strings.Contains(result, "📰") {
-				t.Errorf("formatMessage() должна содержать иконку 📰 для ссылки на источник. Результат: %q", result)
+			// Проверяем, что НЕТ иконки для ссылки на источник (убрали)
+			if strings.Contains(result, "[📰]") {
+				t.Errorf("formatMessage() не должна содержать иконку 📰 для ссылки на источник. Результат: %q", result)
 			}
 			
 			// Проверяем, что заголовок НЕ является ссылкой (обычный текст)
