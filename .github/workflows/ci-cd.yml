@@ -195,10 +195,10 @@ jobs:
           EOL
 
           # Останавливаем и удаляем все контейнеры
-          docker-compose -f /tmp/docker-compose.yml --env-file /tmp/.env down -v --remove-orphans || true
+          docker compose -f /tmp/docker-compose.yml --env-file /tmp/.env down -v --remove-orphans || true
 
-          # Запускаем все сервисы через docker-compose
-          docker-compose -f /tmp/docker-compose.yml --env-file /tmp/.env up -d
+          # Запускаем все сервисы через docker compose
+          docker compose -f /tmp/docker-compose.yml --env-file /tmp/.env up -d
 
           # Проверяем, что контейнеры запустились
           sleep 15
