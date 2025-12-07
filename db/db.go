@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"tg-rss/config"
 	"time"
 
@@ -263,7 +264,13 @@ func InitSchema(db *sql.DB) {
 	`
 	_, err := db.Exec(query)
 	if err != nil {
-		log.Fatalf("ошибка при создании схемы БД: %v", err)
+		// Игнорируем ошибки дублирования ключей при инициализации
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "duplicate key") && !strings.Contains(errMsg, "unique constraint") {
+			log.Fatalf("ошибка при создании схемы БД: %v", err)
+		}
+		// Если это ошибка дублирования, просто логируем и продолжаем
+		log.Printf("Предупреждение при инициализации схемы (возможно, данные уже существуют): %v", err)
 	}
 	log.Println("Схема базы данных инициализирована")
 }

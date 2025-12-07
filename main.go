@@ -35,13 +35,13 @@ func main() {
 
 	// Инициализация Kafka producer с retry
 	var kafkaProducer *kafka.Producer
-	maxRetries := 5
+	maxRetries := 15
 	for i := 0; i < maxRetries; i++ {
 		kafkaProducer, err = kafka.NewProducer(cfgKafka)
 		if err != nil {
 			log.Printf("Ошибка создания Kafka producer (попытка %d/%d): %v", i+1, maxRetries, err)
 			if i < maxRetries-1 {
-				time.Sleep(10 * time.Second)
+				time.Sleep(15 * time.Second)
 				continue
 			}
 			log.Fatalf("Не удалось создать Kafka producer после %d попыток", maxRetries)
@@ -57,7 +57,7 @@ func main() {
 		if err != nil {
 			log.Printf("Ошибка создания Kafka consumer (попытка %d/%d): %v", i+1, maxRetries, err)
 			if i < maxRetries-1 {
-				time.Sleep(10 * time.Second)
+				time.Sleep(15 * time.Second)
 				continue
 			}
 			log.Fatalf("Не удалось создать Kafka consumer после %d попыток", maxRetries)
