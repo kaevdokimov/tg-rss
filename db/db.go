@@ -33,11 +33,24 @@ type User struct {
 }
 
 type News struct {
-	Id          int64
-	Title       string
-	Description string
-	Link        string
-	PublishedAt time.Time
+	Id              int64
+	Title           string
+	Description     string
+	Link            string
+	PublishedAt     time.Time
+	FullText        sql.NullString
+	Author          sql.NullString
+	Category        sql.NullString
+	Tags            []string
+	Images          []string
+	MetaKeywords    sql.NullString
+	MetaDescription sql.NullString
+	MetaData        sql.NullString // JSON
+	ContentHTML     sql.NullString
+	ScrapedAt       sql.NullTime
+	ScrapeStatus    sql.NullString
+	ScrapeError     sql.NullString
+	UpdatedAt       time.Time
 }
 
 // NewsWithSource содержит новость с информацией об источнике
@@ -211,8 +224,22 @@ func InitSchema(db *sql.DB) {
 		description TEXT NOT NULL,
 		link VARCHAR(1024) NOT NULL UNIQUE,
 		published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		-- Дополнительные поля для полного контента и метаданных
+		full_text TEXT,
+		author VARCHAR(255),
+		category VARCHAR(255),
+		tags TEXT[], -- массив тегов
+		images TEXT[], -- массив URL изображений
+		meta_keywords TEXT,
+		meta_description TEXT,
+		meta_data JSONB, -- дополнительные метаданные в формате JSON
+		content_html TEXT, -- HTML контента для анализа
+		scraped_at TIMESTAMP, -- когда был выполнен парсинг страницы
+		scrape_status VARCHAR(50) DEFAULT 'pending', -- pending, success, failed
+		scrape_error TEXT, -- ошибка при парсинге, если была
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		tvs tsvector NULL GENERATED ALWAYS AS (
-			to_tsvector('russian', title || ' ' || description)
+			to_tsvector('russian', COALESCE(title, '') || ' ' || COALESCE(description, '') || ' ' || COALESCE(full_text, ''))
 		) STORED
 	);
 	-- Таблица пользователей

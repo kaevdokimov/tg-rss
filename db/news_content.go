@@ -1,0 +1,120 @@
+package db
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/lib/pq"
+)
+
+// SaveNewsContent сохраняет полный контент новости
+func SaveNewsContent(db *sql.DB, newsID int64, fullText, author, category string, tags, images []string,
+	metaKeywords, metaDescription string, metaData map[string]string, contentHTML string) error {
+
+	// Преобразуем tags и images в массивы PostgreSQL
+	// Используем pq.Array для правильного форматирования
+	tagsArray := tags
+	if tagsArray == nil {
+		tagsArray = []string{}
+	}
+
+	imagesArray := images
+	if imagesArray == nil {
+		imagesArray = []string{}
+	}
+
+	// Преобразуем metaData в JSON
+	metaDataJSON := "{}"
+	if len(metaData) > 0 {
+		jsonBytes, err := json.Marshal(metaData)
+		if err == nil {
+			metaDataJSON = string(jsonBytes)
+		}
+	}
+
+	query := `
+		UPDATE news 
+		SET full_text = $1,
+			author = $2,
+			category = $3,
+			tags = $4,
+			images = $5,
+			meta_keywords = $6,
+			meta_description = $7,
+			meta_data = $8::JSONB,
+			content_html = $9,
+			scraped_at = NOW(),
+			scrape_status = 'success',
+			scrape_error = NULL,
+			updated_at = NOW()
+		WHERE id = $10
+	`
+
+	_, err := db.Exec(query, fullText, author, category, pq.Array(tagsArray), pq.Array(imagesArray),
+		metaKeywords, metaDescription, metaDataJSON, contentHTML, newsID)
+
+	if err != nil {
+		return fmt.Errorf("ошибка сохранения контента новости: %w", err)
+	}
+
+	return nil
+}
+
+// MarkNewsScrapeFailed отмечает новость как не удавшуюся при парсинге
+func MarkNewsScrapeFailed(db *sql.DB, newsID int64, errorMsg string) error {
+	query := `
+		UPDATE news 
+		SET scrape_status = 'failed',
+			scrape_error = $1,
+			scraped_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := db.Exec(query, errorMsg, newsID)
+	if err != nil {
+		return fmt.Errorf("ошибка обновления статуса парсинга: %w", err)
+	}
+
+	return nil
+}
+
+// GetNewsForScraping возвращает список новостей, которые нужно распарсить
+func GetNewsForScraping(db *sql.DB, limit int) ([]NewsForScraping, error) {
+	query := `
+		SELECT id, link, published_at
+		FROM news
+		WHERE (scrape_status IS NULL OR scrape_status = 'pending' OR scrape_status = 'failed')
+		  AND published_at > NOW() - INTERVAL '7 days' -- только новости за последние 7 дней
+		ORDER BY published_at DESC
+		LIMIT $1
+	`
+
+	rows, err := db.Query(query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения новостей для парсинга: %w", err)
+	}
+	defer rows.Close()
+
+	var newsList []NewsForScraping
+	for rows.Next() {
+		var news NewsForScraping
+		err := rows.Scan(&news.ID, &news.Link, &news.PublishedAt)
+		if err != nil {
+			continue
+		}
+		newsList = append(newsList, news)
+	}
+
+	return newsList, nil
+}
+
+// NewsForScraping представляет новость для парсинга
+type NewsForScraping struct {
+	ID          int64
+	Link        string
+	PublishedAt time.Time
+}
+
