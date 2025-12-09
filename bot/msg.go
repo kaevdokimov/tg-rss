@@ -33,7 +33,7 @@ func formatMessage(i int, title, description string, publishedAt time.Time, sour
 	// Минималистичный формат: заголовок обычным текстом, ссылка на новость через иконку
 	// 🔗 - заметная иконка для ссылки на новость
 	return fmt.Sprintf(
-		"%d. %s\n   [🔗](%s) %s • %s\n",
+		"%d. %s   [🔗](%s) %s • %s\n",
 		i, title, newsLink, sourceName, relativeTime,
 	)
 }
