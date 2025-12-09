@@ -107,6 +107,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 
 	// Добавляем новость в очередь для каждого подписанного пользователя
 	np.pendingMutex.Lock()
+	addedToQueue := 0
 	for _, subscription := range subscriptions {
 		// Проверяем, не отправляли ли уже эту новость пользователю
 		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsItem.SourceID, newsItem.Link)
@@ -131,10 +132,19 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 			PublishedAt: publishedAt,
 		}
 		np.pendingNews[subscription.ChatId] = append(np.pendingNews[subscription.ChatId], pending)
+		addedToQueue++
 		newsLogger.Debug("Новость добавлена в очередь для пользователя %d: %s (всего в очереди: %d)", 
 			subscription.ChatId, newsItem.Title, len(np.pendingNews[subscription.ChatId]))
 	}
 	np.pendingMutex.Unlock()
+
+	if addedToQueue > 0 {
+		newsLogger.Info("Новость '%s' добавлена в очередь для %d пользователей", newsItem.Title, addedToQueue)
+	} else if len(subscriptions) > 0 {
+		newsLogger.Warn("Новость '%s' не была добавлена в очередь (возможно, уже отправлена всем подписчикам)", newsItem.Title)
+	} else {
+		newsLogger.Debug("Новость '%s' не была добавлена в очередь (нет подписчиков на источник %d)", newsItem.Title, newsItem.SourceID)
+	}
 
 	return nil
 }
@@ -143,15 +153,16 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 func (np *NewsProcessor) startPeriodicSending() {
 	newsLogger.Info("Запуск периодической отправки новостей с интервалом %v", np.sendInterval)
 	
-	// Первая отправка через 15 минут после старта
+	// Создаем тикер для периодической отправки
+	ticker := time.NewTicker(np.sendInterval)
+	defer ticker.Stop()
+	
+	// Первая отправка через интервал (15 минут)
 	// Это позволяет накопить новости за период
 	time.Sleep(np.sendInterval)
 	np.sendPendingNews()
 	
 	// Затем отправляем по расписанию каждые 15 минут
-	ticker := time.NewTicker(np.sendInterval)
-	defer ticker.Stop()
-	
 	for range ticker.C {
 		np.sendPendingNews()
 	}
@@ -178,7 +189,13 @@ func (np *NewsProcessor) sendPendingNews() {
 		return
 	}
 
-	newsLogger.Info("Начинаем отправку накопленных новостей для %d пользователей", len(pendingCopy))
+	// Подсчитываем общее количество новостей
+	totalNews := 0
+	for _, newsList := range pendingCopy {
+		totalNews += len(newsList)
+	}
+
+	newsLogger.Info("Начинаем отправку накопленных новостей для %d пользователей (всего новостей: %d)", len(pendingCopy), totalNews)
 
 	// Отправляем новости каждому пользователю
 	for chatId, newsList := range pendingCopy {
@@ -187,7 +204,7 @@ func (np *NewsProcessor) sendPendingNews() {
 		}
 
 		// Формируем сообщение со списком новостей
-		message := ""
+		message := "📰 *Новые новости:*\n\n"
 		for i, news := range newsList {
 			message += formatMessage(i+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
 		}
@@ -264,20 +281,35 @@ func (np *NewsProcessor) sendPendingNews() {
 		tx, err := np.db.Begin()
 		if err != nil {
 			newsLogger.Error("Ошибка начала транзакции для сохранения сообщений: %v", err)
+			// Возвращаем новости обратно в очередь
+			np.pendingMutex.Lock()
+			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
+			np.pendingMutex.Unlock()
 			continue
 		}
 
 		// Сохраняем все отправленные новости
+		saveErrors := false
 		for _, news := range newsList {
 			if err := db.SaveMessage(tx, chatId, news.NewsID); err != nil {
 				newsLogger.Error("Ошибка сохранения сообщения для новости %d: %v", news.NewsID, err)
+				saveErrors = true
 				// Продолжаем сохранять остальные
 			}
 		}
 
 		if err := tx.Commit(); err != nil {
 			newsLogger.Error("Ошибка коммита транзакции: %v", err)
+			// Возвращаем новости обратно в очередь
+			np.pendingMutex.Lock()
+			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
+			np.pendingMutex.Unlock()
 			continue
+		}
+
+		// Если были ошибки сохранения, но транзакция прошла, логируем предупреждение
+		if saveErrors {
+			newsLogger.Warn("Некоторые новости не были сохранены в БД для пользователя %d, но сообщение отправлено", chatId)
 		}
 
 		monitoring.IncrementTelegramMessagesSent()

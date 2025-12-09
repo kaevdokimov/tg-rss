@@ -48,7 +48,12 @@ func StartBotWithKafka(cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProduc
 			if err := kafkaConsumer.StartConsuming(func(data interface{}) error {
 				// Определяем тип сообщения и обрабатываем соответственно
 				if newsItem, ok := data.(kafka.NewsItem); ok {
-					return newsProcessor.ProcessNewsItem(newsItem)
+					log.Printf("[Kafka] Получена новость из Kafka: %s (источник: %s)", newsItem.Title, newsItem.SourceName)
+					if err := newsProcessor.ProcessNewsItem(newsItem); err != nil {
+						log.Printf("[Kafka] Ошибка обработки новости: %v", err)
+						return err
+					}
+					return nil
 				}
 				if notification, ok := data.(kafka.NewsNotification); ok {
 					return messageProcessor.ProcessNewsNotification(notification)
@@ -61,6 +66,7 @@ func StartBotWithKafka(cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProduc
 					continue
 				}
 			} else {
+				log.Printf("Kafka consumer успешно запущен")
 				break
 			}
 		}
