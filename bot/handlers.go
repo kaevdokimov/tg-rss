@@ -505,7 +505,7 @@ func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64
 
 	message := "📰 *Последние новости:*\n"
 	for i, item := range news {
-		message += formatMessage(i+1, item.Title, item.Description, item.PublishedAt, item.SourceName, item.Link, item.SourceUrl)
+		message += formatMessage(i+1, item.Title, item.PublishedAt, item.SourceName, item.Link)
 	}
 	// Убираем лишний перенос в конце
 	message = strings.TrimRight(message, "\n")

@@ -189,7 +189,7 @@ func (np *NewsProcessor) sendPendingNews() {
 		// Формируем сообщение со списком новостей
 		message := ""
 		for i, news := range newsList {
-			message += formatMessage(i+1, news.Title, news.Description, news.PublishedAt, news.SourceName, news.Link, news.SourceUrl)
+			message += formatMessage(i+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
 		}
 		// Убираем лишний перенос в конце
 		message = strings.TrimRight(message, "\n")
