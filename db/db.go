@@ -300,7 +300,62 @@ func InitSchema(db *sql.DB) {
 		// Если это ошибка дублирования, просто логируем и продолжаем
 		log.Printf("Предупреждение при инициализации схемы (возможно, данные уже существуют): %v", err)
 	}
+	
+	// Миграция: добавляем новые поля для скраппинга, если таблица уже существует
+	migrateNewsTable(db)
+	
 	log.Println("Схема базы данных инициализирована")
+}
+
+// migrateNewsTable добавляет новые поля для скраппинга к существующей таблице news
+func migrateNewsTable(db *sql.DB) {
+	migrationQueries := []string{
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS full_text TEXT`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS author VARCHAR(255)`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS category VARCHAR(255)`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS tags TEXT[]`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS images TEXT[]`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS meta_keywords TEXT`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS meta_description TEXT`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS meta_data JSONB`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS content_html TEXT`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS scraped_at TIMESTAMP`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS scrape_status VARCHAR(50) DEFAULT 'pending'`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS scrape_error TEXT`,
+		`ALTER TABLE news ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+	}
+
+	for _, query := range migrationQueries {
+		_, err := db.Exec(query)
+		if err != nil {
+			log.Printf("Предупреждение при миграции таблицы news: %v (запрос: %s)", err, query)
+		}
+	}
+
+	// Обновляем tsvector для включения full_text, если он еще не обновлен
+	// Проверяем, существует ли уже правильный tsvector
+	checkQuery := `
+		SELECT COUNT(*) FROM pg_attribute 
+		WHERE attrelid = 'news'::regclass 
+		AND attname = 'tvs'
+	`
+	var count int
+	err := db.QueryRow(checkQuery).Scan(&count)
+	if err == nil && count > 0 {
+		// Пересоздаем tsvector с учетом full_text
+		updateTsvectorQuery := `
+			ALTER TABLE news DROP COLUMN IF EXISTS tvs;
+			ALTER TABLE news ADD COLUMN tvs tsvector NULL GENERATED ALWAYS AS (
+				to_tsvector('russian', COALESCE(title, '') || ' ' || COALESCE(description, '') || ' ' || COALESCE(full_text, ''))
+			) STORED;
+		`
+		_, err = db.Exec(updateTsvectorQuery)
+		if err != nil {
+			log.Printf("Предупреждение при обновлении tsvector: %v", err)
+		}
+	}
+	
+	log.Println("Миграция таблицы news завершена")
 }
 
 // SaveUser сохраняет нового пользователя в БД
