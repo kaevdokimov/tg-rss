@@ -204,7 +204,7 @@ func (np *NewsProcessor) sendPendingNews() {
 		}
 
 		// Формируем сообщение со списком новостей
-		message := "📰 *Новые новости:*\n\n"
+		message := ""
 		for i, news := range newsList {
 			message += formatMessage(i+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
 		}
