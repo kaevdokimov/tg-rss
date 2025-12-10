@@ -304,7 +304,43 @@ func InitSchema(db *sql.DB) {
 	// Миграция: добавляем новые поля для скраппинга, если таблица уже существует
 	migrateNewsTable(db)
 	
+	// Исправляем экранированные символы в заголовках новостей (если они есть)
+	fixEscapedCharactersInNews(db)
+	
 	log.Println("Схема базы данных инициализирована")
+}
+
+// fixEscapedCharactersInNews исправляет экранированные символы в заголовках новостей
+func fixEscapedCharactersInNews(db *sql.DB) {
+	// Исправляем дефисы: заменяем \- на -
+	result, err := db.Exec(`
+		UPDATE news 
+		SET title = REPLACE(title, '\-', '-')
+		WHERE title LIKE '%\-%'
+	`)
+	if err != nil {
+		log.Printf("Предупреждение: ошибка при исправлении дефисов в заголовках: %v", err)
+		return
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		log.Printf("Исправлено дефисов в заголовках: %d записей", rowsAffected)
+	}
+
+	// Исправляем точки: заменяем \. на . (если они были экранированы)
+	result, err = db.Exec(`
+		UPDATE news 
+		SET title = REPLACE(title, '\.', '.')
+		WHERE title LIKE '%\.%'
+	`)
+	if err != nil {
+		log.Printf("Предупреждение: ошибка при исправлении точек в заголовках: %v", err)
+		return
+	}
+	rowsAffected, _ = result.RowsAffected()
+	if rowsAffected > 0 {
+		log.Printf("Исправлено точек в заголовках: %d записей", rowsAffected)
+	}
 }
 
 // migrateNewsTable добавляет новые поля для скраппинга к существующей таблице news
