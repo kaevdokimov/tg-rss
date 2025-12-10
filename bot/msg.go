@@ -28,8 +28,9 @@ func formatNewsMessage(title, description string, publishedAt time.Time, sourceN
 
 // escapeMarkdown экранирует специальные символы Markdown
 func escapeMarkdown(text string) string {
-	// Экранируем специальные символы Markdown: * _ [ ] ( ) ~ ` > # + - = | { } . !
-	re := regexp.MustCompile(`([*_\[\]()~` + "`" + `>#+\-=|{}.!])`)
+	// Экранируем специальные символы Markdown: * _ [ ] ( ) ~ ` > # + - = | { } !
+	// Точка (.) не экранируется, так как она не является специальным символом в обычном тексте
+	re := regexp.MustCompile(`([*_\[\]()~` + "`" + `>#+\-=|{}!])`)
 	return re.ReplaceAllString(text, `\$1`)
 }
 
