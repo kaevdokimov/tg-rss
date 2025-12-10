@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -25,16 +26,29 @@ func formatNewsMessage(title, description string, publishedAt time.Time, sourceN
 	return fmt.Sprintf("%s\n\n%s", header, trimmedDesc)
 }
 
+// escapeMarkdown экранирует специальные символы Markdown
+func escapeMarkdown(text string) string {
+	// Экранируем специальные символы Markdown: * _ [ ] ( ) ~ ` > # + - = | { } . !
+	re := regexp.MustCompile(`([*_\[\]()~` + "`" + `>#+\-=|{}.!])`)
+	return re.ReplaceAllString(text, `\$1`)
+}
+
 // formatMessage форматирует сообщение в списке для отправки
 func formatMessage(i int, title string, publishedAt time.Time, sourceName string, newsLink string) string {
 	// Форматируем относительное время
 	relativeTime := formatRelativeTime(publishedAt)
 
+	// Экранируем специальные символы в заголовке и названии источника
+	// Но не экранируем ссылку, так как она уже в правильном формате
+	escapedTitle := escapeMarkdown(title)
+	escapedSourceName := escapeMarkdown(sourceName)
+	escapedRelativeTime := escapeMarkdown(relativeTime)
+
 	// Минималистичный формат: заголовок обычным текстом, ссылка на новость через иконку
 	// 🔗 - заметная иконка для ссылки на новость
 	return fmt.Sprintf(
 		"%d. %s   [%s](%s) • %s\n",
-		i, title, sourceName, newsLink, relativeTime,
+		i, escapedTitle, escapedSourceName, newsLink, escapedRelativeTime,
 	)
 }
 
