@@ -37,6 +37,15 @@ func TestFormatMessage(t *testing.T) {
 			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "Lenta.ru", "28 мин"},
 		},
 		{
+			name:        "message with hyphen",
+			i:           2,
+			title:       "Семья с ребенком-инвалидом осталась без единственного жилья",
+			publishedAt: now.Add(-7 * time.Hour),
+			sourceName:  "Lenta.ru",
+			newsLink:    "https://lenta.ru/news/456",
+			wantContains: []string{"2.", "Семья с ребенком-инвалидом", "Lenta.ru", "7 ч"},
+		},
+		{
 			name:        "message with long title",
 			i:           10,
 			title:       "Очень длинный заголовок новости который может быть очень длинным",
