@@ -103,6 +103,11 @@ RSS Sources → RSS Poller → Kafka (news-items) → News Processor → Postgre
    KAFKA_BROKERS=kafka:29092
    KAFKA_NEWS_TOPIC=news-items
    KAFKA_NOTIFY_TOPIC=news-notifications
+   
+   # Настройки парсера контента новостей
+   CONTENT_SCRAPER_INTERVAL=1   # интервал парсинга контента в минутах (по умолчанию: 2)
+   CONTENT_SCRAPER_BATCH=60     # размер батча для парсинга контента (по умолчанию: 20)
+   CONTENT_SCRAPER_CONCURRENT=6 # количество параллельных запросов (по умолчанию: 6)
    ```
 
 ### Запуск с Docker Compose
