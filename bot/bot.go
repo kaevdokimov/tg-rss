@@ -33,10 +33,11 @@ func StartBotWithKafka(cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProduc
 	go StartRSSPolling(dbConn, interval, time.Local, kafkaProducer)
 
 	// Запуск фонового парсера контента новостей
-	// Парсит по 10 новостей каждые 5 минут, максимум 3 параллельно
-	contentScraper := NewContentScraper(dbConn, 5*time.Minute, 10, 3)
+	// Парсит по батчу новостей с заданным интервалом, максимум 3 параллельно
+	scraperInterval := time.Duration(cfgTgBot.ContentScraperInterval) * time.Minute
+	contentScraper := NewContentScraper(dbConn, scraperInterval, cfgTgBot.ContentScraperBatch, 3)
 	go contentScraper.Start()
-	log.Printf("Запуск фонового парсера контента: интервал=5 минут, батч=10, параллельно=3")
+	log.Printf("Запуск фонового парсера контента: интервал=%v, батч=%d, параллельно=3", scraperInterval, cfgTgBot.ContentScraperBatch)
 
 	// Запуск обработчика новостей из Kafka с retry логикой
 	go func() {

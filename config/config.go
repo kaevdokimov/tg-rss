@@ -15,9 +15,11 @@ type DBConfig struct {
 }
 
 type TgBotConfig struct {
-	ApiKey  string
-	TZ      string
-	Timeout int
+	ApiKey                 string
+	TZ                     string
+	Timeout                int
+	ContentScraperInterval int // интервал в минутах
+	ContentScraperBatch    int // размер батча
 }
 
 type KafkaConfig struct {
@@ -49,10 +51,20 @@ func LoadTgBotConfig() *TgBotConfig {
 	if err != nil {
 		log.Fatalf("Некорректное значение таймаута: %v", err)
 	}
+	ContentScraperInterval, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_INTERVAL", "2"))
+	if err != nil {
+		log.Fatalf("Некорректное значение интервала парсера контента: %v", err)
+	}
+	ContentScraperBatch, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_BATCH", "20"))
+	if err != nil {
+		log.Fatalf("Некорректное значение размера батча парсера контента: %v", err)
+	}
 	return &TgBotConfig{
-		ApiKey:  TelegramApiKey,
-		TZ:      getEnv("TZ", "Europe/Moscow"),
-		Timeout: Timeout,
+		ApiKey:                 TelegramApiKey,
+		TZ:                     getEnv("TZ", "Europe/Moscow"),
+		Timeout:                Timeout,
+		ContentScraperInterval: ContentScraperInterval,
+		ContentScraperBatch:    ContentScraperBatch,
 	}
 }
 
