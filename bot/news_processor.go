@@ -204,41 +204,6 @@ func (np *NewsProcessor) sendPendingNews() {
 			continue
 		}
 
-		// Формируем сообщение со списком новостей
-		// Telegram имеет лимит 4096 символов на сообщение
-		const maxMessageLength = 4000 // Оставляем запас
-		message := ""
-		newsToSend := newsList
-		newsToReturn := []PendingNews{}
-		
-		for i, news := range newsList {
-			formattedNews := formatMessage(i+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
-			
-			// Проверяем, не превысит ли добавление этой новости лимит
-			if len(message)+len(formattedNews) > maxMessageLength {
-				// Если это первая новость и она сама превышает лимит, отправляем её отдельно
-				if len(message) == 0 {
-					// Оставляем только эту новость, остальные вернем в очередь
-					message = formattedNews
-					newsToSend = newsList[i : i+1]
-					newsToReturn = append(newsToReturn, newsList[i+1:]...)
-					break
-				} else {
-					// Текущее сообщение готово, остальные новости вернем в очередь
-					newsToReturn = newsList[i:]
-					break
-				}
-			}
-			
-			message += formattedNews
-		}
-		
-		// Убираем лишний перенос в конце
-		message = strings.TrimRight(message, "\n")
-		
-		// Обновляем список новостей для отправки
-		newsList = newsToSend
-
 		// Проверяем глобальный rate limit перед отправкой
 		if !np.globalRateLimiter.AllowGlobal() {
 			newsLogger.Debug("Глобальный rate limit, пропускаем отправку списка новостей пользователю %d", chatId)
@@ -249,33 +214,94 @@ func (np *NewsProcessor) sendPendingNews() {
 			continue
 		}
 
-		// Небольшая задержка между отправками
-		currentInterval := np.globalRateLimiter.GetMinInterval()
-		if currentInterval > 0 {
-			time.Sleep(currentInterval)
+		// Отправляем новости частями, если они не помещаются в одно сообщение
+		// Telegram имеет лимит 4096 символов на сообщение
+		const maxMessageLength = 4096
+		message := ""
+		newsIndex := 0
+		sentNewsCount := 0
+		allSentSuccessfully := true
+
+		for newsIndex < len(newsList) {
+			news := newsList[newsIndex]
+			// Нумерация продолжается между сообщениями
+			formattedNews := formatMessage(newsIndex+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
+			
+			// Проверяем, не превысит ли добавление этой новости лимит
+			if len(message)+len(formattedNews) > maxMessageLength {
+				// Если это первая новость и она сама превышает лимит, отправляем её отдельно
+				if len(message) == 0 {
+					// Обрезаем форматированную новость, если она слишком длинная
+					if len(formattedNews) > maxMessageLength {
+						truncatedNews := formattedNews[:maxMessageLength]
+						lastNewline := strings.LastIndex(truncatedNews, "\n")
+						if lastNewline > 0 {
+							formattedNews = truncatedNews[:lastNewline]
+						} else {
+							formattedNews = truncatedNews
+						}
+					}
+					message = formattedNews
+					newsIndex++
+				} else {
+					// Текущее сообщение готово, отправляем его
+					message = strings.TrimRight(message, "\n")
+					if !np.sendNewsMessage(chatId, message, newsList[sentNewsCount:newsIndex]) {
+						allSentSuccessfully = false
+						break
+					}
+					sentNewsCount = newsIndex
+					message = ""
+					// Не увеличиваем newsIndex, чтобы добавить текущую новость в следующее сообщение
+				}
+			} else {
+				message += formattedNews
+				newsIndex++
+			}
 		}
 
-		// Проверяем длину сообщения перед отправкой
-		if len(message) == 0 {
-			newsLogger.Warn("Пустое сообщение для пользователя %d, пропускаем", chatId)
-			continue
+		// Отправляем оставшиеся новости, если есть
+		if allSentSuccessfully && len(message) > 0 {
+			message = strings.TrimRight(message, "\n")
+			if !np.sendNewsMessage(chatId, message, newsList[sentNewsCount:]) {
+				allSentSuccessfully = false
+			} else {
+				sentNewsCount = len(newsList)
+			}
 		}
-		
-		if len(message) > 4096 {
-			newsLogger.Error("Сообщение слишком длинное для пользователя %d: %d символов (максимум 4096)", chatId, len(message))
-			// Возвращаем новости обратно в очередь
+
+		// Если не все сообщения отправились успешно, возвращаем неотправленные новости в очередь
+		if !allSentSuccessfully && sentNewsCount < len(newsList) {
 			np.pendingMutex.Lock()
-			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
+			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList[sentNewsCount:]...)
 			np.pendingMutex.Unlock()
-			continue
+			newsLogger.Warn("Не все новости были отправлены пользователю %d, %d новостей возвращено в очередь", 
+				chatId, len(newsList)-sentNewsCount)
+		} else if sentNewsCount > 0 {
+			newsLogger.Info("Список из %d новостей отправлен пользователю %d", sentNewsCount, chatId)
 		}
+	}
+}
 
-		// Отправляем сообщение
-		msg := tgbotapi.NewMessage(chatId, message)
-		msg.ParseMode = tgbotapi.ModeMarkdown
-		msg.DisableWebPagePreview = true
+// sendNewsMessage отправляет одно сообщение с новостями и сохраняет их в БД
+func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList []PendingNews) bool {
+	if len(message) == 0 {
+		newsLogger.Warn("Пустое сообщение для пользователя %d, пропускаем", chatId)
+		return false
+	}
 
-		if _, err := np.bot.Send(msg); err != nil {
+	// Небольшая задержка между отправками
+	currentInterval := np.globalRateLimiter.GetMinInterval()
+	if currentInterval > 0 {
+		time.Sleep(currentInterval)
+	}
+
+	// Отправляем сообщение
+	msg := tgbotapi.NewMessage(chatId, message)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	msg.DisableWebPagePreview = true
+
+	if _, err := np.bot.Send(msg); err != nil {
 			monitoring.IncrementTelegramMessagesErrors()
 			
 			// Улучшенная обработка ошибок
@@ -304,11 +330,7 @@ func (np *NewsProcessor) sendPendingNews() {
 					np.globalRateLimiter.SetMinInterval(5 * time.Second)
 					newsLogger.Warn("Rate limit для пользователя %d (время не указано), увеличиваем глобальный интервал до 5 секунд", chatId)
 				}
-				// Возвращаем новости обратно в очередь
-				np.pendingMutex.Lock()
-				np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
-				np.pendingMutex.Unlock()
-				continue
+				return false
 			}
 
 			errorMsg := handleTelegramError(err)
@@ -334,40 +356,19 @@ func (np *NewsProcessor) sendPendingNews() {
 				
 				if _, sendErr := np.bot.Send(simpleMsg); sendErr != nil {
 					newsLogger.Error("Ошибка отправки простого сообщения пользователю %d: %v", chatId, sendErr)
-					// Возвращаем новости обратно в очередь
-					np.pendingMutex.Lock()
-					np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
-					np.pendingMutex.Unlock()
-					continue
+					return false
 				}
 				// Если простое сообщение отправилось успешно, продолжаем
 			} else {
-				// Для других ошибок возвращаем новости обратно в очередь
-				np.pendingMutex.Lock()
-				np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
-				np.pendingMutex.Unlock()
-				continue
+				return false
 			}
-		}
-
-		// Если есть новости, которые не поместились, возвращаем их в очередь
-		if len(newsToReturn) > 0 {
-			np.pendingMutex.Lock()
-			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsToReturn...)
-			np.pendingMutex.Unlock()
-			newsLogger.Info("Часть новостей (%d из %d) не поместилась в сообщение для пользователя %d, возвращена в очередь", 
-				len(newsToReturn), len(newsList)+len(newsToReturn), chatId)
 		}
 
 		// Сохраняем информацию об отправке в таблицу messages
 		tx, err := np.db.Begin()
 		if err != nil {
 			newsLogger.Error("Ошибка начала транзакции для сохранения сообщений: %v", err)
-			// Возвращаем новости обратно в очередь
-			np.pendingMutex.Lock()
-			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
-			np.pendingMutex.Unlock()
-			continue
+			return false
 		}
 
 		// Сохраняем все отправленные новости
@@ -382,11 +383,7 @@ func (np *NewsProcessor) sendPendingNews() {
 
 		if err := tx.Commit(); err != nil {
 			newsLogger.Error("Ошибка коммита транзакции: %v", err)
-			// Возвращаем новости обратно в очередь
-			np.pendingMutex.Lock()
-			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
-			np.pendingMutex.Unlock()
-			continue
+			return false
 		}
 
 		// Если были ошибки сохранения, но транзакция прошла, логируем предупреждение
@@ -395,7 +392,7 @@ func (np *NewsProcessor) sendPendingNews() {
 		}
 
 		monitoring.IncrementTelegramMessagesSent()
-		newsLogger.Info("Список из %d новостей отправлен пользователю %d", len(newsList), chatId)
+		newsLogger.Debug("Сообщение с %d новостями отправлено пользователю %d", len(newsList), chatId)
 		
 		// После успешной отправки постепенно уменьшаем интервал, если он был увеличен
 		currentInterval = np.globalRateLimiter.GetMinInterval()
@@ -406,5 +403,6 @@ func (np *NewsProcessor) sendPendingNews() {
 			}
 			np.globalRateLimiter.SetMinInterval(newInterval)
 		}
-	}
+
+	return true
 }
