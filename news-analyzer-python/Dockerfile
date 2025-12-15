@@ -46,12 +46,22 @@ RUN uv pip install --system --no-cache -r requirements.txt && \
 # Runtime stage
 FROM python:3.14-slim
 
-# Устанавливаем системные зависимости для runtime (cron не нужен, используем простой цикл)
+# Устанавливаем системные зависимости для runtime
+# Включаем build зависимости для компиляции hdbscan
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
+    gcc \
+    g++ \
+    cmake \
+    make \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/*
+
+# Устанавливаем uv для установки пакетов в runtime (более надежный способ)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+ENV UV_SYSTEM_PYTHON=1
 
 # Создаем непривилегированного пользователя
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -59,13 +69,34 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Создаем директорию для пакетов перед копированием
-RUN mkdir -p /usr/local/lib/python3.14/site-packages
+# Копируем requirements.txt для установки пакетов
+COPY --from=builder /app/requirements.txt /tmp/requirements.txt
 
-# Копируем установленные пакеты из builder stage
-# uv устанавливает пакеты в /usr/local/lib/python3.14/site-packages для системного Python
-COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Устанавливаем build зависимости для hdbscan
+RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
+
+# Устанавливаем Python зависимости через uv в runtime stage
+# Это гарантирует, что пакеты будут доступны
+RUN uv pip install --system --no-cache -r /tmp/requirements.txt && \
+    # Проверяем установку всех критических пакетов
+    python -c "import nltk; print('✓ nltk')" && \
+    python -c "import pandas; print('✓ pandas')" && \
+    python -c "import numpy; print('✓ numpy')" && \
+    python -c "import sklearn; print('✓ sklearn')" && \
+    python -c "import hdbscan; print('✓ hdbscan')" && \
+    python -c "import psycopg2; print('✓ psycopg2')" && \
+    python -c "import yaml; print('✓ yaml (pyyaml)')" && \
+    python -c "import dotenv; print('✓ python-dotenv')" && \
+    python -c "import requests; print('✓ requests')" && \
+    python -c "import tqdm; print('✓ tqdm')" && \
+    echo "All packages imported successfully" && \
+    # Очищаем временные файлы
+    rm -f /tmp/requirements.txt && \
+    # Удаляем build зависимости для уменьшения размера образа
+    apt-get purge -y gcc g++ cmake make libc6-dev && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Устанавливаем PYTHONPATH для поиска пакетов
 ENV PYTHONPATH=/usr/local/lib/python3.14/site-packages
@@ -82,12 +113,10 @@ RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
     # Создаем директории для данных (от root, потом изменим владельца)
     mkdir -p storage/reports storage/logs && \
     chown -R appuser:appuser storage && \
-    # Проверяем, что пакеты доступны (проверка после копирования)
-    echo "Checking packages after copy..." && \
-    ls -la /usr/local/lib/python3.14/site-packages/ | head -5 && \
-    python -c "import sys; print('Python path:', sys.path)" && \
-    python -c "import site; print('Site packages:', site.getsitepackages())" && \
-    python -c "import nltk; print('NLTK found:', nltk.__file__)" || (echo "WARNING: NLTK not found after copy" && python -c "import sys; [print(p) for p in sys.path]") && \
+    # Проверяем, что все критические пакеты доступны
+    python -c "import nltk; print('✓ NLTK found:', nltk.__file__)" || echo "WARNING: NLTK not found" && \
+    python -c "import yaml; print('✓ yaml (pyyaml) found:', yaml.__file__)" || echo "ERROR: yaml not found" && \
+    python -c "import pandas, numpy, sklearn, hdbscan, psycopg2, dotenv, requests, tqdm; print('✓ All other packages available')" || echo "WARNING: Some packages not found" && \
     # Инициализируем NLTK данные (если еще не загружены)
     python setup_nltk.py || true && \
     # Очищаем временные файлы
