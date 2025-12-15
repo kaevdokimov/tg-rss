@@ -154,9 +154,7 @@ services:
       retries: 5
 
   news-analyzer:
-    build:
-      context: ./news-analyzer-python
-      dockerfile: Dockerfile
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-kaevdokimov}/news-analyzer:latest
     container_name: news-analyzer
     depends_on:
       db:

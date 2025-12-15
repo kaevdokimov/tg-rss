@@ -5,6 +5,9 @@ FROM python:3.14-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
+    cmake \
+    make \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -14,9 +17,22 @@ WORKDIR /app
 # Копируем requirements.txt для кэширования слоев
 COPY requirements.txt .
 
+# Обновляем pip до последней версии
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Устанавливаем build зависимости для hdbscan
+RUN pip install --no-cache-dir --user "cython<4.0" "numpy<3.0"
+
 # Устанавливаем Python зависимости и очищаем кэш pip
 RUN pip install --no-cache-dir --user -r requirements.txt && \
-    pip cache purge || true
+    pip cache purge || true && \
+    # Очищаем временные файлы сборки
+    find /root/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -name "*.pyc" -delete 2>/dev/null || true && \
+    find /root/.local -name "*.pyo" -delete 2>/dev/null || true && \
+    # Очищаем .dist-info и .egg-info (оставляем только необходимое)
+    find /root/.local -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 # Runtime stage
 FROM python:3.14-slim
@@ -64,7 +80,18 @@ RUN python setup_nltk.py || true && \
     mkdir -p storage/reports storage/logs && \
     # Очищаем кэш pip и временные файлы
     pip cache purge || true && \
-    rm -rf /tmp/* /var/tmp/* ~/.cache/pip ~/.cache/nltk || true
+    rm -rf /tmp/* /var/tmp/* ~/.cache/pip ~/.cache/nltk || true && \
+    # Очищаем Python кэш и временные файлы
+    find /home/appuser/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /home/appuser/.local -name "*.pyc" -delete 2>/dev/null || true && \
+    find /home/appuser/.local -name "*.pyo" -delete 2>/dev/null || true && \
+    find /home/appuser/.local -name "*.pyd" -delete 2>/dev/null || true && \
+    # Очищаем документацию пакетов (не нужна в runtime)
+    find /home/appuser/.local -type d -name "*.dist-info" -exec sh -c 'rm -rf "$1"/RECORD "$1"/INSTALLER "$1"/REQUESTED 2>/dev/null || true' _ {} \; || true && \
+    # Очищаем тесты из установленных пакетов
+    find /home/appuser/.local -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /home/appuser/.local -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    find /home/appuser/.local -type d -name "*.tests" -exec rm -rf {} + 2>/dev/null || true
 
 # Healthcheck для проверки работоспособности
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
