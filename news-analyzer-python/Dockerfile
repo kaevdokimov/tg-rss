@@ -11,28 +11,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
+# Устанавливаем uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+ENV UV_SYSTEM_PYTHON=1
+
 # Создаем рабочую директорию
 WORKDIR /app
 
 # Копируем requirements.txt для кэширования слоев
 COPY requirements.txt .
 
-# Обновляем pip до последней версии
-RUN pip install --no-cache-dir --root-user-action=ignore --upgrade pip setuptools wheel
+# Устанавливаем build зависимости для hdbscan (cython и numpy нужны для компиляции)
+RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
 
-# Устанавливаем build зависимости для hdbscan
-RUN pip install --no-cache-dir --root-user-action=ignore --user "cython<4.0" "numpy<3.0"
-
-# Устанавливаем Python зависимости и очищаем кэш pip
-RUN pip install --no-cache-dir --root-user-action=ignore --user -r requirements.txt && \
-    pip cache purge --root-user-action=ignore || true && \
+# Устанавливаем Python зависимости через uv
+RUN uv pip install --system --no-cache -r requirements.txt && \
     # Очищаем временные файлы сборки
-    find /root/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /root/.local -name "*.pyc" -delete 2>/dev/null || true && \
-    find /root/.local -name "*.pyo" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -name "*.pyc" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -name "*.pyo" -delete 2>/dev/null || true && \
     # Очищаем .dist-info и .egg-info (оставляем только необходимое)
-    find /root/.local -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
-    find /root/.local -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+    find /usr/local/lib/python3.14/site-packages -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 # Runtime stage
 FROM python:3.14-slim
@@ -51,7 +51,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # Копируем установленные пакеты из builder stage
-COPY --from=builder /root/.local /home/appuser/.local
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Копируем исходный код
 COPY --chown=appuser:appuser . .
@@ -61,37 +62,32 @@ COPY --chown=appuser:appuser . .
 RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
     # Устанавливаем права на скрипты
     chmod +x run_daily.py setup_nltk.py test_connection.py docker-entrypoint.sh && \
+    # Создаем директории для данных (от root, потом изменим владельца)
+    mkdir -p storage/reports storage/logs && \
+    chown -R appuser:appuser storage && \
+    # Инициализируем NLTK данные (если еще не загружены)
+    python setup_nltk.py || true && \
     # Очищаем временные файлы
-    rm -rf /tmp/* /var/tmp/*
+    rm -rf /tmp/* /var/tmp/* /root/.cache/nltk || true && \
+    # Очищаем Python кэш и временные файлы
+    find /usr/local/lib/python3.14/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -name "*.pyc" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -name "*.pyo" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -name "*.pyd" -delete 2>/dev/null || true && \
+    # Очищаем документацию пакетов (не нужна в runtime)
+    find /usr/local/lib/python3.14/site-packages -type d -name "*.dist-info" -exec sh -c 'rm -rf "$1"/RECORD "$1"/INSTALLER "$1"/REQUESTED 2>/dev/null || true' _ {} \; || true && \
+    # Очищаем тесты из установленных пакетов
+    find /usr/local/lib/python3.14/site-packages -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.14/site-packages -type d -name "*.tests" -exec rm -rf {} + 2>/dev/null || true
 
 # Переключаемся на непривилегированного пользователя
 USER appuser
 
-# Устанавливаем PATH для Python пакетов
-ENV PATH=/home/appuser/.local/bin:$PATH
+# Устанавливаем переменные окружения
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV PIP_NO_CACHE_DIR=1
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Инициализируем NLTK данные (если еще не загружены) и очищаем кэш
-RUN python setup_nltk.py || true && \
-    # Создаем директории для данных
-    mkdir -p storage/reports storage/logs && \
-    # Очищаем кэш pip и временные файлы
-    pip cache purge --root-user-action=ignore || true && \
-    rm -rf /tmp/* /var/tmp/* ~/.cache/pip ~/.cache/nltk || true && \
-    # Очищаем Python кэш и временные файлы
-    find /home/appuser/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /home/appuser/.local -name "*.pyc" -delete 2>/dev/null || true && \
-    find /home/appuser/.local -name "*.pyo" -delete 2>/dev/null || true && \
-    find /home/appuser/.local -name "*.pyd" -delete 2>/dev/null || true && \
-    # Очищаем документацию пакетов (не нужна в runtime)
-    find /home/appuser/.local -type d -name "*.dist-info" -exec sh -c 'rm -rf "$1"/RECORD "$1"/INSTALLER "$1"/REQUESTED 2>/dev/null || true' _ {} \; || true && \
-    # Очищаем тесты из установленных пакетов
-    find /home/appuser/.local -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
-    find /home/appuser/.local -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
-    find /home/appuser/.local -type d -name "*.tests" -exec rm -rf {} + 2>/dev/null || true
+ENV UV_SYSTEM_PYTHON=1
 
 # Healthcheck для проверки работоспособности
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
