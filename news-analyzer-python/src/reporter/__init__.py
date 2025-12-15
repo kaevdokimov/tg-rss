@@ -2,5 +2,6 @@
 
 from .formatter import ReportFormatter
 from .summary import SummaryGenerator
+from .telegram_notifier import TelegramNotifier
 
-__all__ = ["ReportFormatter", "SummaryGenerator"]
+__all__ = ["ReportFormatter", "SummaryGenerator", "TelegramNotifier"]

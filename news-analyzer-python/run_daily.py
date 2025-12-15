@@ -18,12 +18,12 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from datetime import datetime
 
 from src.config import load_settings
-from src.db import Database
+from src.db import Database, User
 from src.fetcher import NewsFetcher
 from src.preprocessor import TextCleaner
 from src.analyzer import TextVectorizer, NewsClusterer
 from src.narrative import NarrativeBuilder
-from src.reporter import ReportFormatter, SummaryGenerator
+from src.reporter import ReportFormatter, SummaryGenerator, TelegramNotifier
 from src.utils import setup_logger, ensure_dir, get_logger
 
 
@@ -140,6 +140,43 @@ def main():
             
             # Выводим резюме в консоль и логи
             logger.info("\n" + summary)
+            
+            # 6. Отправка отчета в Telegram всем подписанным пользователям
+            # Используется отдельный бот для отправки отчетов (TELEGRAM_SIGNAL_API_KEY)
+            telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
+            
+            if telegram_token:
+                try:
+                    logger.info("Получение списка пользователей из БД...")
+                    users = db.get_all_users()
+                    
+                    if not users:
+                        logger.warning("Пользователи не найдены в БД. Отчет не будет отправлен.")
+                    else:
+                        logger.info(f"Найдено {len(users)} пользователей. Отправка отчетов...")
+                        
+                        # Создаем notifier
+                        notifier = TelegramNotifier(bot_token=telegram_token)
+                        
+                        # Получаем список chat_id
+                        chat_ids = [user.chat_id for user in users]
+                        
+                        # Отправляем отчет всем пользователям
+                        results = notifier.send_report_to_all(chat_ids, report_path)
+                        
+                        # Статистика отправки
+                        successful = sum(1 for success in results.values() if success)
+                        failed = len(results) - successful
+                        
+                        logger.info(f"Отправка завершена: успешно {successful}, ошибок {failed}")
+                        
+                        if failed > 0:
+                            failed_chat_ids = [chat_id for chat_id, success in results.items() if not success]
+                            logger.warning(f"Не удалось отправить {failed} пользователям: {failed_chat_ids[:10]}...")  # Показываем первые 10
+                except Exception as e:
+                    logger.error(f"Ошибка при отправке отчетов в Telegram: {e}")
+            else:
+                logger.info("Telegram не настроен (TELEGRAM_SIGNAL_API_KEY не установлен)")
             
             logger.info("=" * 60)
             logger.info("Анализ завершен успешно")

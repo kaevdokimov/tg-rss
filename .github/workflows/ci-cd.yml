@@ -96,8 +96,10 @@ jobs:
       - name: Create .env file
         run: |
           cat > .env << 'EOL'
-          # Telegram
+          # Telegram (основной бот)
           TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }}
+          # Telegram (бот для отчетов анализа)
+          TELEGRAM_SIGNAL_API_KEY=${{ secrets.TELEGRAM_SIGNAL_API_KEY }}
           
           # PostgreSQL
           POSTGRES_HOST=${{ secrets.POSTGRES_HOST || 'localhost' }}
@@ -132,15 +134,21 @@ jobs:
 
           # Создаем .env файл локально
           cat > /tmp/.env << EOF
+          # Telegram (основной бот)
           TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }}
+          # Telegram (бот для отчетов анализа)
+          TELEGRAM_SIGNAL_API_KEY=${{ secrets.TELEGRAM_SIGNAL_API_KEY }}
+          # PostgreSQL
           POSTGRES_HOST=db
           POSTGRES_PORT=5432
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          # Kafka
           KAFKA_BROKERS=kafka:29092
           KAFKA_NEWS_TOPIC=news-items
           KAFKA_NOTIFY_TOPIC=news-notifications
+          # Application
           TZ=Europe/Moscow
           TIMEOUT=60
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}

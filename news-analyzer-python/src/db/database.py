@@ -23,6 +23,13 @@ class NewsItem:
     source_id: Optional[int] = None
 
 
+@dataclass
+class User:
+    """Структура пользователя из БД."""
+    chat_id: int
+    username: str
+
+
 class Database:
     """Класс для работы с PostgreSQL."""
     
@@ -142,6 +149,45 @@ class Database:
                 
         except psycopg2.Error as e:
             logger.error(f"Ошибка при получении новостей: {e}")
+            raise
+    
+    def get_all_users(self, table_name: str = "users") -> List[User]:
+        """
+        Получает всех пользователей из БД.
+        
+        Args:
+            table_name: Имя таблицы с пользователями
+            
+        Returns:
+            Список пользователей
+        """
+        if not self._conn:
+            raise RuntimeError("Подключение к БД не установлено. Вызовите connect() или используйте контекстный менеджер.")
+        
+        query = f"""
+            SELECT chat_id, username
+            FROM {table_name}
+            ORDER BY chat_id
+        """
+        
+        try:
+            with self._conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                
+                users = []
+                for row in rows:
+                    user = User(
+                        chat_id=row["chat_id"],
+                        username=row.get("username", "") or ""
+                    )
+                    users.append(user)
+                
+                logger.info(f"Получено {len(users)} пользователей из БД")
+                return users
+                
+        except psycopg2.Error as e:
+            logger.error(f"Ошибка при получении пользователей: {e}")
             raise
     
     def test_connection(self) -> bool:
