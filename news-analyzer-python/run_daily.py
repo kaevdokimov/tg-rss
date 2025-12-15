@@ -9,6 +9,7 @@
     0 0 * * * cd /path/to/news-analyzer-python && /path/to/venv/bin/python run_daily.py
 """
 
+import os
 import sys
 from pathlib import Path
 

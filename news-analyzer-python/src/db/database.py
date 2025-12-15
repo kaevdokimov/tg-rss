@@ -2,6 +2,7 @@
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2 import sql
 from typing import List, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -91,10 +92,10 @@ class Database:
         # Вычисляем временную границу
         time_threshold = datetime.now() - timedelta(hours=hours)
         
-        # Формируем запрос
+        # Формируем запрос с безопасной подстановкой имени таблицы
         if use_titles_only:
             # Используем только заголовки для анализа
-            query = f"""
+            query = sql.SQL("""
                 SELECT 
                     id,
                     title,
@@ -103,15 +104,15 @@ class Database:
                     published_at,
                     full_text,
                     source_id
-                FROM {table_name}
+                FROM {}
                 WHERE published_at >= %s
                   AND title IS NOT NULL
                   AND title != ''
                 ORDER BY published_at DESC
-            """
+            """).format(sql.Identifier(table_name))
         else:
             # Используем заголовки и описание
-            query = f"""
+            query = sql.SQL("""
                 SELECT 
                     id,
                     title,
@@ -120,11 +121,11 @@ class Database:
                     published_at,
                     full_text,
                     source_id
-                FROM {table_name}
+                FROM {}
                 WHERE published_at >= %s
                   AND (title IS NOT NULL AND title != '')
                 ORDER BY published_at DESC
-            """
+            """).format(sql.Identifier(table_name))
         
         try:
             with self._conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -164,11 +165,12 @@ class Database:
         if not self._conn:
             raise RuntimeError("Подключение к БД не установлено. Вызовите connect() или используйте контекстный менеджер.")
         
-        query = f"""
+        # Безопасная подстановка имени таблицы
+        query = sql.SQL("""
             SELECT chat_id, username
-            FROM {table_name}
+            FROM {}
             ORDER BY chat_id
-        """
+        """).format(sql.Identifier(table_name))
         
         try:
             with self._conn.cursor(cursor_factory=RealDictCursor) as cursor:

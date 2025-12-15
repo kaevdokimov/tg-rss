@@ -1,7 +1,7 @@
 """Очистка и предобработка текста для русского языка."""
 
 import re
-from typing import List
+from typing import List, Optional
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -23,7 +23,7 @@ class TextCleaner:
     
     def __init__(
         self,
-        stopwords_extra: List[str] = None,
+        stopwords_extra: Optional[List[str]] = None,
         min_word_length: int = 3,
         max_word_length: int = 20
     ):

@@ -1,12 +1,15 @@
 """Построение нарративов (тем) из кластеров новостей."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, TYPE_CHECKING
 from collections import Counter
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from ..db.database import NewsItem
 from ..utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from ..analyzer.vectorizer import TextVectorizer
 
 logger = get_logger(__name__)
 
@@ -29,7 +32,7 @@ class NarrativeBuilder:
         self,
         news_items: List[NewsItem],
         labels: List[int],
-        vectorizer: Any,
+        vectorizer: "TextVectorizer",
         top_n: int = 5
     ) -> List[Dict[str, Any]]:
         """
@@ -80,7 +83,7 @@ class NarrativeBuilder:
         self,
         news_items: List[NewsItem],
         indices: List[int],
-        vectorizer: Any,
+        vectorizer: "TextVectorizer",
         cluster_id: int
     ) -> Dict[str, Any]:
         """
