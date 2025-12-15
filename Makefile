@@ -21,4 +21,24 @@ logs:
 	docker-compose logs -f
 
 console:
-	docker exec -it news_bot sh
+	docker exec -it bot sh
+
+############################
+# NEWS ANALYZER (Python)
+############################
+analyzer-logs:
+	docker-compose logs -f news-analyzer
+analyzer-console:
+	docker exec -it news-analyzer bash
+analyzer-run:
+	docker exec -it news-analyzer python run_daily.py
+analyzer-test:
+	docker exec -it news-analyzer python test_connection.py
+analyzer-build:
+	docker-compose build news-analyzer
+analyzer-restart:
+	docker-compose restart news-analyzer
+analyzer-stop:
+	docker-compose stop news-analyzer
+analyzer-start:
+	docker-compose start news-analyzer
