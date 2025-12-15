@@ -65,6 +65,7 @@ COPY --chown=appuser:appuser . .
 RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
     # Устанавливаем права на скрипты
     chmod +x run_daily.py setup_nltk.py test_connection.py docker-entrypoint.sh && \
+    chmod +x scripts/get_analysis_history.py 2>/dev/null || true && \
     # Создаем директории для данных (от root, потом изменим владельца)
     mkdir -p storage/reports storage/logs && \
     chown -R appuser:appuser storage && \

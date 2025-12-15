@@ -131,6 +131,23 @@ def main():
                 analysis_date=analysis_date
             )
             
+            # Сохраняем результат анализа в БД для исторических данных
+            logger.info("Сохранение результата анализа в БД...")
+            try:
+                # Убеждаемся, что таблица существует
+                db.ensure_analysis_table_exists()
+                
+                # Сохраняем результат
+                analysis_id = db.save_analysis_result(
+                    analysis_date=analysis_date,
+                    total_news=len(news_items),
+                    narratives=narratives
+                )
+                logger.info(f"Результат анализа сохранен в БД с ID: {analysis_id}")
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении результата анализа в БД: {e}")
+                logger.warning("Продолжаем работу, отчет сохранен в файл")
+            
             # Генерируем текстовое резюме
             summary_gen = SummaryGenerator()
             summary = summary_gen.generate(
