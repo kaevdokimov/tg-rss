@@ -17,6 +17,11 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS:-"kafka:29092"}
       KAFKA_NEWS_TOPIC: ${KAFKA_NEWS_TOPIC:-"news-items"}
       KAFKA_NOTIFY_TOPIC: ${KAFKA_NOTIFY_TOPIC:-"news-notifications"}
+      TZ: ${TZ:-"Europe/Moscow"}
+      TIMEOUT: ${TIMEOUT:-"60"}
+      CONTENT_SCRAPER_INTERVAL: ${CONTENT_SCRAPER_INTERVAL:-"2"}
+      CONTENT_SCRAPER_BATCH: ${CONTENT_SCRAPER_BATCH:-"20"}
+      CONTENT_SCRAPER_CONCURRENT: ${CONTENT_SCRAPER_CONCURRENT:-"6"}
     restart: unless-stopped
 
   zookeeper:
