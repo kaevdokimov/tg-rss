@@ -7,6 +7,12 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.whl
 
 # Virtual environments
 venv/
@@ -36,8 +42,9 @@ storage/logs/*.log
 .git/
 .gitignore
 
-# Documentation (опционально, можно оставить)
-# *.md
+# Documentation (исключаем для минимизации образа)
+*.md
+!README.md
 
 # Tests
 .pytest_cache/

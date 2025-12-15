@@ -193,7 +193,8 @@ jobs:
             # Запускаем все сервисы через docker compose с принудительным обновлением образов
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull bot || true
             # Собираем news-analyzer (собирается локально, не из registry)
-            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env build news-analyzer || true
+            # Используем --no-cache для чистой сборки и минимизации образа
+            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env build --no-cache news-analyzer || true
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
             # Ждем запуска сервисов (zookeeper может требовать больше времени для инициализации)
@@ -222,6 +223,17 @@ jobs:
               docker logs news-analyzer --tail 50 || true
             fi
 
-            # Очищаем неиспользуемые образы
-            docker image prune -af
+            # Очистка мусора Docker
+            echo '🧹 Очистка неиспользуемых Docker ресурсов...'
+            # Удаляем неиспользуемые образы
+            docker image prune -af || true
+            # Удаляем остановленные контейнеры
+            docker container prune -f || true
+            # Удаляем неиспользуемые сети
+            docker network prune -f || true
+            # Удаляем неиспользуемые volumes (осторожно - не удаляем используемые)
+            docker volume prune -f || true
+            # Удаляем неиспользуемые build cache
+            docker builder prune -af || true
+            echo '✅ Очистка завершена'
           "
