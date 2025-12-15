@@ -48,7 +48,7 @@ RUN uv pip install --system --no-cache -r requirements.txt && \
 FROM python:3.14-slim
 
 # Устанавливаем системные зависимости для runtime
-# Включаем build зависимости для компиляции hdbscan и pyyaml
+# Включаем build зависимости для компиляции hdbscan, pyyaml и psycopg2-binary
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     gcc \
@@ -57,6 +57,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     libc6-dev \
     libyaml-dev \
+    libpq-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/*
@@ -79,6 +81,7 @@ RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
 
 # Устанавливаем Python зависимости через uv в runtime stage
 # Это гарантирует, что пакеты будут доступны
+# psycopg2-binary может требовать сборки из исходников для Python 3.14, поэтому libpq-dev уже установлен
 RUN uv pip install --system --no-cache -r /tmp/requirements.txt
 
 # Проверяем установку всех критических пакетов отдельно для диагностики
@@ -95,6 +98,7 @@ RUN python -c "import nltk; print('✓ nltk')" && \
     echo "All packages imported successfully"
 
 # Очищаем временные файлы и удаляем build зависимости
+# Оставляем libpq-dev и postgresql-client, так как они могут понадобиться для psycopg2-binary
 RUN rm -f /tmp/requirements.txt && \
     apt-get purge -y gcc g++ cmake make libc6-dev libyaml-dev && \
     apt-get autoremove -y && \
