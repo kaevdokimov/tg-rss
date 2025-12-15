@@ -167,8 +167,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       TZ: ${TZ:-"Europe/Moscow"}
       LOG_LEVEL: ${ANALYZER_LOG_LEVEL:-"INFO"}
-      # Расписание запуска анализа (формат: "HH:MM,HH:MM", по умолчанию 12:00 и 19:00)
-      ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-"12:00,19:00"}
+      # Расписание запуска анализа (формат: "HH:MM,HH:MM", по умолчанию 3:00, 9:00, 12:00, 15:00, 21:00)
+      ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-3:00,9:00,12:00,15:00,21:00}
       # Запустить анализ сразу при старте контейнера (для тестирования)
       RUN_ON_STARTUP: ${ANALYZER_RUN_ON_STARTUP:-"false"}
       # Telegram для отправки отчетов

@@ -54,6 +54,9 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# Устанавливаем PYTHONPATH для поиска пакетов
+ENV PYTHONPATH=/usr/local/lib/python3.14/site-packages
+
 # Копируем исходный код
 COPY --chown=appuser:appuser . .
 
@@ -88,6 +91,7 @@ USER appuser
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV UV_SYSTEM_PYTHON=1
+# PYTHONPATH уже установлен выше
 
 # Healthcheck для проверки работоспособности
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
