@@ -20,12 +20,17 @@ if [ ! -f ".env" ]; then
     log "ПРЕДУПРЕЖДЕНИЕ: .env не найден, используем переменные окружения"
 fi
 
+# Создаем директории, если их нет
+mkdir -p storage/reports storage/logs
+
+# Создаем директорию для NLTK данных, если её нет
+NLTK_DATA_DIR="${NLTK_DATA:-/app/nltk_data}"
+mkdir -p "$NLTK_DATA_DIR"
+log "Директория NLTK: $NLTK_DATA_DIR"
+
 # Инициализируем NLTK данные, если еще не загружены
 log "Проверка данных NLTK..."
 python setup_nltk.py || log "ПРЕДУПРЕЖДЕНИЕ: Не удалось загрузить данные NLTK"
-
-# Создаем директории, если их нет
-mkdir -p storage/reports storage/logs
 
 # Определяем расписание запусков (по умолчанию 3:00, 9:00, 12:00, 15:00, 21:00)
 # Формат: "HH:MM,HH:MM" или через переменную ANALYZER_SCHEDULE_TIMES

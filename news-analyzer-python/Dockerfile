@@ -109,6 +109,8 @@ RUN rm -f /tmp/requirements.txt && \
 
 # Устанавливаем PYTHONPATH для поиска пакетов
 ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
+# Устанавливаем директорию для данных NLTK
+ENV NLTK_DATA=/app/nltk_data
 
 # Копируем исходный код
 COPY --chown=appuser:appuser . .
@@ -120,8 +122,8 @@ RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
     chmod +x run_daily.py setup_nltk.py test_connection.py docker-entrypoint.sh && \
     chmod +x scripts/get_analysis_history.py 2>/dev/null || true && \
     # Создаем директории для данных (от root, потом изменим владельца)
-    mkdir -p storage/reports storage/logs && \
-    chown -R appuser:appuser storage && \
+    mkdir -p storage/reports storage/logs nltk_data && \
+    chown -R appuser:appuser storage nltk_data && \
     # Проверяем, что все критические пакеты доступны
     python -c "import nltk; print('✓ NLTK found:', nltk.__file__)" || echo "WARNING: NLTK not found" && \
     python -c "import yaml; print('✓ yaml (pyyaml) found:', yaml.__file__)" || echo "ERROR: yaml not found" && \
@@ -149,7 +151,7 @@ USER appuser
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV UV_SYSTEM_PYTHON=1
-# PYTHONPATH уже установлен выше
+# PYTHONPATH и NLTK_DATA уже установлены выше
 
 # Healthcheck для проверки работоспособности
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
