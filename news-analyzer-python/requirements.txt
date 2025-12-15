@@ -1,5 +1,5 @@
-# Зависимости для Python 3.14
-# Версии проверены на совместимость с Python 3.14
+# Зависимости для Python 3.13
+# Версии проверены на совместимость с Python 3.13
 pandas==2.2.3
 numpy==2.1.0
 scikit-learn==1.6.0
@@ -7,6 +7,6 @@ nltk==3.9.1
 hdbscan==0.8.33
 psycopg2-binary==2.9.10
 python-dotenv==1.0.0
-pyyaml==6.0.3
+pyyaml==6.0.2
 tqdm==4.66.5
 requests==2.31.0

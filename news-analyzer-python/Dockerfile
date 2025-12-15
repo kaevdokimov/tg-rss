@@ -1,5 +1,5 @@
 # Multi-stage build для оптимизации размера образа
-FROM python:3.14-slim AS builder
+FROM python:3.13-slim AS builder
 
 # Устанавливаем системные зависимости для сборки
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,8 +31,8 @@ RUN uv pip install --system --no-cache -r requirements.txt && \
     python -c "import site; pkgs = site.getsitepackages(); print('Site packages:', pkgs); print('First site-packages:', pkgs[0] if pkgs else 'NONE')" && \
     python -c "import nltk, pandas, numpy, sklearn, hdbscan, psycopg2; print('All packages imported successfully')" && \
     # Проверяем, где именно установлены пакеты
-    ls -la /usr/local/lib/python3.14/site-packages/ | head -10 && \
-    ls -la /usr/lib/python3.14/site-packages/ 2>/dev/null | head -10 || echo "No packages in /usr/lib/python3.14/site-packages" && \
+    ls -la /usr/local/lib/python3.13/site-packages/ | head -10 && \
+    ls -la /usr/lib/python3.13/site-packages/ 2>/dev/null | head -10 || echo "No packages in /usr/lib/python3.13/site-packages" && \
     # Определяем путь к site-packages для очистки
     SITE_PKGS=$(python -c "import site; print(site.getsitepackages()[0])") && \
     echo "Cleaning packages in: $SITE_PKGS" && \
@@ -45,7 +45,7 @@ RUN uv pip install --system --no-cache -r requirements.txt && \
     find "$SITE_PKGS" -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 # Runtime stage
-FROM python:3.14-slim
+FROM python:3.13-slim
 
 # Устанавливаем системные зависимости для runtime
 # Включаем build зависимости для компиляции hdbscan, pyyaml и psycopg2-binary
@@ -81,7 +81,7 @@ RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
 
 # Устанавливаем Python зависимости через uv в runtime stage
 # Это гарантирует, что пакеты будут доступны
-# psycopg2-binary может требовать сборки из исходников для Python 3.14, поэтому libpq-dev уже установлен
+# psycopg2-binary может требовать сборки из исходников, поэтому libpq-dev уже установлен
 RUN uv pip install --system --no-cache -r /tmp/requirements.txt
 
 # Проверяем установку всех критических пакетов отдельно для диагностики
@@ -106,7 +106,7 @@ RUN rm -f /tmp/requirements.txt && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Устанавливаем PYTHONPATH для поиска пакетов
-ENV PYTHONPATH=/usr/local/lib/python3.14/site-packages
+ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
 
 # Копируем исходный код
 COPY --chown=appuser:appuser . .
@@ -129,16 +129,16 @@ RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
     # Очищаем временные файлы
     rm -rf /tmp/* /var/tmp/* /root/.cache/nltk || true && \
     # Очищаем Python кэш и временные файлы
-    find /usr/local/lib/python3.14/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -name "*.pyc" -delete 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -name "*.pyo" -delete 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -name "*.pyd" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.13/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.13/site-packages -name "*.pyc" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.13/site-packages -name "*.pyo" -delete 2>/dev/null || true && \
+    find /usr/local/lib/python3.13/site-packages -name "*.pyd" -delete 2>/dev/null || true && \
     # Очищаем документацию пакетов (не нужна в runtime)
-    find /usr/local/lib/python3.14/site-packages -type d -name "*.dist-info" -exec sh -c 'rm -rf "$1"/RECORD "$1"/INSTALLER "$1"/REQUESTED 2>/dev/null || true' _ {} \; || true && \
+    find /usr/local/lib/python3.13/site-packages -type d -name "*.dist-info" -exec sh -c 'rm -rf "$1"/RECORD "$1"/INSTALLER "$1"/REQUESTED 2>/dev/null || true' _ {} \; || true && \
     # Очищаем тесты из установленных пакетов
-    find /usr/local/lib/python3.14/site-packages -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -type d -name "*.tests" -exec rm -rf {} + 2>/dev/null || true
+    find /usr/local/lib/python3.13/site-packages -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.13/site-packages -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.13/site-packages -type d -name "*.tests" -exec rm -rf {} + 2>/dev/null || true
 
 # Переключаемся на непривилегированного пользователя
 USER appuser
