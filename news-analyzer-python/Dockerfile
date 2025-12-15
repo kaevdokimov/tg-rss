@@ -26,13 +26,22 @@ RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
 
 # Устанавливаем Python зависимости через uv
 RUN uv pip install --system --no-cache -r requirements.txt && \
+    # Проверяем, что пакеты установлены
+    python -c "import site; pkgs = site.getsitepackages(); print('Site packages:', pkgs); print('First site-packages:', pkgs[0] if pkgs else 'NONE')" && \
+    python -c "import nltk, pandas, numpy, sklearn, hdbscan, psycopg2; print('All packages imported successfully')" && \
+    # Проверяем, где именно установлены пакеты
+    ls -la /usr/local/lib/python3.14/site-packages/ | head -10 && \
+    ls -la /usr/lib/python3.14/site-packages/ 2>/dev/null | head -10 || echo "No packages in /usr/lib/python3.14/site-packages" && \
+    # Определяем путь к site-packages для очистки
+    SITE_PKGS=$(python -c "import site; print(site.getsitepackages()[0])") && \
+    echo "Cleaning packages in: $SITE_PKGS" && \
     # Очищаем временные файлы сборки
-    find /usr/local/lib/python3.14/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -name "*.pyc" -delete 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -name "*.pyo" -delete 2>/dev/null || true && \
+    find "$SITE_PKGS" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find "$SITE_PKGS" -name "*.pyc" -delete 2>/dev/null || true && \
+    find "$SITE_PKGS" -name "*.pyo" -delete 2>/dev/null || true && \
     # Очищаем .dist-info и .egg-info (оставляем только необходимое)
-    find /usr/local/lib/python3.14/site-packages -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+    find "$SITE_PKGS" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
+    find "$SITE_PKGS" -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 # Runtime stage
 FROM python:3.14-slim
@@ -50,7 +59,11 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
+# Создаем директорию для пакетов перед копированием
+RUN mkdir -p /usr/local/lib/python3.14/site-packages
+
 # Копируем установленные пакеты из builder stage
+# uv устанавливает пакеты в /usr/local/lib/python3.14/site-packages для системного Python
 COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
@@ -69,6 +82,12 @@ RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
     # Создаем директории для данных (от root, потом изменим владельца)
     mkdir -p storage/reports storage/logs && \
     chown -R appuser:appuser storage && \
+    # Проверяем, что пакеты доступны (проверка после копирования)
+    echo "Checking packages after copy..." && \
+    ls -la /usr/local/lib/python3.14/site-packages/ | head -5 && \
+    python -c "import sys; print('Python path:', sys.path)" && \
+    python -c "import site; print('Site packages:', site.getsitepackages())" && \
+    python -c "import nltk; print('NLTK found:', nltk.__file__)" || (echo "WARNING: NLTK not found after copy" && python -c "import sys; [print(p) for p in sys.path]") && \
     # Инициализируем NLTK данные (если еще не загружены)
     python setup_nltk.py || true && \
     # Очищаем временные файлы
