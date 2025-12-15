@@ -90,7 +90,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts || true
 
       # Создание .env файла для деплоя
       - name: Create .env file
@@ -116,6 +116,11 @@ jobs:
           # Application
           TZ=${{ secrets.TZ || 'Europe/Moscow' }}
           TIMEOUT=${{ secrets.TIMEOUT || '60' }}
+          
+          # Content scraper configuration
+          CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL || '2' }}
+          CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH || '20' }}
+          CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT || '6' }}
           EOL
 
       # Деплой на сервер
@@ -130,7 +135,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p $SSH_PORT $SSH_HOST >> ~/.ssh/known_hosts
+          ssh-keyscan -p $SSH_PORT $SSH_HOST >> ~/.ssh/known_hosts || true
 
           # Создаем .env файл локально
           cat > /tmp/.env << EOF
@@ -152,6 +157,11 @@ jobs:
           TZ=Europe/Moscow
           TIMEOUT=60
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
+          
+          # Content scraper configuration
+          CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL || '2' }}
+          CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH || '20' }}
+          CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT || '6' }}
           EOF
 
           # Копируем файлы на сервер
@@ -170,8 +180,8 @@ jobs:
             # Останавливаем контейнеры БЕЗ удаления volumes (чтобы сохранить данные)
             # Флаг -v удаляет volumes, поэтому его убираем для сохранения данных
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down --remove-orphans || true
-            docker stop bot db kafka zookeeper 2>/dev/null || true
-            docker rm bot db kafka zookeeper 2>/dev/null || true
+            docker stop bot db kafka zookeeper news-analyzer 2>/dev/null || true
+            docker rm bot db kafka zookeeper news-analyzer 2>/dev/null || true
 
             # Принудительно обновляем образ бота
             docker pull ghcr.io/${{ github.repository_owner }}/news-bot:latest || true
@@ -186,7 +196,7 @@ jobs:
             
             # Проверяем статус контейнеров
             echo '📊 Статус контейнеров:'
-            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper)' || true
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper|news-analyzer)' || true
             
             # Проверяем логи zookeeper если он не запустился
             if ! docker ps | grep -q zookeeper; then
@@ -194,9 +204,9 @@ jobs:
               docker logs zookeeper --tail 50 || true
             fi
             
-            # Проверяем, что все контейнеры запущены
+            # Проверяем, что основные контейнеры запущены
             docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper)' || exit 1
-            echo '✅ Все сервисы успешно запущены'
+            echo '✅ Все основные сервисы успешно запущены'
 
             # Очищаем неиспользуемые образы
             docker image prune -af
