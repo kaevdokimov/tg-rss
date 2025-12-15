@@ -168,6 +168,10 @@ jobs:
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p ~/news-bot" || true
           scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:~/news-bot/docker-compose.yml
           scp -P $SSH_PORT /tmp/.env $SSH_USER@$SSH_HOST:~/news-bot/.env
+          
+          # Копируем директорию news-analyzer-python для сборки образа
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p ~/news-bot/news-analyzer-python" || true
+          scp -r -P $SSH_PORT news-analyzer-python/* $SSH_USER@$SSH_HOST:~/news-bot/news-analyzer-python/
 
           # Выполнение команд на сервере
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
@@ -188,6 +192,8 @@ jobs:
 
             # Запускаем все сервисы через docker compose с принудительным обновлением образов
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull bot || true
+            # Собираем news-analyzer (собирается локально, не из registry)
+            docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env build news-analyzer || true
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
             # Ждем запуска сервисов (zookeeper может требовать больше времени для инициализации)
@@ -207,6 +213,14 @@ jobs:
             # Проверяем, что основные контейнеры запущены
             docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper)' || exit 1
             echo '✅ Все основные сервисы успешно запущены'
+            
+            # Проверяем news-analyzer (не критично, если не запустился)
+            if docker ps | grep -q news-analyzer; then
+              echo '✅ News analyzer запущен'
+            else
+              echo '⚠️ News analyzer не запустился, проверяем логи:'
+              docker logs news-analyzer --tail 50 || true
+            fi
 
             # Очищаем неиспользуемые образы
             docker image prune -af
