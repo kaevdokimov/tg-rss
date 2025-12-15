@@ -18,14 +18,14 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Обновляем pip до последней версии
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --root-user-action=ignore --upgrade pip setuptools wheel
 
 # Устанавливаем build зависимости для hdbscan
-RUN pip install --no-cache-dir --user "cython<4.0" "numpy<3.0"
+RUN pip install --no-cache-dir --root-user-action=ignore --user "cython<4.0" "numpy<3.0"
 
 # Устанавливаем Python зависимости и очищаем кэш pip
-RUN pip install --no-cache-dir --user -r requirements.txt && \
-    pip cache purge || true && \
+RUN pip install --no-cache-dir --root-user-action=ignore --user -r requirements.txt && \
+    pip cache purge --root-user-action=ignore || true && \
     # Очищаем временные файлы сборки
     find /root/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
     find /root/.local -name "*.pyc" -delete 2>/dev/null || true && \
@@ -79,7 +79,7 @@ RUN python setup_nltk.py || true && \
     # Создаем директории для данных
     mkdir -p storage/reports storage/logs && \
     # Очищаем кэш pip и временные файлы
-    pip cache purge || true && \
+    pip cache purge --root-user-action=ignore || true && \
     rm -rf /tmp/* /var/tmp/* ~/.cache/pip ~/.cache/nltk || true && \
     # Очищаем Python кэш и временные файлы
     find /home/appuser/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
