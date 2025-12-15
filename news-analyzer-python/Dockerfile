@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     make \
     libc6-dev \
+    libyaml-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -47,7 +48,7 @@ RUN uv pip install --system --no-cache -r requirements.txt && \
 FROM python:3.14-slim
 
 # Устанавливаем системные зависимости для runtime
-# Включаем build зависимости для компиляции hdbscan
+# Включаем build зависимости для компиляции hdbscan и pyyaml
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     gcc \
@@ -55,6 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     make \
     libc6-dev \
+    libyaml-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/*
@@ -77,9 +79,10 @@ RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
 
 # Устанавливаем Python зависимости через uv в runtime stage
 # Это гарантирует, что пакеты будут доступны
-RUN uv pip install --system --no-cache -r /tmp/requirements.txt && \
-    # Проверяем установку всех критических пакетов
-    python -c "import nltk; print('✓ nltk')" && \
+RUN uv pip install --system --no-cache -r /tmp/requirements.txt
+
+# Проверяем установку всех критических пакетов отдельно для диагностики
+RUN python -c "import nltk; print('✓ nltk')" && \
     python -c "import pandas; print('✓ pandas')" && \
     python -c "import numpy; print('✓ numpy')" && \
     python -c "import sklearn; print('✓ sklearn')" && \
@@ -89,11 +92,11 @@ RUN uv pip install --system --no-cache -r /tmp/requirements.txt && \
     python -c "import dotenv; print('✓ python-dotenv')" && \
     python -c "import requests; print('✓ requests')" && \
     python -c "import tqdm; print('✓ tqdm')" && \
-    echo "All packages imported successfully" && \
-    # Очищаем временные файлы
-    rm -f /tmp/requirements.txt && \
-    # Удаляем build зависимости для уменьшения размера образа
-    apt-get purge -y gcc g++ cmake make libc6-dev && \
+    echo "All packages imported successfully"
+
+# Очищаем временные файлы и удаляем build зависимости
+RUN rm -f /tmp/requirements.txt && \
+    apt-get purge -y gcc g++ cmake make libc6-dev libyaml-dev && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
