@@ -81,8 +81,10 @@ RUN uv pip install --system --no-cache "cython<4.0" "numpy<3.0"
 
 # Устанавливаем Python зависимости через uv в runtime stage
 # Это гарантирует, что пакеты будут доступны
-# psycopg2-binary может требовать сборки из исходников, поэтому libpq-dev уже установлен
-RUN uv pip install --system --no-cache -r /tmp/requirements.txt
+# scikit-learn автоматически установит scipy, который нужен для hdbscan
+# Устанавливаем scikit-learn первым, чтобы scipy был доступен для hdbscan
+RUN uv pip install --system --no-cache "scikit-learn==1.6.0" && \
+    uv pip install --system --no-cache -r /tmp/requirements.txt
 
 # Проверяем установку всех критических пакетов отдельно для диагностики
 RUN python -c "import nltk; print('✓ nltk')" && \
