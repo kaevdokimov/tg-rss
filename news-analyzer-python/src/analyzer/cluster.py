@@ -48,6 +48,19 @@ class NewsClusterer:
         # Преобразуем в numpy array
         X = np.array(vectors)
         
+        # Исправление для совместимости с новыми версиями sklearn:
+        # Метрика 'cosine' не поддерживается напрямую, поэтому нормализуем векторы
+        # и используем 'euclidean', что эквивалентно cosine для нормализованных векторов
+        metric = self.metric
+        if metric == "cosine":
+            # Нормализуем векторы (L2 нормализация)
+            norms = np.linalg.norm(X, axis=1, keepdims=True)
+            # Избегаем деления на ноль
+            norms[norms == 0] = 1
+            X = X / norms
+            metric = "euclidean"
+            logger.debug("Векторы нормализованы для использования cosine distance через euclidean")
+        
         # Оптимизация: для больших объемов данных используем более быстрые параметры
         # core_dist_n_jobs позволяет использовать несколько ядер CPU
         # но может быть слишком агрессивным, поэтому используем умеренное значение
@@ -57,7 +70,7 @@ class NewsClusterer:
         self.clusterer = hdbscan.HDBSCAN(
             min_cluster_size=self.min_cluster_size,
             min_samples=self.min_samples,
-            metric=self.metric,
+            metric=metric,
             cluster_selection_method="eom",  # Excess of Mass
             core_dist_n_jobs=n_jobs,  # Параллельная обработка для ускорения
             prediction_data=True  # Сохраняем данные для предсказаний
