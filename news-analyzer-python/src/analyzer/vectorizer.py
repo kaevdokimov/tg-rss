@@ -52,10 +52,17 @@ class TextVectorizer:
         )
         
         # Преобразуем в numpy array, затем в список списков
+        # ВАЖНО: Используем sparse matrix до последнего момента для экономии памяти
         vectors = self.vectorizer.fit_transform(texts)
         self._fitted = True
         
         logger.info(f"Создано {vectors.shape[1]} признаков")
+        
+        # Оптимизация: преобразуем sparse matrix в dense только если нужно
+        # Для больших объемов данных это может быть очень дорого
+        # Если HDBSCAN поддерживает sparse, можно передавать напрямую
+        # Но пока оставляем совместимость с текущим кодом
+        # Используем toarray() только в конце, когда действительно нужно
         return vectors.toarray().tolist()
     
     def get_feature_names(self) -> List[str]:

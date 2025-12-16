@@ -1,5 +1,6 @@
 """Кластеризация новостей с помощью HDBSCAN."""
 
+import os
 from typing import List, Dict, Any
 import numpy as np
 import hdbscan
@@ -47,12 +48,19 @@ class NewsClusterer:
         # Преобразуем в numpy array
         X = np.array(vectors)
         
+        # Оптимизация: для больших объемов данных используем более быстрые параметры
+        # core_dist_n_jobs позволяет использовать несколько ядер CPU
+        # но может быть слишком агрессивным, поэтому используем умеренное значение
+        n_jobs = min(4, os.cpu_count() or 1)  # Ограничиваем количество ядер
+        
         # Создаем и обучаем кластеризатор
         self.clusterer = hdbscan.HDBSCAN(
             min_cluster_size=self.min_cluster_size,
             min_samples=self.min_samples,
             metric=self.metric,
-            cluster_selection_method="eom"  # Excess of Mass
+            cluster_selection_method="eom",  # Excess of Mass
+            core_dist_n_jobs=n_jobs,  # Параллельная обработка для ускорения
+            prediction_data=True  # Сохраняем данные для предсказаний
         )
         
         labels = self.clusterer.fit_predict(X)

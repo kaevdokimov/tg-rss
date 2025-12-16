@@ -12,6 +12,9 @@
 import os
 import sys
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
+import time
 
 # Добавляем src в путь для импортов
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -69,6 +72,16 @@ def main():
             
             logger.info(f"Получено {len(news_items)} новостей для анализа")
             
+            # Оптимизация: ограничиваем количество новостей для обработки
+            # чтобы избежать перегрузки сервера
+            max_news_limit = int(os.getenv("MAX_NEWS_LIMIT", "1000"))
+            if len(news_items) > max_news_limit:
+                logger.warning(
+                    f"Обнаружено {len(news_items)} новостей, что превышает лимит {max_news_limit}. "
+                    f"Обрабатываем только последние {max_news_limit} новостей."
+                )
+                news_items = news_items[:max_news_limit]
+            
             # 1. Предобработка текста
             logger.info("Предобработка текста...")
             cleaner = TextCleaner(
@@ -77,14 +90,69 @@ def main():
                 max_word_length=settings.max_word_length
             )
             
-            processed_texts = []
-            for item in news_items:
-                if settings.use_titles_only:
+            # Оптимизация: параллельная обработка текста для ускорения
+            def preprocess_item(item, use_titles_only):
+                """Функция для предобработки одного элемента."""
+                if use_titles_only:
                     text = item.title
                 else:
                     text = f"{item.title} {item.description}"
-                processed = cleaner.preprocess(text)
-                processed_texts.append(processed)
+                return cleaner.preprocess(text)
+            
+            # Используем параллельную обработку для больших объемов данных
+            # Для малых объемов последовательная обработка быстрее из-за накладных расходов
+            # Используем ThreadPoolExecutor вместо ProcessPoolExecutor для избежания проблем с сериализацией
+            if len(news_items) > 100:
+                logger.info("Используется параллельная обработка текста...")
+                max_workers = min(4, os.cpu_count() or 1)  # Ограничиваем количество потоков
+                preprocess_func = partial(preprocess_item, use_titles_only=settings.use_titles_only)
+                
+                processed_texts = []
+                try:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Отправляем задачи и сохраняем соответствие индексов
+                        future_to_index = {
+                            executor.submit(preprocess_func, item): idx 
+                            for idx, item in enumerate(news_items)
+                        }
+                        # Создаем список результатов нужного размера
+                        processed_texts = [None] * len(news_items)
+                        # Собираем результаты в правильном порядке
+                        for future in as_completed(future_to_index):
+                            idx = future_to_index[future]
+                            try:
+                                processed_texts[idx] = future.result()
+                            except Exception as e:
+                                logger.error(f"Ошибка при предобработке текста для элемента {idx}: {e}")
+                                # Fallback: обрабатываем последовательно при ошибке
+                                processed_texts = []
+                                for item in news_items:
+                                    if settings.use_titles_only:
+                                        text = item.title
+                                    else:
+                                        text = f"{item.title} {item.description}"
+                                    processed_texts.append(cleaner.preprocess(text))
+                                break
+                except Exception as e:
+                    logger.warning(f"Ошибка при параллельной обработке, переключаемся на последовательную: {e}")
+                    # Fallback: последовательная обработка
+                    processed_texts = []
+                    for item in news_items:
+                        if settings.use_titles_only:
+                            text = item.title
+                        else:
+                            text = f"{item.title} {item.description}"
+                        processed_texts.append(cleaner.preprocess(text))
+            else:
+                # Последовательная обработка для малых объемов
+                processed_texts = []
+                for item in news_items:
+                    if settings.use_titles_only:
+                        text = item.title
+                    else:
+                        text = f"{item.title} {item.description}"
+                    processed = cleaner.preprocess(text)
+                    processed_texts.append(processed)
             
             logger.info(f"Предобработано {len(processed_texts)} текстов")
             

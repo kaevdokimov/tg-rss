@@ -86,19 +86,31 @@ class TelegramNotifier:
         Returns:
             Словарь {chat_id: success} с результатами отправки
         """
+        import time
+        import os
+        
         results = {}
         successful = 0
         failed = 0
         
         logger.info(f"Отправка сообщения {len(chat_ids)} пользователям...")
         
-        for chat_id in chat_ids:
+        # Оптимизация: добавляем задержку между отправками для снижения нагрузки на API
+        # Telegram API имеет лимит: 30 сообщений в секунду для бота
+        # Используем задержку 0.05 секунды (20 сообщений в секунду) для безопасности
+        delay_between_messages = float(os.getenv("TELEGRAM_SEND_DELAY", "0.05"))
+        
+        for idx, chat_id in enumerate(chat_ids):
             success = self.send_message(chat_id, text, disable_notification)
             results[chat_id] = success
             if success:
                 successful += 1
             else:
                 failed += 1
+            
+            # Добавляем задержку между отправками (кроме последнего сообщения)
+            if idx < len(chat_ids) - 1:
+                time.sleep(delay_between_messages)
         
         logger.info(f"Отправка завершена: успешно {successful}, ошибок {failed}")
         return results
