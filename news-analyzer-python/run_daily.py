@@ -11,10 +11,15 @@
 
 import os
 import sys
+import warnings
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 import time
+
+# Подавляем предупреждения SyntaxWarning из библиотеки hdbscan
+# Это предупреждение связано с форматированием строк в самой библиотеке
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="hdbscan")
 
 # Добавляем src в путь для импортов
 sys.path.insert(0, str(Path(__file__).parent / "src"))
