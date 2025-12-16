@@ -185,7 +185,7 @@ services:
       - analyzer_reports:/app/storage/reports
       - analyzer_logs:/app/storage/logs
       # Опционально: монтируем config.yaml для возможности изменения без пересборки
-      # - ./news-analyzer-python/config.yaml:/app/config.yaml:ro
+      - ./news-analyzer-python/config.yaml:/app/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import sys; sys.path.insert(0, '/app/src'); from src.db import Database; from src.config import load_settings; s = load_settings(); db = Database(s.get_db_connection_string()); db.connect(); exit(0 if db.test_connection() else 1)\" || exit 1"]
       interval: 60s
