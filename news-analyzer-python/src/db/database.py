@@ -81,6 +81,46 @@ class Database:
         """Контекстный менеджер: выход."""
         self.disconnect()
     
+    def get_news_count_last_hours(
+        self,
+        hours: int = 24,
+        table_name: str = "news"
+    ) -> int:
+        """
+        Получает количество новостей за последние N часов.
+
+        Args:
+            hours: Количество часов для выборки
+            table_name: Имя таблицы с новостями
+
+        Returns:
+            Количество новостей
+        """
+        if not self._conn:
+            raise RuntimeError("Подключение к БД не установлено. Вызовите connect() или используйте контекстный менеджер.")
+
+        # Вычисляем временную границу
+        time_threshold = datetime.now() - timedelta(hours=hours)
+
+        # Формируем запрос с безопасной подстановкой имени таблицы
+        query = sql.SQL("""
+            SELECT COUNT(*)
+            FROM {}
+            WHERE published_at >= %s
+              AND title IS NOT NULL
+              AND title != ''
+        """).format(sql.Identifier(table_name))
+
+        try:
+            with self._conn.cursor() as cursor:
+                cursor.execute(query, (time_threshold,))
+                count = cursor.fetchone()[0]
+                return count
+
+        except psycopg2.Error as e:
+            logger.error(f"Ошибка при получении количества новостей: {e}")
+            raise
+
     def get_news_last_hours(
         self,
         hours: int = 24,

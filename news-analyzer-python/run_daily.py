@@ -66,11 +66,28 @@ def main():
                 logger.error("Не удалось подключиться к БД")
                 sys.exit(1)
             
+            # ОПТИМИЗАЦИЯ: Проверяем количество новостей перед анализом
+            logger.info("Проверка количества новостей...")
+            min_news_threshold = int(os.getenv("ANALYZER_MIN_NEWS_THRESHOLD",
+                                               os.getenv("MIN_NEWS_THRESHOLD", "10")))
+
+            news_count = db.get_news_count_last_hours(
+                hours=settings.time_window_hours,
+                table_name=settings.db_table
+            )
+
+            if news_count < min_news_threshold:
+                logger.info(
+                    f"Найдено только {news_count} новостей за последние {settings.time_window_hours} часов "
+                    f"(минимум: {min_news_threshold}). Анализ пропущен для снижения нагрузки."
+                )
+                return
+
             # Получаем новости
-            logger.info("Получение новостей из БД...")
+            logger.info(f"Найдено {news_count} новостей. Начинаем получение данных...")
             fetcher = NewsFetcher(db, settings)
             news_items = fetcher.fetch_recent_news()
-            
+
             if not news_items:
                 logger.warning("Новости не найдены. Анализ завершен.")
                 return
@@ -79,7 +96,10 @@ def main():
             
             # Оптимизация: ограничиваем количество новостей для обработки
             # чтобы избежать перегрузки сервера
-            max_news_limit = int(os.getenv("MAX_NEWS_LIMIT", "1000"))
+            # Используем ANALYZER_MAX_NEWS_LIMIT для контейнера, если установлена,
+            # иначе MAX_NEWS_LIMIT для обратной совместимости
+            max_news_limit = int(os.getenv("ANALYZER_MAX_NEWS_LIMIT",
+                                          os.getenv("MAX_NEWS_LIMIT", "1000")))
             if len(news_items) > max_news_limit:
                 logger.warning(
                     f"Обнаружено {len(news_items)} новостей, что превышает лимит {max_news_limit}. "

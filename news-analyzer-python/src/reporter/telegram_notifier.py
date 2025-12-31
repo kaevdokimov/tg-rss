@@ -98,7 +98,9 @@ class TelegramNotifier:
         # Оптимизация: добавляем задержку между отправками для снижения нагрузки на API
         # Telegram API имеет лимит: 30 сообщений в секунду для бота
         # Используем задержку 0.05 секунды (20 сообщений в секунду) для безопасности
-        delay_between_messages = float(os.getenv("TELEGRAM_SEND_DELAY", "0.05"))
+        # Для контейнера используем ANALYZER_TELEGRAM_DELAY, если установлена
+        delay_between_messages = float(os.getenv("ANALYZER_TELEGRAM_DELAY",
+                                                os.getenv("TELEGRAM_SEND_DELAY", "0.05")))
         
         for idx, chat_id in enumerate(chat_ids):
             success = self.send_message(chat_id, text, disable_notification)

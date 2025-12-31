@@ -167,19 +167,24 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       TZ: ${TZ:-"Europe/Moscow"}
       LOG_LEVEL: ${ANALYZER_LOG_LEVEL:-"INFO"}
-      # Расписание запуска анализа (формат: "HH:MM,HH:MM", по умолчанию 3:00, 9:00, 12:00, 15:00, 21:00)
-      ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-3:00,9:00,12:00,15:00,21:00}
+      # Расписание запуска анализа (формат: "HH:MM,HH:MM")
+      # ОПТИМИЗАЦИЯ: Запуск только 2 раза в день вместо 5 для снижения нагрузки
+      ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-9:00,21:00}
       # Запустить анализ сразу при старте контейнера (для тестирования)
       RUN_ON_STARTUP: ${ANALYZER_RUN_ON_STARTUP:-"false"}
       # Telegram для отправки отчетов
       # Использует отдельный бот для отправки отчетов (токен из GitHub Actions переменных или .env)
       # Отправляет отчеты всем пользователям из таблицы users
       TELEGRAM_SIGNAL_API_KEY: ${TELEGRAM_SIGNAL_API_KEY}
+      # ОПТИМИЗАЦИЯ: Ограничения производительности
+      MAX_NEWS_LIMIT: ${ANALYZER_MAX_NEWS_LIMIT:-300}  # Максимум 300 новостей вместо 1000
+      TELEGRAM_SEND_DELAY: ${ANALYZER_TELEGRAM_DELAY:-0.1}  # Увеличенная задержка между отправками
+      MIN_NEWS_THRESHOLD: ${ANALYZER_MIN_NEWS_THRESHOLD:-10}  # Минимум новостей для анализа
     restart: unless-stopped
-    # Ограничения ресурсов
-    mem_limit: 512m
-    mem_reservation: 256m
-    cpus: 0.3
+    # ОПТИМИЗАЦИЯ: Более строгие ограничения ресурсов
+    mem_limit: 256m  # Уменьшено с 512m
+    mem_reservation: 128m  # Уменьшено с 256m
+    cpus: 0.2  # Уменьшено с 0.3
     volumes:
       # Монтируем директории для отчетов и логов (персистентность)
       - analyzer_reports:/app/storage/reports
