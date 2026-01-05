@@ -6,7 +6,7 @@ services:
       db:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
       POSTGRES_HOST: ${POSTGRES_HOST:-"db"}
@@ -104,11 +104,11 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:29092 --list >/dev/null 2>&1 && echo 'OK' || exit 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "/bin/bash -c 'timeout 5 bash -c \"</dev/tcp/kafka/29092\" && echo \"OK\" || exit 1'"]
+      interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 60s
 
   db:
     image: postgres:18.1-alpine3.23
