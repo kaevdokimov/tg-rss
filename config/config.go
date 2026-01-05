@@ -23,10 +23,12 @@ type TgBotConfig struct {
 	ContentScraperConcurrent int // количество параллельных запросов
 }
 
-type KafkaConfig struct {
-	Brokers     []string
-	NewsTopic   string
-	NotifyTopic string
+type RedisConfig struct {
+	Addr         string
+	Password     string
+	DB           int
+	NewsChannel  string
+	NotifyChannel string
 }
 
 func LoadDBConfig() *DBConfig {
@@ -74,13 +76,16 @@ func LoadTgBotConfig() *TgBotConfig {
 	}
 }
 
-func LoadKafkaConfig() *KafkaConfig {
-	brokers := getEnv("KAFKA_BROKERS", "kafka:29092")
-	log.Printf("Kafka brokers: %s", brokers)
-	return &KafkaConfig{
-		Brokers:     []string{brokers},
-		NewsTopic:   getEnv("KAFKA_NEWS_TOPIC", "news-items"),
-		NotifyTopic: getEnv("KAFKA_NOTIFY_TOPIC", "news-notifications"),
+func LoadRedisConfig() *RedisConfig {
+	addr := getEnv("REDIS_ADDR", "redis:6379")
+	db, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	log.Printf("Redis addr: %s", addr)
+	return &RedisConfig{
+		Addr:          addr,
+		Password:      getEnv("REDIS_PASSWORD", ""),
+		DB:            db,
+		NewsChannel:   getEnv("REDIS_NEWS_CHANNEL", "news-items"),
+		NotifyChannel: getEnv("REDIS_NOTIFY_CHANNEL", "news-notifications"),
 	}
 }
 

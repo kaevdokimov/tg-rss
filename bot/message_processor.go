@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"tg-rss/db"
-	"tg-rss/kafka"
+	"tg-rss/redis"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -31,7 +31,7 @@ func NewMessageProcessor(bot *tgbotapi.BotAPI, db *sql.DB) *MessageProcessor {
 }
 
 // ProcessNewsNotification обрабатывает уведомление о новости
-func (mp *MessageProcessor) ProcessNewsNotification(notification kafka.NewsNotification) error {
+func (mp *MessageProcessor) ProcessNewsNotification(notification redis.NewsNotification) error {
 	// Проверяем, подписан ли пользователь на источник
 	isSubscribed, err := db.IsUserSubscribed(mp.db, notification.ChatID, notification.SourceID)
 	if err != nil {

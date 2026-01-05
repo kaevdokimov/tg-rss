@@ -5,8 +5,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      redis:
+        condition: service_healthy
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
       POSTGRES_HOST: ${POSTGRES_HOST:-"db"}
@@ -14,9 +14,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
-      KAFKA_BROKERS: ${KAFKA_BROKERS:-"kafka:29092"}
-      KAFKA_NEWS_TOPIC: ${KAFKA_NEWS_TOPIC:-"news-items"}
-      KAFKA_NOTIFY_TOPIC: ${KAFKA_NOTIFY_TOPIC:-"news-notifications"}
+      REDIS_ADDR: ${REDIS_ADDR:-"redis:6379"}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-""}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_NEWS_CHANNEL: ${REDIS_NEWS_CHANNEL:-"news-items"}
+      REDIS_NOTIFY_CHANNEL: ${REDIS_NOTIFY_CHANNEL:-"news-notifications"}
       TZ: ${TZ:-"Europe/Moscow"}
       TIMEOUT: ${TIMEOUT:-"60"}
       CONTENT_SCRAPER_INTERVAL: ${CONTENT_SCRAPER_INTERVAL:-"2"}
@@ -28,87 +30,36 @@ services:
     mem_reservation: ${BOT_MEM_RESERVATION:-256m}
     cpus: ${BOT_CPUS:-0.5}
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.8.6
-    container_name: zookeeper
-    # МИНИМАЛЬНЫЕ ограничения ресурсов для Zookeeper (увеличено для стабильности)
-    mem_limit: ${ZOOKEEPER_MEM_LIMIT:-256m}
-    mem_reservation: ${ZOOKEEPER_MEM_RESERVATION:-128m}
-    cpus: ${ZOOKEEPER_CPUS:-0.2}
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_INIT_LIMIT: 5
-      ZOOKEEPER_SYNC_LIMIT: 2
-      ZOOKEEPER_MAX_CLIENT_CNXNS: 60
-      # Оптимизированные настройки для быстрого старта
-      ZOOKEEPER_AUTOPURGE_PURGEINTERVAL: 0
-      ZOOKEEPER_AUTOPURGE_SNAPRETAINCOUNT: 3
-      KAFKA_HEAP_OPTS: "-Xmx128M -Xms64M"
-      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok -Dzookeeper.request.timeout=30000"
+  redis:
+    image: redis:8.4-alpine3.22
+    container_name: redis
+    # Минимальные ресурсы для Redis
+    mem_limit: ${REDIS_MEM_LIMIT:-100m}
+    mem_reservation: ${REDIS_MEM_RESERVATION:-50m}
+    cpus: ${REDIS_CPUS:-0.05}
     ports:
-      - "2181:2181"
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-      - zookeeper_logs:/var/lib/zookeeper/log
-    healthcheck:
-      test: ["CMD-SHELL", "sh -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok || exit 1"]
-      interval: 15s
-      timeout: 10s
-      start_period: 60s  # Увеличено время ожидания для Zookeeper
-      retries: 10  # Увеличено количество попыток
-    restart: unless-stopped
-
-  kafka:
-    image: confluentinc/cp-kafka:7.8.6
-    container_name: kafka
-    # Оптимальные ограничения ресурсов для Kafka (увеличено для heap)
-    mem_limit: ${KAFKA_MEM_LIMIT:-512m}
-    mem_reservation: ${KAFKA_MEM_RESERVATION:-256m}
-    cpus: ${KAFKA_CPUS:-0.2}
-    depends_on:
-      zookeeper:
-        condition: service_healthy
-    ports:
-      - "9092:9092"
+      - "6379:6379"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      # Оптимизированные настройки памяти JVM
-      KAFKA_HEAP_OPTS: "-Xmx384M -Xms192M"
-
-      # МИНИМАЛЬНЫЕ настройки производительности
-      KAFKA_NUM_NETWORK_THREADS: 2
-      KAFKA_NUM_IO_THREADS: 2
-      KAFKA_SOCKET_SEND_BUFFER_BYTES: 51200
-      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 51200
-      KAFKA_SOCKET_REQUEST_MAX_BYTES: 20971520  # 20MB
-
-      # Оптимизированные настройки для быстрого старта
-      KAFKA_NUM_PARTITIONS: 1
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
-      KAFKA_MIN_INSYNC_REPLICAS: 1
-      KAFKA_LOG_RETENTION_HOURS: 1  # 1 час для экономии места
-      KAFKA_LOG_RETENTION_BYTES: 268435456  # 256MB
-      KAFKA_LOG_SEGMENT_BYTES: 26214400  # 25MB
-      KAFKA_COMPRESSION_TYPE: uncompressed  # Без сжатия для экономии CPU
-      KAFKA_MESSAGE_MAX_BYTES: 524288  # 512KB
-      # Ускорение старта
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Оптимизированные настройки для Redis
+      REDIS_MAXMEMORY: 50mb
+      REDIS_MAXMEMORY_POLICY: allkeys-lru
+      REDIS_TCP_BACKLOG: 128
+      REDIS_TCP_KEEPALIVE: 300
+      REDIS_TIMEOUT: 0
+      # Включение persistence
+      REDIS_SAVE: "60 1000"  # Сохранение каждые 60 секунд если 1000 изменений
+      REDIS_APPENDONLY: "yes"
+      REDIS_APPENDFSYNC: "everysec"
     volumes:
-      - kafka_data:/var/lib/kafka/data
+      - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "/bin/bash -c 'timeout 5 bash -c \"</dev/tcp/kafka/29092\" && echo \"OK\" || exit 1'"]
-      interval: 15s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
       retries: 5
-      start_period: 60s
+      start_period: 5s
+    restart: unless-stopped
+    command: redis-server --protected-mode no
 
   db:
     image: postgres:18.1-alpine3.23
@@ -173,11 +124,7 @@ services:
 volumes:
   db_data:
     driver: local
-  zookeeper_data:
-    driver: local
-  zookeeper_logs:
-    driver: local
-  kafka_data:
+  redis_data:
     driver: local
   # Раскомментируйте для включения news-analyzer
   # analyzer_reports:

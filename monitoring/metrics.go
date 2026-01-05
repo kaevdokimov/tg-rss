@@ -14,10 +14,10 @@ type Metrics struct {
 	RSSPollsErrors     int64
 	RSSItemsProcessed int64
 
-	// Kafka метрики
-	KafkaMessagesProduced int64
-	KafkaMessagesConsumed  int64
-	KafkaErrors            int64
+	// Redis метрики
+	RedisMessagesProduced int64
+	RedisMessagesConsumed  int64
+	RedisErrors            int64
 
 	// Telegram метрики
 	TelegramMessagesSent    int64
@@ -46,9 +46,9 @@ func GetMetrics() *Metrics {
 		RSSPollsTotal:          globalMetrics.RSSPollsTotal,
 		RSSPollsErrors:         globalMetrics.RSSPollsErrors,
 		RSSItemsProcessed:      globalMetrics.RSSItemsProcessed,
-		KafkaMessagesProduced:  globalMetrics.KafkaMessagesProduced,
-		KafkaMessagesConsumed:  globalMetrics.KafkaMessagesConsumed,
-		KafkaErrors:            globalMetrics.KafkaErrors,
+		RedisMessagesProduced:  globalMetrics.RedisMessagesProduced,
+		RedisMessagesConsumed:  globalMetrics.RedisMessagesConsumed,
+		RedisErrors:            globalMetrics.RedisErrors,
 		TelegramMessagesSent:   globalMetrics.TelegramMessagesSent,
 		TelegramMessagesErrors: globalMetrics.TelegramMessagesErrors,
 		TelegramCommandsTotal:  globalMetrics.TelegramCommandsTotal,
@@ -82,27 +82,27 @@ func IncrementRSSItemsProcessed() {
 	globalMetrics.LastUpdate = time.Now()
 }
 
-// IncrementKafkaMessagesProduced увеличивает счетчик отправленных сообщений в Kafka
-func IncrementKafkaMessagesProduced() {
+// IncrementRedisMessagesProduced увеличивает счетчик отправленных сообщений в Redis
+func IncrementRedisMessagesProduced() {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
-	globalMetrics.KafkaMessagesProduced++
+	globalMetrics.RedisMessagesProduced++
 	globalMetrics.LastUpdate = time.Now()
 }
 
-// IncrementKafkaMessagesConsumed увеличивает счетчик потребленных сообщений из Kafka
-func IncrementKafkaMessagesConsumed() {
+// IncrementRedisMessagesConsumed увеличивает счетчик потребленных сообщений из Redis
+func IncrementRedisMessagesConsumed() {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
-	globalMetrics.KafkaMessagesConsumed++
+	globalMetrics.RedisMessagesConsumed++
 	globalMetrics.LastUpdate = time.Now()
 }
 
-// IncrementKafkaErrors увеличивает счетчик ошибок Kafka
-func IncrementKafkaErrors() {
+// IncrementRedisErrors увеличивает счетчик ошибок Redis
+func IncrementRedisErrors() {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
-	globalMetrics.KafkaErrors++
+	globalMetrics.RedisErrors++
 	globalMetrics.LastUpdate = time.Now()
 }
 
@@ -165,22 +165,22 @@ func GetRSSItemsProcessed() int64 {
 	return globalMetrics.RSSItemsProcessed
 }
 
-func GetKafkaMessagesProduced() int64 {
+func GetRedisMessagesProduced() int64 {
 	globalMetrics.mu.RLock()
 	defer globalMetrics.mu.RUnlock()
-	return globalMetrics.KafkaMessagesProduced
+	return globalMetrics.RedisMessagesProduced
 }
 
-func GetKafkaMessagesConsumed() int64 {
+func GetRedisMessagesConsumed() int64 {
 	globalMetrics.mu.RLock()
 	defer globalMetrics.mu.RUnlock()
-	return globalMetrics.KafkaMessagesConsumed
+	return globalMetrics.RedisMessagesConsumed
 }
 
-func GetKafkaErrors() int64 {
+func GetRedisErrors() int64 {
 	globalMetrics.mu.RLock()
 	defer globalMetrics.mu.RUnlock()
-	return globalMetrics.KafkaErrors
+	return globalMetrics.RedisErrors
 }
 
 func GetTelegramMessagesSent() int64 {

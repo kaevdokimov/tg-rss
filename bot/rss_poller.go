@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"tg-rss/db"
-	"tg-rss/kafka"
+	"tg-rss/redis"
 	"tg-rss/monitoring"
 	"tg-rss/rss"
 )
@@ -46,7 +46,7 @@ func min(a, b int) int {
 }
 
 // StartRSSPolling запускает регулярный опрос RSS-источников
-func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, kafkaProducer *kafka.Producer) {
+func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, redisProducer *redis.Producer) {
 	// Кэшируем источники для снижения нагрузки на БД
 	// Обновляем кэш каждые 30 минут
 	const cacheDuration = 30 * time.Minute
@@ -63,7 +63,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере: %v. Перезапуск через %v", r, interval)
 			time.Sleep(interval)
 			// Рекурсивно перезапускаем парсер
-			go StartRSSPolling(dbConn, interval, tz, kafkaProducer)
+			go StartRSSPolling(dbConn, interval, tz, redisProducer)
 		}
 	}()
 	
@@ -168,7 +168,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 
 		// Оптимизация: батч-проверка дубликатов и отправка в Kafka
 		if len(candidates) > 0 {
-			totalNewsSent += processCandidatesBatch(dbConn, kafkaProducer, candidates)
+			totalNewsSent += processCandidatesBatch(dbConn, redisProducer, candidates)
 		}
 
 		rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Kafka %d, ошибок %d", 
@@ -187,7 +187,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 }
 
 // processCandidatesBatch обрабатывает кандидатов новостей батчем для оптимизации запросов к БД
-func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candidates []newsCandidate) int {
+func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candidates []newsCandidate) int {
 	if len(candidates) == 0 {
 		return 0
 	}
@@ -214,7 +214,7 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 	if err != nil {
 		rssLogger.Error("Ошибка батч-проверки дубликатов: %v", err)
 		// Fallback: обрабатываем по одной новости
-		return processCandidatesSequential(dbConn, kafkaProducer, candidates)
+		return processCandidatesSequential(dbConn, redisProducer, candidates)
 	}
 	defer rows.Close()
 
@@ -239,8 +239,8 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 
 		monitoring.IncrementRSSItemsProcessed()
 
-		// Создаем объект новости для отправки в Kafka
-		newsItem := kafka.NewsItem{
+		// Создаем объект новости для отправки в Redis
+		newsItem := redis.NewsItem{
 			SourceID:    candidate.source.Id,
 			SourceName:  candidate.source.Name,
 			Title:       candidate.item.Title,
@@ -249,16 +249,14 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 			PublishedAt: candidate.item.PublishedAt.Format("2006-01-02 15:04:05"),
 		}
 
-		// Отправляем новость в Kafka для обработки
-		if err := kafkaProducer.SendNewsItem(newsItem); err != nil {
-			monitoring.IncrementKafkaErrors()
-			rssLogger.Error("Ошибка отправки новости в Kafka: %v", err)
+		// Отправляем новость в Redis для обработки
+		if err := redisProducer.PublishNews(newsItem); err != nil {
+			rssLogger.Error("Ошибка отправки новости в Redis: %v", err)
 			continue
 		}
 
-		monitoring.IncrementKafkaMessagesProduced()
 		sent++
-		rssLogger.Info("Новость отправлена в Kafka: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
+		rssLogger.Info("Новость отправлена в Redis: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
 	}
 
 	rssLogger.Info("Батч обработан: %d кандидатов, %d отправлено в Kafka", len(candidates), sent)
@@ -266,7 +264,7 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 }
 
 // processCandidatesSequential обрабатывает кандидатов последовательно (fallback функция)
-func processCandidatesSequential(dbConn *sql.DB, kafkaProducer *kafka.Producer, candidates []newsCandidate) int {
+func processCandidatesSequential(dbConn *sql.DB, redisProducer *redis.Producer, candidates []newsCandidate) int {
 	sent := 0
 	for _, candidate := range candidates {
 		// Проверяем дубликат индивидуально по ссылке
@@ -286,7 +284,7 @@ func processCandidatesSequential(dbConn *sql.DB, kafkaProducer *kafka.Producer, 
 
 		monitoring.IncrementRSSItemsProcessed()
 
-		newsItem := kafka.NewsItem{
+		newsItem := redis.NewsItem{
 			SourceID:    candidate.source.Id,
 			SourceName:  candidate.source.Name,
 			Title:       candidate.item.Title,
@@ -295,13 +293,13 @@ func processCandidatesSequential(dbConn *sql.DB, kafkaProducer *kafka.Producer, 
 			PublishedAt: candidate.item.PublishedAt.Format("2006-01-02 15:04:05"),
 		}
 
-		if err := kafkaProducer.SendNewsItem(newsItem); err != nil {
-			monitoring.IncrementKafkaErrors()
+		if err := redisProducer.PublishNews(newsItem); err != nil {
+			monitoring.IncrementRedisErrors()
 			rssLogger.Error("Ошибка отправки новости в Kafka: %v", err)
 			continue
 		}
 
-		monitoring.IncrementKafkaMessagesProduced()
+		monitoring.IncrementRedisMessagesProduced()
 		sent++
 		rssLogger.Info("Новость отправлена в Kafka: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
 	}

@@ -11,8 +11,8 @@ func TestMetrics(t *testing.T) {
 	// Тестируем инкременты
 	IncrementRSSPolls()
 	IncrementRSSItemsProcessed()
-	IncrementKafkaMessagesProduced()
-	IncrementKafkaMessagesConsumed()
+	IncrementRedisMessagesProduced()
+	IncrementRedisMessagesConsumed()
 	IncrementTelegramMessagesSent()
 	IncrementTelegramCommands()
 	IncrementDBQueries()
@@ -25,11 +25,11 @@ func TestMetrics(t *testing.T) {
 	if metrics.RSSItemsProcessed != 1 {
 		t.Errorf("Ожидался RSSItemsProcessed=1, получено %d", metrics.RSSItemsProcessed)
 	}
-	if metrics.KafkaMessagesProduced != 1 {
-		t.Errorf("Ожидался KafkaMessagesProduced=1, получено %d", metrics.KafkaMessagesProduced)
+	if metrics.RedisMessagesProduced != 1 {
+		t.Errorf("Ожидался RedisMessagesProduced=1, получено %d", metrics.RedisMessagesProduced)
 	}
-	if metrics.KafkaMessagesConsumed != 1 {
-		t.Errorf("Ожидался KafkaMessagesConsumed=1, получено %d", metrics.KafkaMessagesConsumed)
+	if metrics.RedisMessagesConsumed != 1 {
+		t.Errorf("Ожидался RedisMessagesConsumed=1, получено %d", metrics.RedisMessagesConsumed)
 	}
 	if metrics.TelegramMessagesSent != 1 {
 		t.Errorf("Ожидался TelegramMessagesSent=1, получено %d", metrics.TelegramMessagesSent)
@@ -46,7 +46,7 @@ func TestMetricsErrors(t *testing.T) {
 	Reset()
 
 	IncrementRSSPollsErrors()
-	IncrementKafkaErrors()
+	IncrementRedisErrors()
 	IncrementTelegramMessagesErrors()
 	IncrementDBQueriesErrors()
 
@@ -55,8 +55,8 @@ func TestMetricsErrors(t *testing.T) {
 	if metrics.RSSPollsErrors != 1 {
 		t.Errorf("Ожидался RSSPollsErrors=1, получено %d", metrics.RSSPollsErrors)
 	}
-	if metrics.KafkaErrors != 1 {
-		t.Errorf("Ожидался KafkaErrors=1, получено %d", metrics.KafkaErrors)
+	if metrics.RedisErrors != 1 {
+		t.Errorf("Ожидался RedisErrors=1, получено %d", metrics.RedisErrors)
 	}
 	if metrics.TelegramMessagesErrors != 1 {
 		t.Errorf("Ожидался TelegramMessagesErrors=1, получено %d", metrics.TelegramMessagesErrors)
@@ -74,7 +74,7 @@ func TestMetricsConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			IncrementRSSPolls()
-			IncrementKafkaMessagesProduced()
+			IncrementRedisMessagesProduced()
 			done <- true
 		}()
 	}
@@ -88,8 +88,8 @@ func TestMetricsConcurrency(t *testing.T) {
 	if metrics.RSSPollsTotal != 10 {
 		t.Errorf("Ожидался RSSPollsTotal=10, получено %d", metrics.RSSPollsTotal)
 	}
-	if metrics.KafkaMessagesProduced != 10 {
-		t.Errorf("Ожидался KafkaMessagesProduced=10, получено %d", metrics.KafkaMessagesProduced)
+	if metrics.RedisMessagesProduced != 10 {
+		t.Errorf("Ожидался RedisMessagesProduced=10, получено %d", metrics.RedisMessagesProduced)
 	}
 }
 

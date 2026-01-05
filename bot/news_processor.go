@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 	"tg-rss/db"
-	"tg-rss/kafka"
+	"tg-rss/redis"
 	"tg-rss/monitoring"
 	"time"
 
@@ -67,8 +67,8 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 	return np
 }
 
-// ProcessNewsItem обрабатывает новость из Kafka
-func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
+// ProcessNewsItem обрабатывает новость из Redis
+func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 	// Парсим время публикации
 	publishedAt, err := time.Parse("2006-01-02 15:04:05", newsItem.PublishedAt)
 	if err != nil {

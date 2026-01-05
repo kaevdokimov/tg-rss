@@ -88,43 +88,60 @@ func TestLoadDBConfig(t *testing.T) {
 	}
 }
 
-func TestLoadKafkaConfig(t *testing.T) {
-	originalBrokers := os.Getenv("KAFKA_BROKERS")
-	originalNewsTopic := os.Getenv("KAFKA_NEWS_TOPIC")
-	originalNotifyTopic := os.Getenv("KAFKA_NOTIFY_TOPIC")
+func TestLoadRedisConfig(t *testing.T) {
+	originalAddr := os.Getenv("REDIS_ADDR")
+	originalPassword := os.Getenv("REDIS_PASSWORD")
+	originalDB := os.Getenv("REDIS_DB")
+	originalNewsChannel := os.Getenv("REDIS_NEWS_CHANNEL")
+	originalNotifyChannel := os.Getenv("REDIS_NOTIFY_CHANNEL")
 
 	defer func() {
-		if originalBrokers != "" {
-			os.Setenv("KAFKA_BROKERS", originalBrokers)
+		if originalAddr != "" {
+			os.Setenv("REDIS_ADDR", originalAddr)
 		} else {
-			os.Unsetenv("KAFKA_BROKERS")
+			os.Unsetenv("REDIS_ADDR")
 		}
-		if originalNewsTopic != "" {
-			os.Setenv("KAFKA_NEWS_TOPIC", originalNewsTopic)
+		if originalPassword != "" {
+			os.Setenv("REDIS_PASSWORD", originalPassword)
 		} else {
-			os.Unsetenv("KAFKA_NEWS_TOPIC")
+			os.Unsetenv("REDIS_PASSWORD")
 		}
-		if originalNotifyTopic != "" {
-			os.Setenv("KAFKA_NOTIFY_TOPIC", originalNotifyTopic)
+		if originalDB != "" {
+			os.Setenv("REDIS_DB", originalDB)
 		} else {
-			os.Unsetenv("KAFKA_NOTIFY_TOPIC")
+			os.Unsetenv("REDIS_DB")
+		}
+		if originalNewsChannel != "" {
+			os.Setenv("REDIS_NEWS_CHANNEL", originalNewsChannel)
+		} else {
+			os.Unsetenv("REDIS_NEWS_CHANNEL")
+		}
+		if originalNotifyChannel != "" {
+			os.Setenv("REDIS_NOTIFY_CHANNEL", originalNotifyChannel)
+		} else {
+			os.Unsetenv("REDIS_NOTIFY_CHANNEL")
 		}
 	}()
 
 	// Тест с дефолтными значениями
-	os.Unsetenv("KAFKA_BROKERS")
-	os.Unsetenv("KAFKA_NEWS_TOPIC")
-	os.Unsetenv("KAFKA_NOTIFY_TOPIC")
+	os.Unsetenv("REDIS_ADDR")
+	os.Unsetenv("REDIS_PASSWORD")
+	os.Unsetenv("REDIS_DB")
+	os.Unsetenv("REDIS_NEWS_CHANNEL")
+	os.Unsetenv("REDIS_NOTIFY_CHANNEL")
 
-	cfg := LoadKafkaConfig()
-	if len(cfg.Brokers) == 0 || cfg.Brokers[0] != "kafka:29092" {
-		t.Errorf("Ожидался брокер по умолчанию 'kafka:29092', получено '%v'", cfg.Brokers)
+	cfg := LoadRedisConfig()
+	if cfg.Addr != "redis:6379" {
+		t.Errorf("Ожидался адрес по умолчанию 'redis:6379', получено '%s'", cfg.Addr)
 	}
-	if cfg.NewsTopic != "news-items" {
-		t.Errorf("Ожидался NewsTopic 'news-items', получено '%s'", cfg.NewsTopic)
+	if cfg.DB != 0 {
+		t.Errorf("Ожидался DB по умолчанию 0, получено %d", cfg.DB)
 	}
-	if cfg.NotifyTopic != "news-notifications" {
-		t.Errorf("Ожидался NotifyTopic 'news-notifications', получено '%s'", cfg.NotifyTopic)
+	if cfg.NewsChannel != "news-items" {
+		t.Errorf("Ожидался NewsChannel 'news-items', получено '%s'", cfg.NewsChannel)
+	}
+	if cfg.NotifyChannel != "news-notifications" {
+		t.Errorf("Ожидался NotifyChannel 'news-notifications', получено '%s'", cfg.NotifyChannel)
 	}
 }
 
