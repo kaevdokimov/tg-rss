@@ -27,7 +27,7 @@ type PendingNews struct {
 	PublishedAt time.Time
 }
 
-// NewsProcessor обрабатывает новости из Kafka и записывает в БД
+// NewsProcessor обрабатывает новости из Redis и записывает в БД
 type NewsProcessor struct {
 	db                *sql.DB
 	bot               *tgbotapi.BotAPI

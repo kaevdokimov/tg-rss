@@ -167,12 +167,12 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 			}
 		}
 
-		// Оптимизация: батч-проверка дубликатов и отправка в Kafka
+		// Оптимизация: батч-проверка дубликатов и отправка в Redis
 		if len(candidates) > 0 {
 			totalNewsSent += processCandidatesBatch(dbConn, redisProducer, candidates)
 		}
 
-		rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Kafka %d, ошибок %d", 
+		rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Redis %d, ошибок %d",
 			sourcesProcessed, len(sources), totalNewsFound, totalNewsSent, sourcesWithErrors)
 		
 		// Первый цикл выполняется сразу, последующие - с интервалом
@@ -260,7 +260,7 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 		rssLogger.Info("Новость отправлена в Redis: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
 	}
 
-	rssLogger.Info("Батч обработан: %d кандидатов, %d отправлено в Kafka", len(candidates), sent)
+	rssLogger.Info("Батч обработан: %d кандидатов, %d отправлено в Redis", len(candidates), sent)
 	return sent
 }
 
@@ -296,13 +296,13 @@ func processCandidatesSequential(dbConn *sql.DB, redisProducer *redis.Producer, 
 
 		if err := redisProducer.PublishNews(newsItem); err != nil {
 			monitoring.IncrementRedisErrors()
-			rssLogger.Error("Ошибка отправки новости в Kafka: %v", err)
+			rssLogger.Error("Ошибка отправки новости в Redis: %v", err)
 			continue
 		}
 
 		monitoring.IncrementRedisMessagesProduced()
 		sent++
-		rssLogger.Info("Новость отправлена в Kafka: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
+		rssLogger.Info("Новость отправлена в Redis: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
 	}
 	return sent
 }

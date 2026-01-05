@@ -17,6 +17,12 @@ var handlerLogger = monitoring.NewLogger("Handler")
 
 // StartCommandHandler запускает обработку команд Telegram
 func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
+	// Проверяем, не является ли бот mock'ом (без реального API)
+	if bot.Self.UserName == "MockBot" {
+		handlerLogger.Info("Mock бот - пропускаем обработку Telegram команд")
+		return
+	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = interval
 

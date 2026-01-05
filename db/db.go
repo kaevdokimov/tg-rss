@@ -397,7 +397,7 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 	for _, update := range updates {
 		result, err := db.Exec(`
 			UPDATE sources
-			SET url = $2, updated_at = NOW()
+			SET url = $2
 			WHERE url = $1
 		`, update.oldURL, update.newURL)
 

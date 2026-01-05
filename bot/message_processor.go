@@ -11,7 +11,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// MessageProcessor обрабатывает сообщения из Kafka
+// MessageProcessor обрабатывает сообщения из Redis
 type MessageProcessor struct {
 	bot         *tgbotapi.BotAPI
 	db          *sql.DB

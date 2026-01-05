@@ -16,11 +16,27 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn
 	interval := time.Duration(cfgTgBot.Timeout) * time.Second
 
 	// Инициализация Telegram-бота
-	bot, err := tgbotapi.NewBotAPI(cfgTgBot.ApiKey)
-	if err != nil {
-		log.Fatalf("Ошибка инициализации бота: %v", err)
+	var bot *tgbotapi.BotAPI
+	log.Printf("🔍 Проверяем TELEGRAM_API_KEY: '%s'", cfgTgBot.ApiKey)
+
+	if cfgTgBot.ApiKey == "" || cfgTgBot.ApiKey == "YOUR_TELEGRAM_BOT_TOKEN_HERE" {
+		log.Printf("⚠️  TELEGRAM_API_KEY не задан или содержит placeholder - бот будет работать без Telegram функционала")
+		// Создаем заглушку для бота
+		bot = &tgbotapi.BotAPI{}
+		bot.Self = tgbotapi.User{UserName: "MockBot"}
+	} else {
+		var err error
+		bot, err = tgbotapi.NewBotAPI(cfgTgBot.ApiKey)
+		if err != nil {
+			log.Printf("⚠️  Ошибка инициализации Telegram бота: %v", err)
+			log.Printf("🔄 Продолжаем работу без Telegram функционала")
+			// Создаем заглушку для бота
+			bot = &tgbotapi.BotAPI{}
+			bot.Self = tgbotapi.User{UserName: "MockBot"}
+		} else {
+			log.Printf("Бот авторизован как %s", bot.Self.UserName)
+		}
 	}
-	log.Printf("Бот авторизован как %s", bot.Self.UserName)
 
 	// Создание обработчиков
 	newsProcessor := NewNewsProcessor(dbConn, bot)
@@ -61,7 +77,7 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn
 					continue
 				}
 			} else {
-				log.Printf("Kafka consumer успешно запущен")
+				log.Printf("Redis consumer успешно запущен")
 				break
 			}
 		}
