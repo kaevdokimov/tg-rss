@@ -31,18 +31,18 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.7
     container_name: zookeeper
-    # МИНИМАЛЬНЫЕ ограничения ресурсов для экономии памяти
-    mem_limit: ${ZOOKEEPER_MEM_LIMIT:-128m}
-    mem_reservation: ${ZOOKEEPER_MEM_RESERVATION:-64m}
-    cpus: ${ZOOKEEPER_CPUS:-0.1}
+    # МИНИМАЛЬНЫЕ ограничения ресурсов для Zookeeper (увеличено для стабильности)
+    mem_limit: ${ZOOKEEPER_MEM_LIMIT:-256m}
+    mem_reservation: ${ZOOKEEPER_MEM_RESERVATION:-128m}
+    cpus: ${ZOOKEEPER_CPUS:-0.2}
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_MAX_CLIENT_CNXNS: 60
-      # МИНИМАЛЬНАЯ память JVM для Zookeeper
-      KAFKA_HEAP_OPTS: "-Xmx64M -Xms32M"
+      # Оптимальная память JVM для Zookeeper
+      KAFKA_HEAP_OPTS: "-Xmx128M -Xms64M"
       KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"
     ports:
       - "2181:2181"
@@ -51,10 +51,10 @@ services:
       - zookeeper_logs:/var/lib/zookeeper/log
     healthcheck:
       test: ["CMD-SHELL", "sh -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok || exit 1"]
-      interval: 20s  # Увеличен интервал для экономии ресурсов
-      timeout: 5s
-      start_period: 30s  # Уменьшено время ожидания
-      retries: 5  # Уменьшено количество попыток
+      interval: 15s
+      timeout: 10s
+      start_period: 60s  # Увеличено время ожидания для Zookeeper
+      retries: 10  # Увеличено количество попыток
     restart: unless-stopped
 
   kafka:
