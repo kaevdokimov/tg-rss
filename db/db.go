@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"tg-rss/config"
 	"time"
@@ -200,6 +201,12 @@ func Connect(config *config.DBConfig) (*sql.DB, error) {
 }
 
 func InitSchema(db *sql.DB) {
+	log.Println("Начинаем инициализацию схемы базы данных...")
+
+	// Оптимизация: Разделяем инициализацию на этапы для ускорения
+
+	// Этап 1: Создание таблиц и типов
+	log.Println("Этап 1: Создание таблиц и типов...")
 	query := `
 	-- Создание типа ENUM
 	DO $$ BEGIN
@@ -281,62 +288,97 @@ func InitSchema(db *sql.DB) {
 	CREATE TRIGGER trg_lowercase_url
 	BEFORE INSERT OR UPDATE ON sources
 	FOR EACH ROW EXECUTE FUNCTION lowercase_url();
-
-	INSERT INTO public.sources ("name",url,created_at,status) VALUES
-	 ('Lenta.ru','https://lenta.ru/rss/google-newsstand/main/','2025-08-24 02:26:05.39313','active'::public."status_enum"),
-	 ('Lenta.ru - Новости','https://lenta.ru/rss/news','2025-08-24 02:26:05.39313','active'::public."status_enum"),
-	 ('Lenta.ru - Топ 7','https://lenta.ru/rss/top7','2025-08-24 02:26:05.39313','active'::public."status_enum"),
-	 ('Ria.ru','https://ria.ru/export/rss2/index.xml?page_type=google_newsstand','2025-08-24 02:26:07.792288','active'::public."status_enum"),
-	 ('Ria.ru - Все новости','https://ria.ru/export/rss2/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
-	 ('Ria.ru - Политика','https://ria.ru/export/rss2/politics/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
-	 ('Ria.ru - Экономика','https://ria.ru/export/rss2/economy/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
-	 ('Ria.ru - Общество','https://ria.ru/export/rss2/society/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
-	 ('Ria.ru - Спорт','https://sport.ria.ru/export/rss2/sport/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
-	 ('ТАСС','https://tass.ru/rss/v2.xml?sections=MjU%3D','2025-08-24 02:26:11.897401','active'::public."status_enum"),
-	 ('ТАСС - Все новости','https://tass.ru/rss/v2.xml','2025-08-24 02:26:11.897401','active'::public."status_enum"),
-	 ('Интерфакс','https://www.interfax.ru/rss.xml','2025-08-24 02:26:15.000000','active'::public."status_enum"),
-	 ('Аргументы и Факты','https://aif.ru/rss/all.php','2025-08-24 02:26:08.000000','active'::public."status_enum"),
-	 ('Ведомости','https://www.vedomosti.ru/rss/news','2025-08-24 02:26:09.000000','active'::public."status_enum"),
-	 ('Ведомости - Статьи','https://www.vedomosti.ru/rss/articles','2025-08-24 02:26:09.000000','active'::public."status_enum"),
-	 ('РБК','https://rssexport.rbc.ru/rbcnews/news/30/full.rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
-	 ('РБК - Главная','https://www.rbc.ru/rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
-	 ('Коммерсант','https://www.kommersant.ru/RSS/news.xml','2025-08-24 02:26:16.000000','active'::public."status_enum"),
-	 ('Полит.ру','https://polit.ru/rss/index.xml','2025-08-24 02:26:10.000000','active'::public."status_enum"),
-	 ('Газета.Ru','https://www.gazeta.ru/export/rss/first.xml','2025-08-24 02:26:12.000000','active'::public."status_enum"),
-	 ('News.mail.ru','https://news.mail.ru/rss/','2025-08-24 02:26:17.000000','active'::public."status_enum"),
-	 ('NEWSru.com','https://newsru.com/plain/rss/all.xml','2025-08-24 02:26:18.000000','active'::public."status_enum"),
-	 ('iXBT.com - Новости','https://www.ixbt.com/export/softnews.rss','2025-08-24 02:26:19.000000','active'::public."status_enum"),
-	 ('iXBT.com - Статьи','https://www.ixbt.com/export/articles.rss','2025-08-24 02:26:19.000000','active'::public."status_enum"),
-	 ('Sports.ru','https://www.sports.ru/sports_docs.xml','2025-08-24 02:26:20.000000','active'::public."status_enum"),
-	 ('Travel.ru','https://www.travel.ru/inc/side/yandex.rdf','2025-08-24 02:26:21.000000','active'::public."status_enum"),
-	 ('ECOportal.su','https://ecoportal.su/rss/news.xml','2025-08-24 02:26:22.000000','active'::public."status_enum"),
-	 ('Meduza','https://meduza.io/rss2/all','2025-08-24 02:26:23.000000','active'::public."status_enum"),
-	 ('Независимая газета','https://www.ng.ru/rss/','2025-08-24 02:26:24.000000','active'::public."status_enum"),
-	 ('Россия в глобальной политике','https://globalaffairs.ru/feed/','2025-08-24 02:26:25.000000','active'::public."status_enum"),
-	 ('Фонтанка.ру','https://www.fontanka.ru/_transmission_for_yandex.thtml','2025-08-24 02:26:26.000000','active'::public."status_enum"),
-	 ('Новости Кузбасса','https://kuzbassnews.ru/engine/rss.php','2025-08-24 02:26:27.000000','active'::public."status_enum"),
-	 ('Government.ru','http://government.ru/all/rss/','2025-08-24 02:26:14.245899','active'::public."status_enum")
-	ON CONFLICT (url) DO NOTHING;
 	`
 	_, err := db.Exec(query)
 	if err != nil {
-		// Игнорируем ошибки дублирования ключей при инициализации
-		errMsg := err.Error()
-		if !strings.Contains(errMsg, "duplicate key") && !strings.Contains(errMsg, "unique constraint") {
-			log.Fatalf("ошибка при создании схемы БД: %v", err)
-		}
-		// Если это ошибка дублирования, просто логируем и продолжаем
-		log.Printf("Предупреждение при инициализации схемы (возможно, данные уже существуют): %v", err)
+		log.Fatalf("Ошибка при создании схемы БД (этап 1): %v", err)
 	}
-	
-	// Миграция: добавляем новые поля для скраппинга, если таблица уже существует
-	migrateNewsTable(db)
-	
-	// Исправляем экранированные символы в заголовках новостей (если они есть)
-	fixEscapedCharactersInNews(db)
-	
-	log.Println("Схема базы данных инициализирована")
+	log.Println("Этап 1 завершен: таблицы созданы")
+
+	// Этап 2: Инициализация основных источников (асинхронно)
+	log.Println("Этап 2: Инициализация источников новостей...")
+	initSourcesAsync(db)
+	log.Println("Инициализация схемы завершена")
 }
+
+func initSourcesAsync(db *sql.DB) {
+	// Проверяем переменную окружения для отключения асинхронной инициализации
+	if os.Getenv("DISABLE_ASYNC_SOURCES_INIT") == "true" {
+		log.Println("Асинхронная инициализация источников отключена")
+		return
+	}
+
+	// Оптимизация: Инициализируем источники асинхронно, чтобы не блокировать запуск приложения
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Паника при инициализации источников: %v", r)
+			}
+		}()
+
+		// Группируем источники по категориям для поэтапной загрузки
+		basicSources := `
+		INSERT INTO public.sources ("name",url,created_at,status) VALUES
+		('Lenta.ru','https://lenta.ru/rss/google-newsstand/main/','2025-08-24 02:26:05.39313','active'::public."status_enum"),
+		('Ria.ru','https://ria.ru/export/rss2/index.xml?page_type=google_newsstand','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+		('ТАСС','https://tass.ru/rss/v2.xml?sections=MjU%3D','2025-08-24 02:26:11.897401','active'::public."status_enum"),
+		('Ведомости','https://www.vedomosti.ru/rss/news','2025-08-24 02:26:09.000000','active'::public."status_enum"),
+		('РБК','https://rssexport.rbc.ru/rbcnews/news/30/full.rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
+		('Газета.Ru','https://www.gazeta.ru/export/rss/first.xml','2025-08-24 02:26:12.000000','active'::public."status_enum"),
+		('Government.ru','http://government.ru/all/rss/','2025-08-24 02:26:14.245899','active'::public."status_enum")
+		ON CONFLICT (url) DO NOTHING;
+		`
+
+		if _, err := db.Exec(basicSources); err != nil && !strings.Contains(err.Error(), "duplicate key") {
+			log.Printf("Ошибка при инициализации основных источников: %v", err)
+		} else {
+			log.Println("Основные источники инициализированы")
+		}
+
+		// Небольшая задержка перед загрузкой дополнительных источников
+		time.Sleep(2 * time.Second)
+
+		// Дополнительные источники (тематические и региональные)
+		extendedSources := `
+		INSERT INTO public.sources ("name",url,created_at,status) VALUES
+		('Lenta.ru - Новости','https://lenta.ru/rss/news','2025-08-24 02:26:05.39313','active'::public."status_enum"),
+		('Lenta.ru - Топ 7','https://lenta.ru/rss/top7','2025-08-24 02:26:05.39313','active'::public."status_enum"),
+		('Ria.ru - Все новости','https://ria.ru/export/rss2/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+		('Ria.ru - Политика','https://ria.ru/export/rss2/politics/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+		('Ria.ru - Экономика','https://ria.ru/export/rss2/economy/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+		('Ria.ru - Общество','https://ria.ru/export/rss2/society/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+		('Ria.ru - Спорт','https://sport.ria.ru/export/rss2/sport/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
+		('ТАСС - Все новости','https://tass.ru/rss/v2.xml','2025-08-24 02:26:11.897401','active'::public."status_enum"),
+		('Интерфакс','https://www.interfax.ru/rss.xml','2025-08-24 02:26:15.000000','active'::public."status_enum"),
+		('Аргументы и Факты','https://aif.ru/rss/all.php','2025-08-24 02:26:08.000000','active'::public."status_enum"),
+		('Ведомости - Статьи','https://www.vedomosti.ru/rss/articles','2025-08-24 02:26:09.000000','active'::public."status_enum"),
+		('РБК - Главная','https://www.rbc.ru/rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
+		('Коммерсант','https://www.kommersant.ru/RSS/news.xml','2025-08-24 02:26:16.000000','active'::public."status_enum"),
+		('Полит.ру','https://polit.ru/rss/index.xml','2025-08-24 02:26:10.000000','active'::public."status_enum"),
+		('News.mail.ru','https://news.mail.ru/rss/','2025-08-24 02:26:17.000000','active'::public."status_enum"),
+		('NEWSru.com','https://newsru.com/plain/rss/all.xml','2025-08-24 02:26:18.000000','active'::public."status_enum"),
+		('iXBT.com - Новости','https://www.ixbt.com/export/softnews.rss','2025-08-24 02:26:19.000000','active'::public."status_enum"),
+		('iXBT.com - Статьи','https://www.ixbt.com/export/articles.rss','2025-08-24 02:26:19.000000','active'::public."status_enum"),
+		('Sports.ru','https://www.sports.ru/sports_docs.xml','2025-08-24 02:26:20.000000','active'::public."status_enum"),
+		('Travel.ru','https://www.travel.ru/inc/side/yandex.rdf','2025-08-24 02:26:21.000000','active'::public."status_enum"),
+		('ECOportal.su','https://ecoportal.su/rss/news.xml','2025-08-24 02:26:22.000000','active'::public."status_enum"),
+		('Meduza','https://meduza.io/rss2/all','2025-08-24 02:26:23.000000','active'::public."status_enum"),
+		('Независимая газета','https://www.ng.ru/rss/','2025-08-24 02:26:24.000000','active'::public."status_enum"),
+		('Россия в глобальной политике','https://globalaffairs.ru/feed/','2025-08-24 02:26:25.000000','active'::public."status_enum"),
+		('Фонтанка.ру','https://www.fontanka.ru/_transmission_for_yandex.thtml','2025-08-24 02:26:26.000000','active'::public."status_enum"),
+		('Новости Кузбасса','https://kuzbassnews.ru/engine/rss.php','2025-08-24 02:26:27.000000','active'::public."status_enum")
+		ON CONFLICT (url) DO NOTHING;
+		`
+
+		if _, err := db.Exec(extendedSources); err != nil && !strings.Contains(err.Error(), "duplicate key") {
+			log.Printf("Ошибка при инициализации дополнительных источников: %v", err)
+		} else {
+			log.Println("Все источники новостей успешно инициализированы")
+		}
+	}()
+}
+
+// fixEscapedCharactersInNews исправляет экранированные символы в заголовках новостей
 
 // fixEscapedCharactersInNews исправляет экранированные символы в заголовках новостей
 func fixEscapedCharactersInNews(db *sql.DB) {

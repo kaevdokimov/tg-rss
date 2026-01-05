@@ -6,7 +6,7 @@ services:
       db:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     environment:
       TELEGRAM_API_KEY: ${TELEGRAM_API_KEY}
       POSTGRES_HOST: ${POSTGRES_HOST:-"db"}
@@ -41,9 +41,11 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_MAX_CLIENT_CNXNS: 60
-      # Оптимальная память JVM для Zookeeper
+      # Оптимизированные настройки для быстрого старта
+      ZOOKEEPER_AUTOPURGE_PURGEINTERVAL: 0
+      ZOOKEEPER_AUTOPURGE_SNAPRETAINCOUNT: 3
       KAFKA_HEAP_OPTS: "-Xmx128M -Xms64M"
-      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok -Dzookeeper.request.timeout=30000"
     ports:
       - "2181:2181"
     volumes:
@@ -88,7 +90,7 @@ services:
       KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 51200
       KAFKA_SOCKET_REQUEST_MAX_BYTES: 20971520  # 20MB
 
-      # МИНИМАЛЬНЫЕ настройки хранения
+      # Оптимизированные настройки для быстрого старта
       KAFKA_NUM_PARTITIONS: 1
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
@@ -97,8 +99,18 @@ services:
       KAFKA_LOG_SEGMENT_BYTES: 26214400  # 25MB
       KAFKA_COMPRESSION_TYPE: uncompressed  # Без сжатия для экономии CPU
       KAFKA_MESSAGE_MAX_BYTES: 524288  # 512KB
+      # Ускорение старта
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     volumes:
       - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1 && echo 'OK' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   db:
     image: postgres:18.1-alpine3.23
