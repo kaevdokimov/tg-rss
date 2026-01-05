@@ -235,7 +235,7 @@ class TelegramNotifier:
             lines.append("⚠️ Темы не найдены")
         
         # Подвал
-        lines.append("─" * 30)
+        lines.append("─" * 7)
         lines.append("_Автоматический анализ новостей_")
         
         return "\n".join(lines)
