@@ -15,6 +15,8 @@ import (
 	"tg-rss/redis"
 	"tg-rss/monitoring"
 	"time"
+
+	_ "github.com/lib/pq" // PostgreSQL драйвер
 )
 
 func main() {
@@ -48,6 +50,10 @@ func main() {
 
 	logger.Info("Инициализация схемы базы данных...")
 	db.InitSchema(dbConn)
+
+	// Обновляем устаревшие RSS URL источников
+	logger.Info("Обновление устаревших RSS источников...")
+	db.UpdateOutdatedRSSSources(dbConn)
 
 	// Обновляем названия существующих источников
 	logger.Info("Обновление названий источников...")

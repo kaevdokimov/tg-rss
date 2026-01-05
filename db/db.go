@@ -379,11 +379,46 @@ func initSourcesAsync(db *sql.DB) {
 
 // fixEscapedCharactersInNews исправляет экранированные символы в заголовках новостей
 
+// UpdateOutdatedRSSSources обновляет устаревшие RSS URL источников
+func UpdateOutdatedRSSSources(db *sql.DB) {
+	log.Println("Обновление устаревших RSS источников...")
+
+	// Обновляем источники с новыми URL
+	updates := []struct {
+		oldURL string
+		newURL string
+	}{
+		{"https://www.interfax.ru/rss.xml", "https://www.interfax.ru/rss.asp"},
+		{"https://www.rbc.ru/rss", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"},
+		{"https://www.travel.ru/inc/side/yandex.rdf", "https://www.travel.ru/news/feed/"},
+		{"https://www.fontanka.ru/_transmission_for_yandex.thtml", "https://www.fontanka.ru/rss"},
+	}
+
+	for _, update := range updates {
+		result, err := db.Exec(`
+			UPDATE sources
+			SET url = $2, updated_at = NOW()
+			WHERE url = $1
+		`, update.oldURL, update.newURL)
+
+		if err != nil {
+			log.Printf("Ошибка обновления источника %s: %v", update.oldURL, err)
+		} else {
+			rowsAffected, _ := result.RowsAffected()
+			if rowsAffected > 0 {
+				log.Printf("Обновлен источник: %s → %s", update.oldURL, update.newURL)
+			}
+		}
+	}
+
+	log.Println("Обновление RSS источников завершено")
+}
+
 // fixEscapedCharactersInNews исправляет экранированные символы в заголовках новостей
 func fixEscapedCharactersInNews(db *sql.DB) {
 	// Исправляем дефисы: заменяем \- на -
 	result, err := db.Exec(`
-		UPDATE news 
+		UPDATE news
 		SET title = REPLACE(title, '\-', '-')
 		WHERE title LIKE '%\-%'
 	`)
