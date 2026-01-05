@@ -348,10 +348,10 @@ func initSourcesAsync(db *sql.DB) {
 		('Ria.ru - Общество','https://ria.ru/export/rss2/society/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
 		('Ria.ru - Спорт','https://sport.ria.ru/export/rss2/sport/index.xml','2025-08-24 02:26:07.792288','active'::public."status_enum"),
 		('ТАСС - Все новости','https://tass.ru/rss/v2.xml','2025-08-24 02:26:11.897401','active'::public."status_enum"),
-		('Интерфакс','https://www.interfax.ru/rss.xml','2025-08-24 02:26:15.000000','active'::public."status_enum"),
+		('Интерфакс','https://www.interfax.ru/rss.asp','2025-08-24 02:26:15.000000','active'::public."status_enum"),
 		('Аргументы и Факты','https://aif.ru/rss/all.php','2025-08-24 02:26:08.000000','active'::public."status_enum"),
 		('Ведомости - Статьи','https://www.vedomosti.ru/rss/articles','2025-08-24 02:26:09.000000','active'::public."status_enum"),
-		('РБК - Главная','https://www.rbc.ru/rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
+		('РБК - Главная','https://rssexport.rbc.ru/rbcnews/news/30/full.rss','2025-08-24 02:26:09.780376','active'::public."status_enum"),
 		('Коммерсант','https://www.kommersant.ru/RSS/news.xml','2025-08-24 02:26:16.000000','active'::public."status_enum"),
 		('Полит.ру','https://polit.ru/rss/index.xml','2025-08-24 02:26:10.000000','active'::public."status_enum"),
 		('News.mail.ru','https://news.mail.ru/rss/','2025-08-24 02:26:17.000000','active'::public."status_enum"),
@@ -359,12 +359,12 @@ func initSourcesAsync(db *sql.DB) {
 		('iXBT.com - Новости','https://www.ixbt.com/export/softnews.rss','2025-08-24 02:26:19.000000','active'::public."status_enum"),
 		('iXBT.com - Статьи','https://www.ixbt.com/export/articles.rss','2025-08-24 02:26:19.000000','active'::public."status_enum"),
 		('Sports.ru','https://www.sports.ru/sports_docs.xml','2025-08-24 02:26:20.000000','active'::public."status_enum"),
-		('Travel.ru','https://www.travel.ru/inc/side/yandex.rdf','2025-08-24 02:26:21.000000','active'::public."status_enum"),
+		('Travel.ru','https://www.travel.ru/news/feed/','2025-08-24 02:26:21.000000','active'::public."status_enum"),
 		('ECOportal.su','https://ecoportal.su/rss/news.xml','2025-08-24 02:26:22.000000','active'::public."status_enum"),
 		('Meduza','https://meduza.io/rss2/all','2025-08-24 02:26:23.000000','active'::public."status_enum"),
 		('Независимая газета','https://www.ng.ru/rss/','2025-08-24 02:26:24.000000','active'::public."status_enum"),
 		('Россия в глобальной политике','https://globalaffairs.ru/feed/','2025-08-24 02:26:25.000000','active'::public."status_enum"),
-		('Фонтанка.ру','https://www.fontanka.ru/_transmission_for_yandex.thtml','2025-08-24 02:26:26.000000','active'::public."status_enum"),
+		('Фонтанка.ру','https://www.fontanka.ru/rss','2025-08-24 02:26:26.000000','active'::public."status_enum"),
 		('Новости Кузбасса','https://kuzbassnews.ru/engine/rss.php','2025-08-24 02:26:27.000000','active'::public."status_enum")
 		ON CONFLICT (url) DO NOTHING;
 		`

@@ -23,7 +23,7 @@ services:
       TIMEOUT: ${TIMEOUT:-"60"}
       CONTENT_SCRAPER_INTERVAL: ${CONTENT_SCRAPER_INTERVAL:-"2"}
       CONTENT_SCRAPER_BATCH: ${CONTENT_SCRAPER_BATCH:-"20"}
-      CONTENT_SCRAPER_CONCURRENT: ${CONTENT_SCRAPER_CONCURRENT:-"6"}
+      CONTENT_SCRAPER_CONCURRENT: ${CONTENT_SCRAPER_CONCURRENT:-3}
     restart: unless-stopped
     # ОПТИМИЗИРОВАННЫЕ ограничения ресурсов для сервера с 900MB RAM
     mem_limit: ${BOT_MEM_LIMIT:-400m}

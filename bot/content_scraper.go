@@ -69,13 +69,19 @@ func (cs *ContentScraper) scrapeBatch() {
 	semaphore := make(chan struct{}, cs.concurrent)
 	results := make(chan scrapeResult, len(newsList))
 
-	// Запускаем парсинг параллельно
-	for _, news := range newsList {
+	// Запускаем парсинг параллельно с задержкой между запросами
+	for i, news := range newsList {
 		semaphore <- struct{}{} // занимаем слот
-		go func(n db.NewsForScraping) {
+		go func(n db.NewsForScraping, idx int) {
 			defer func() { <-semaphore }() // освобождаем слот
+
+			// Добавляем задержку между запросами для избежания rate limiting
+			if idx > 0 {
+				time.Sleep(time.Duration(idx%cs.concurrent) * 200 * time.Millisecond)
+			}
+
 			cs.scrapeNews(n, results)
-		}(news)
+		}(news, i)
 	}
 
 	// Ждем завершения всех горутин

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lib/pq"
 	"tg-rss/db"
 	"tg-rss/redis"
 	"tg-rss/monitoring"
@@ -210,7 +211,7 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 		WHERE link = ANY($1)
 	`
 
-	rows, err := dbConn.Query(query, links)
+	rows, err := dbConn.Query(query, pq.Array(links))
 	if err != nil {
 		rssLogger.Error("Ошибка батч-проверки дубликатов: %v", err)
 		// Fallback: обрабатываем по одной новости
