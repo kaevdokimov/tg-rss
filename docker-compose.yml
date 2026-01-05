@@ -1,7 +1,6 @@
 services:
   bot:
-    # image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-kaevdokimov}/news-bot:latest
-    image: news-bot:arm64  # Локальный образ для ARM64
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-kaevdokimov}/news-bot:latest
     container_name: bot
     depends_on:
       db:
@@ -24,24 +23,26 @@ services:
       CONTENT_SCRAPER_BATCH: ${CONTENT_SCRAPER_BATCH:-"20"}
       CONTENT_SCRAPER_CONCURRENT: ${CONTENT_SCRAPER_CONCURRENT:-"6"}
     restart: unless-stopped
+    # ГИБКИЕ ограничения ресурсов (можно переопределить в .env)
+    mem_limit: ${BOT_MEM_LIMIT:-512m}
+    mem_reservation: ${BOT_MEM_RESERVATION:-256m}
+    cpus: ${BOT_CPUS:-0.5}
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.7
     container_name: zookeeper
-    # Ограничения ресурсов для Zookeeper (для docker-compose без swarm используйте mem_limit и cpus)
-    mem_limit: 256m
-    mem_reservation: 128m
-    cpus: 0.3
+    # МИНИМАЛЬНЫЕ ограничения ресурсов для экономии памяти
+    mem_limit: ${ZOOKEEPER_MEM_LIMIT:-128m}
+    mem_reservation: ${ZOOKEEPER_MEM_RESERVATION:-64m}
+    cpus: ${ZOOKEEPER_CPUS:-0.1}
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      # Оптимизация для малых ресурсов
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_MAX_CLIENT_CNXNS: 60
-      # Ограничение памяти JVM для Zookeeper
-      KAFKA_HEAP_OPTS: "-Xmx128M -Xms128M"
-      # Разрешаем 4LW команды (включая ruok) для healthcheck
+      # МИНИМАЛЬНАЯ память JVM для Zookeeper
+      KAFKA_HEAP_OPTS: "-Xmx64M -Xms32M"
       KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"
     ports:
       - "2181:2181"
@@ -49,24 +50,20 @@ services:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_logs:/var/lib/zookeeper/log
     healthcheck:
-      # Проверяем здоровье zookeeper через команду ruok
-      # KAFKA_OPTS разрешает использование ruok команды (4LW команды)
-      # Используем /dev/tcp для проверки (встроено в bash/sh, не требует дополнительных утилит)
-      # Формат: exec 3<>/dev/tcp/host/port открывает TCP соединение
       test: ["CMD-SHELL", "sh -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok || exit 1"]
-      interval: 10s
+      interval: 20s  # Увеличен интервал для экономии ресурсов
       timeout: 5s
-      start_period: 60s
-      retries: 15
+      start_period: 30s  # Уменьшено время ожидания
+      retries: 5  # Уменьшено количество попыток
     restart: unless-stopped
 
   kafka:
     image: confluentinc/cp-kafka:7.7.7
     container_name: kafka
-    # Ограничения ресурсов для Kafka (для docker-compose без swarm используйте mem_limit и cpus)
-    mem_limit: 512m
-    mem_reservation: 256m
-    cpus: 0.3
+    # МИНИМАЛЬНЫЕ ограничения ресурсов для работы на серверах с ограниченными ресурсами
+    mem_limit: ${KAFKA_MEM_LIMIT:-128m}
+    mem_reservation: ${KAFKA_MEM_RESERVATION:-64m}
+    cpus: ${KAFKA_CPUS:-0.1}
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -80,81 +77,58 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      
-      # Ограничение памяти JVM для Kafka (512MB максимум, 256MB минимум)
-      KAFKA_HEAP_OPTS: "-Xmx384M -Xms256M"
-      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15 -Djava.awt.headless=true"
-      
-      # Настройки для сохранения данных (агрессивная очистка для экономии места)
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_LOG_RETENTION_HOURS: 24  # 1 день вместо 7
-      KAFKA_LOG_RETENTION_BYTES: 536870912  # 512MB вместо 1GB
-      KAFKA_LOG_SEGMENT_BYTES: 104857600  # 100MB сегменты (меньше для быстрой очистки)
-      KAFKA_LOG_CLEANUP_POLICY: delete
-      KAFKA_LOG_CLEANER_THREADS: 1  # Меньше потоков для очистки
-      
-      # Оптимизация производительности для малых ресурсов
-      KAFKA_NUM_NETWORK_THREADS: 3  # Минимум потоков
-      KAFKA_NUM_IO_THREADS: 4  # Минимум потоков
-      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400  # 100KB буферы
-      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400  # 100KB буферы
-      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600  # 100MB максимум
-      
-      # Настройки для экономии памяти
-      KAFKA_NUM_PARTITIONS: 1  # Минимум партиций
+
+      # МИНИМАЛЬНЫЕ настройки памяти JVM
+      KAFKA_HEAP_OPTS: "-Xmx64M -Xms32M"
+
+      # МИНИМАЛЬНЫЕ настройки производительности
+      KAFKA_NUM_NETWORK_THREADS: 2
+      KAFKA_NUM_IO_THREADS: 2
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 51200
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 51200
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 20971520  # 20MB
+
+      # МИНИМАЛЬНЫЕ настройки хранения
+      KAFKA_NUM_PARTITIONS: 1
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
-      
-      # Настройки для быстрой обработки (меньше буферизации)
-      KAFKA_COMPRESSION_TYPE: snappy  # Сжатие для экономии места
-      KAFKA_MESSAGE_MAX_BYTES: 1048576  # 1MB максимум на сообщение
+      KAFKA_LOG_RETENTION_HOURS: 1  # 1 час для экономии места
+      KAFKA_LOG_RETENTION_BYTES: 268435456  # 256MB
+      KAFKA_LOG_SEGMENT_BYTES: 26214400  # 25MB
+      KAFKA_COMPRESSION_TYPE: uncompressed  # Без сжатия для экономии CPU
+      KAFKA_MESSAGE_MAX_BYTES: 524288  # 512KB
     volumes:
       - kafka_data:/var/lib/kafka/data
-
-  # Kafka UI отключен для экономии ресурсов (можно включить при необходимости)
-  # Для продакшена рекомендуется отключить или запускать только при необходимости
-  # kafka-ui:
-  #   image: provectuslabs/kafka-ui:latest
-  #   container_name: kafka-ui
-  #   mem_limit: 128m
-  #   cpus: 0.1
-  #   depends_on:
-  #     kafka:
-  #       condition: service_started
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     KAFKA_CLUSTERS_0_NAME: local
-  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-  #     KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-  #   restart: always
 
   db:
     image: postgres:18.1-alpine3.23
     container_name: db
-    # Ограничения ресурсов для PostgreSQL (для docker-compose без swarm используйте mem_limit и cpus)
-    mem_limit: 256m
-    mem_reservation: 128m
-    cpus: 0.15
+    # Оптимальные ограничения ресурсов для PostgreSQL с дополнительными оптимизациями
+    mem_limit: ${DB_MEM_LIMIT:-192m}
+    mem_reservation: ${DB_MEM_RESERVATION:-96m}
+    cpus: ${DB_CPUS:-0.1}
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
-      # Оптимизация PostgreSQL для малых ресурсов
-      # Ограничения памяти применяются через docker-compose (mem_limit: 256m)
-      # PostgreSQL автоматически адаптируется под доступную память
+      # Дополнительные оптимизации PostgreSQL для малой памяти
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     restart: always
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
+      interval: 15s  # Увеличен интервал для экономии ресурсов
       timeout: 5s
-      retries: 5
+      retries: 3  # Уменьшено количество попыток
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "effective_cache_size=128MB", "-c", "maintenance_work_mem=16MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=4MB", "-c", "default_statistics_target=100"]
 
-  # news-analyzer отключен из-за нехватки ресурсов
+  # NEWS-ANALYZER ОТКЛЮЧЕН из-за нехватки ресурсов на сервере
+  # Для включения раскомментируйте блок ниже и volumes в конце файла
   # news-analyzer:
   #   image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-kaevdokimov}/news-analyzer:latest
   #   container_name: news-analyzer
@@ -169,30 +143,19 @@ services:
   #     POSTGRES_DB: ${POSTGRES_DB}
   #     TZ: ${TZ:-"Europe/Moscow"}
   #     LOG_LEVEL: ${ANALYZER_LOG_LEVEL:-"INFO"}
-  #     # Расписание запуска анализа (формат: "HH:MM,HH:MM")
-  #     # ОПТИМИЗАЦИЯ: Запуск только 2 раза в день вместо 5 для снижения нагрузки
   #     ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-9:00,21:00}
-  #     # Запустить анализ сразу при старте контейнера (для тестирования)
   #     RUN_ON_STARTUP: ${ANALYZER_RUN_ON_STARTUP:-"false"}
-  #     # Telegram для отправки отчетов
-  #     # Использует отдельный бот для отправки отчетов (токен из GitHub Actions переменных или .env)
-  #     # Отправляет отчеты всем пользователям из таблицы users
   #     TELEGRAM_SIGNAL_API_KEY: ${TELEGRAM_SIGNAL_API_KEY}
-  #     # ОПТИМИЗАЦИЯ: Ограничения производительности
-  #     MAX_NEWS_LIMIT: ${ANALYZER_MAX_NEWS_LIMIT:-300}  # Максимум 300 новостей вместо 1000
-  #     TELEGRAM_SEND_DELAY: ${ANALYZER_TELEGRAM_DELAY:-0.1}  # Увеличенная задержка между отправками
-  #     MIN_NEWS_THRESHOLD: ${ANALYZER_MIN_NEWS_THRESHOLD:-10}  # Минимум новостей для анализа
+  #     MAX_NEWS_LIMIT: ${ANALYZER_MAX_NEWS_LIMIT:-300}
+  #     TELEGRAM_SEND_DELAY: ${ANALYZER_TELEGRAM_DELAY:-0.1}
+  #     MIN_NEWS_THRESHOLD: ${ANALYZER_MIN_NEWS_THRESHOLD:-10}
   #   restart: unless-stopped
-  #   # ОПТИМИЗАЦИЯ: Более строгие ограничения ресурсов
-  #   mem_limit: 256m  # Уменьшено с 512m
-  #   mem_reservation: 128m  # Уменьшено с 256m
-  #   cpus: 0.2  # Уменьшено с 0.3
+  #   mem_limit: 256m
+  #   mem_reservation: 128m
+  #   cpus: 0.2
   #   volumes:
-  #     # Монтируем директории для отчетов и логов (персистентность)
   #     - analyzer_reports:/app/storage/reports
   #     - analyzer_logs:/app/storage/logs
-  #     # Опционально: монтируем config.yaml для возможности изменения без пересборки
-  #     # - ./news-analyzer-python/config.yaml:/app/config.yaml:ro
   #   healthcheck:
   #     test: ["CMD-SHELL", "python -c \"import sys; sys.path.insert(0, '/app/src'); from src.db import Database; from src.config import load_settings; s = load_settings(); db = Database(s.get_db_connection_string()); db.connect(); exit(0 if db.test_connection() else 1)\" || exit 1"]
   #     interval: 60s
@@ -209,7 +172,8 @@ volumes:
     driver: local
   kafka_data:
     driver: local
-  # analyzer_reports:  # Отключено вместе с news-analyzer
+  # Раскомментируйте для включения news-analyzer
+  # analyzer_reports:
   #   driver: local
-  # analyzer_logs:    # Отключено вместе с news-analyzer
+  # analyzer_logs:
   #   driver: local
