@@ -146,6 +146,67 @@ func IncrementDBQueriesErrors() {
 	globalMetrics.LastUpdate = time.Now()
 }
 
+// Getters для Prometheus-style метрик
+func GetRSSPolls() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.RSSPollsTotal
+}
+
+func GetRSSPollsErrors() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.RSSPollsErrors
+}
+
+func GetRSSItemsProcessed() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.RSSItemsProcessed
+}
+
+func GetKafkaMessagesProduced() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.KafkaMessagesProduced
+}
+
+func GetKafkaMessagesConsumed() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.KafkaMessagesConsumed
+}
+
+func GetKafkaErrors() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.KafkaErrors
+}
+
+func GetTelegramMessagesSent() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.TelegramMessagesSent
+}
+
+func GetTelegramMessagesErrors() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.TelegramMessagesErrors
+}
+
+func GetDBQueries() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.DBQueriesTotal
+}
+
+func GetDBQueriesErrors() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.DBQueriesErrors
+}
+
 // Reset сбрасывает все метрики
 func Reset() {
 	globalMetrics.mu.Lock()

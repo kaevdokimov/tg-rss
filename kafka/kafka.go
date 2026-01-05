@@ -49,8 +49,11 @@ type Consumer struct {
 func NewProducer(kafkaConfig *config.KafkaConfig) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
-	config.Producer.RequiredAcks = sarama.WaitForAll
-	config.Producer.Retry.Max = 5
+	config.Producer.RequiredAcks = sarama.WaitForLocal // Оптимизация: локальное подтверждение вместо WaitForAll
+	config.Producer.Retry.Max = 3 // Снижаем количество повторных попыток
+	config.Producer.Compression = sarama.CompressionSnappy // Сжатие для экономии трафика
+	config.Producer.Flush.Frequency = 500 * time.Millisecond // Частая отправка мелких батчей
+	config.Producer.Flush.Messages = 100 // Отправка при накоплении 100 сообщений
 
 	producer, err := sarama.NewSyncProducer(kafkaConfig.Brokers, config)
 	if err != nil {
@@ -67,11 +70,15 @@ func NewProducer(kafkaConfig *config.KafkaConfig) (*Producer, error) {
 // NewConsumer создает новый Kafka consumer с группой
 func NewConsumer(kafkaConfig *config.KafkaConfig) (*Consumer, error) {
 	log.Printf("Создание consumer с brokers: %v", kafkaConfig.Brokers)
-	
+
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
-	
+	config.Consumer.Fetch.Min = 1 // Минимальный размер батча для экономии памяти
+	config.Consumer.Fetch.Max = 1048576 // 1MB максимум
+	config.Consumer.MaxWaitTime = 500 * time.Millisecond // Таймаут ожидания сообщений
+	config.Consumer.MaxProcessingTime = 100 * time.Millisecond // Время обработки
+
 	// Создаем consumer group
 	consumerGroup, err := sarama.NewConsumerGroup(kafkaConfig.Brokers, "tg-bot-group", config)
 	if err != nil {

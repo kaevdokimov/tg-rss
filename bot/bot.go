@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"tg-rss/config"
@@ -11,7 +12,7 @@ import (
 )
 
 // StartBotWithKafka запускает бота с использованием Kafka для очередей сообщений
-func StartBotWithKafka(cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProducer *kafka.Producer, kafkaConsumer *kafka.Consumer) {
+func StartBotWithKafka(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProducer *kafka.Producer, kafkaConsumer *kafka.Consumer) {
 	interval := time.Duration(cfgTgBot.Timeout) * time.Second
 
 	// Инициализация Telegram-бота
@@ -73,6 +74,7 @@ func StartBotWithKafka(cfgTgBot *config.TgBotConfig, dbConn *sql.DB, kafkaProduc
 		}
 	}()
 
-	// Задержка для предотвращения выхода из программы
-	select {}
+	// Ожидание завершения контекста
+	<-ctx.Done()
+	log.Println("Бот завершает работу...")
 }

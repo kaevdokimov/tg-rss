@@ -35,6 +35,11 @@ type NewsProcessor struct {
 	pendingNews       map[int64][]PendingNews // очередь новостей по пользователям
 	pendingMutex      sync.Mutex
 	sendInterval      time.Duration
+	// Кэш подписок для снижения запросов к БД
+	subscriptionsCache map[int64][]interface{} // кэш подписок по source_id
+	cacheMutex         sync.RWMutex
+	lastCacheUpdate    time.Time
+	cacheDuration      time.Duration
 }
 
 // NewNewsProcessor создает новый обработчик новостей
@@ -42,13 +47,18 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 	// Глобальный rate limiter: минимум 50ms между сообщениями (20 сообщений/секунду)
 	// Это дает запас от лимита Telegram в 30 сообщений/секунду
 	globalLimiter := NewGlobalRateLimiter(50 * time.Millisecond)
-	
+
+	// Инициализация кэша подписок
+	cache := make(map[int64][]interface{})
+
 	np := &NewsProcessor{
 		db:                db,
 		bot:               bot,
 		globalRateLimiter: globalLimiter,
 		pendingNews:       make(map[int64][]PendingNews),
 		sendInterval:      15 * time.Minute, // отправка раз в 15 минут
+		subscriptionsCache: cache,
+		cacheDuration:      10 * time.Minute, // обновление кэша каждые 10 минут
 	}
 	
 	// Запускаем периодическую отправку накопленных новостей
@@ -89,11 +99,9 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		return nil
 	}
 
-	// Получение списка пользователей, подписанных на источник
-	monitoring.IncrementDBQueries()
-	subscriptions, err := db.GetSubscriptions(np.db, newsItem.SourceID)
+	// Получение списка пользователей, подписанных на источник (с кэшированием)
+	subscriptions, err := np.getSubscriptionsCached(newsItem.SourceID)
 	if err != nil {
-		monitoring.IncrementDBQueriesErrors()
 		newsLogger.Error("Ошибка при получении подписок: %v", err)
 		return err
 	}
@@ -405,4 +413,58 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 		}
 
 	return true
+}
+
+// getSubscriptionsCached возвращает подписки для источника с кэшированием
+func (np *NewsProcessor) getSubscriptionsCached(sourceID int64) ([]db.Subscription, error) {
+	np.cacheMutex.RLock()
+	if cachedSubs, exists := np.subscriptionsCache[sourceID]; exists &&
+		time.Since(np.lastCacheUpdate) < np.cacheDuration {
+		np.cacheMutex.RUnlock()
+		// Преобразуем interface{} обратно в db.Subscription
+		subscriptions := make([]db.Subscription, len(cachedSubs))
+		for i, sub := range cachedSubs {
+			if s, ok := sub.(db.Subscription); ok {
+				subscriptions[i] = s
+			}
+		}
+		return subscriptions, nil
+	}
+	np.cacheMutex.RUnlock()
+
+	// Кэш устарел или не существует, обновляем
+	np.cacheMutex.Lock()
+	defer np.cacheMutex.Unlock()
+
+	// Проверяем еще раз, вдруг другой горутина уже обновила
+	if cachedSubs, exists := np.subscriptionsCache[sourceID]; exists &&
+		time.Since(np.lastCacheUpdate) < np.cacheDuration {
+		// Преобразуем interface{} обратно в db.Subscription
+		subscriptions := make([]db.Subscription, len(cachedSubs))
+		for i, sub := range cachedSubs {
+			if s, ok := sub.(db.Subscription); ok {
+				subscriptions[i] = s
+			}
+		}
+		return subscriptions, nil
+	}
+
+	monitoring.IncrementDBQueries()
+	subscriptions, err := db.GetSubscriptions(np.db, sourceID)
+	if err != nil {
+		monitoring.IncrementDBQueriesErrors()
+		return nil, err
+	}
+
+	// Обновляем кэш для всех источников (оптимизация)
+	allSubscriptions := make(map[int64][]interface{})
+	for _, sub := range subscriptions {
+		allSubscriptions[sub.SourceId] = append(allSubscriptions[sub.SourceId], sub)
+	}
+
+	np.subscriptionsCache = allSubscriptions
+	np.lastCacheUpdate = time.Now()
+
+	newsLogger.Debug("Кэш подписок обновлен, источников: %d", len(allSubscriptions))
+	return subscriptions, nil
 }
