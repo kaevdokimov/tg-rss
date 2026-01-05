@@ -687,6 +687,9 @@ type AdminStats struct {
 	NewsToday      int
 	NewsYesterday  int
 	TotalUsers     int
+	NewsSuccess    int // Количество успешно обработанных новостей
+	NewsFailed     int // Количество новостей с ошибками обработки
+	NewsPending    int // Количество новостей в ожидании обработки
 }
 
 // GetAdminStats возвращает статистику для администратора
@@ -728,6 +731,22 @@ func GetAdminStats(db *sql.DB) (AdminStats, error) {
 	if err != nil {
 		return stats, fmt.Errorf("ошибка при получении количества пользователей: %w", err)
 	}
-	
+
+	// Количество новостей по статусам обработки
+	err = db.QueryRow("SELECT COUNT(*) FROM news WHERE scrape_status = 'success'").Scan(&stats.NewsSuccess)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении количества успешных новостей: %w", err)
+	}
+
+	err = db.QueryRow("SELECT COUNT(*) FROM news WHERE scrape_status = 'failed'").Scan(&stats.NewsFailed)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении количества неудачных новостей: %w", err)
+	}
+
+	err = db.QueryRow("SELECT COUNT(*) FROM news WHERE scrape_status = 'pending' OR scrape_status IS NULL").Scan(&stats.NewsPending)
+	if err != nil {
+		return stats, fmt.Errorf("ошибка при получении количества новостей в ожидании: %w", err)
+	}
+
 	return stats, nil
 }

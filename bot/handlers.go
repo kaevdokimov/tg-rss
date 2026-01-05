@@ -636,11 +636,19 @@ func handleAdminStats(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 • За сегодня: %d
 • За вчера: %d
 
+🔄 *Статусы обработки новостей:*
+• ✅ Успешно обработано: %d
+• ❌ Ошибки обработки: %d
+• ⏳ В ожидании: %d
+
 👥 *Пользователи:*
 • Всего пользователей: %d`,
 		stats.TotalNews,
 		stats.NewsToday,
 		stats.NewsYesterday,
+		stats.NewsSuccess,
+		stats.NewsFailed,
+		stats.NewsPending,
 		stats.TotalUsers,
 	)
 
