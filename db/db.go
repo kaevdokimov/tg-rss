@@ -140,7 +140,7 @@ func SendNewsToSubscribers(db *sql.DB, chatIDs []int64, sourceID int64, title, d
 	// Отправляем уведомления
 	for _, chatID := range chatIDs {
 		// Проверяем, не отправляли ли уже эту новость пользователю
-		sent, err := IsNewsSentToUser(db, chatID, sourceID, link)
+		sent, err := IsNewsSentToUser(db, chatID, newsID)
 		if err != nil {
 			log.Printf("Ошибка при проверке отправленной новости: %v", err)
 			continue
@@ -167,14 +167,13 @@ func SendNewsToSubscribers(db *sql.DB, chatIDs []int64, sourceID int64, title, d
 }
 
 // IsNewsSentToUser проверяет, была ли уже отправлена новость пользователю
-func IsNewsSentToUser(db *sql.DB, chatID, sourceID int64, link string) (bool, error) {
+func IsNewsSentToUser(db *sql.DB, chatID, newsID int64) (bool, error) {
 	var count int
 	err := db.QueryRow(`
-		SELECT COUNT(*) 
-		FROM messages m
-		JOIN news n ON m.news_id = n.id
-		WHERE m.chat_id = $1 AND n.source_id = $2 AND n.link = $3
-	`, chatID, sourceID, link).Scan(&count)
+		SELECT COUNT(*)
+		FROM messages
+		WHERE chat_id = $1 AND news_id = $2
+	`, chatID, newsID).Scan(&count)
 
 	if err != nil {
 		return false, fmt.Errorf("ошибка при проверке отправленной новости: %v", err)

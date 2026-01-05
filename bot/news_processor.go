@@ -114,12 +114,24 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 		sourceUrl = ""
 	}
 
+	// Проверяем, не отправляли ли уже эту новость кому-то (глобальная дедупликация)
+	// Используем news_id вместо source_id + link для дедупликации по контенту
+	newsAlreadySent, err := np.isNewsAlreadySentGlobally(newsID)
+	if err != nil {
+		newsLogger.Error("Ошибка при проверке глобальной отправки новости: %v", err)
+		return err
+	}
+	if newsAlreadySent {
+		newsLogger.Debug("Новость уже была отправлена глобально: %s", newsItem.Title)
+		return nil
+	}
+
 	// Добавляем новость в очередь для каждого подписанного пользователя
 	np.pendingMutex.Lock()
 	addedToQueue := 0
 	for _, subscription := range subscriptions {
-		// Проверяем, не отправляли ли уже эту новость пользователю
-		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsItem.SourceID, newsItem.Link)
+			// Проверяем, не отправляли ли уже эту новость пользователю
+		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsID)
 		if err != nil {
 			newsLogger.Error("Ошибка при проверке отправленной новости для пользователя %d: %v", subscription.ChatId, err)
 			continue
@@ -156,6 +168,22 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem kafka.NewsItem) error {
 	}
 
 	return nil
+}
+
+// isNewsAlreadySentGlobally проверяет, была ли новость уже отправлена кому-либо
+func (np *NewsProcessor) isNewsAlreadySentGlobally(newsID int64) (bool, error) {
+	var count int
+	err := np.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM messages
+		WHERE news_id = $1
+	`, newsID).Scan(&count)
+
+	if err != nil {
+		return false, fmt.Errorf("ошибка при проверке глобальной отправки новости: %v", err)
+	}
+
+	return count > 0, nil
 }
 
 // startPeriodicSending запускает периодическую отправку накопленных новостей

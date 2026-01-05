@@ -2,7 +2,6 @@ package bot
 
 import (
 	"database/sql"
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -195,28 +194,23 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 
 	rssLogger.Debug("Проверка батча из %d кандидатов на дубликаты", len(candidates))
 
-	// Собираем все комбинации source_id + link для проверки дубликатов
-	var sourceIDs []int64
+	// Собираем все ссылки для проверки дубликатов (дедупликация по контенту)
 	var links []string
-	sourceLinkMap := make(map[string]newsCandidate) // ключ: "source_id:link"
+	linkMap := make(map[string]newsCandidate) // ключ: link
 
 	for _, candidate := range candidates {
-		key := fmt.Sprintf("%d:%s", candidate.source.Id, candidate.item.Link)
-		sourceIDs = append(sourceIDs, candidate.source.Id)
 		links = append(links, candidate.item.Link)
-		sourceLinkMap[key] = candidate
+		linkMap[candidate.item.Link] = candidate
 	}
 
-	// Оптимизация: батч-запрос для проверки существования новостей
+	// Оптимизация: батч-запрос для проверки существования новостей по ссылке
 	query := `
-		SELECT source_id, link
+		SELECT link
 		FROM news
-		WHERE (source_id, link) IN (
-			SELECT unnest($1::bigint[]), unnest($2::text[])
-		)
+		WHERE link = ANY($1)
 	`
 
-	rows, err := dbConn.Query(query, sourceIDs, links)
+	rows, err := dbConn.Query(query, links)
 	if err != nil {
 		rssLogger.Error("Ошибка батч-проверки дубликатов: %v", err)
 		// Fallback: обрабатываем по одной новости
@@ -227,20 +221,18 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 	// Собираем существующие новости
 	existingNews := make(map[string]bool)
 	for rows.Next() {
-		var sourceID int64
 		var link string
-		if err := rows.Scan(&sourceID, &link); err != nil {
+		if err := rows.Scan(&link); err != nil {
 			rssLogger.Warn("Ошибка чтения результата проверки дубликатов: %v", err)
 			continue
 		}
-		key := fmt.Sprintf("%d:%s", sourceID, link)
-		existingNews[key] = true
+		existingNews[link] = true
 	}
 
 	// Обрабатываем кандидатов, пропуская дубликаты
 	sent := 0
-	for key, candidate := range sourceLinkMap {
-		if existingNews[key] {
+	for link, candidate := range linkMap {
+		if existingNews[link] {
 			rssLogger.Debug("Новость уже есть в БД, пропускаем: %s", candidate.item.Title)
 			continue
 		}
@@ -277,14 +269,15 @@ func processCandidatesBatch(dbConn *sql.DB, kafkaProducer *kafka.Producer, candi
 func processCandidatesSequential(dbConn *sql.DB, kafkaProducer *kafka.Producer, candidates []newsCandidate) int {
 	sent := 0
 	for _, candidate := range candidates {
-		// Проверяем дубликат индивидуально
+		// Проверяем дубликат индивидуально по ссылке
 		var existingNewsID int64
 		err := dbConn.QueryRow(`
 			SELECT id FROM news
-			WHERE source_id = $1 AND link = $2
-		`, candidate.source.Id, candidate.item.Link).Scan(&existingNewsID)
+			WHERE link = $1
+		`, candidate.item.Link).Scan(&existingNewsID)
 
 		if err == nil {
+			rssLogger.Debug("Новость уже есть в БД, пропускаем: %s", candidate.item.Title)
 			continue // Новость уже есть
 		} else if err != sql.ErrNoRows {
 			rssLogger.Warn("Ошибка проверки дубликата: %v", err)
