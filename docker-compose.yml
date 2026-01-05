@@ -60,10 +60,10 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.7.7
     container_name: kafka
-    # МИНИМАЛЬНЫЕ ограничения ресурсов для работы на серверах с ограниченными ресурсами
-    mem_limit: ${KAFKA_MEM_LIMIT:-128m}
-    mem_reservation: ${KAFKA_MEM_RESERVATION:-64m}
-    cpus: ${KAFKA_CPUS:-0.1}
+    # Оптимальные ограничения ресурсов для Kafka (увеличено для heap)
+    mem_limit: ${KAFKA_MEM_LIMIT:-384m}
+    mem_reservation: ${KAFKA_MEM_RESERVATION:-192m}
+    cpus: ${KAFKA_CPUS:-0.15}
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -79,7 +79,7 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
 
       # МИНИМАЛЬНЫЕ настройки памяти JVM
-      KAFKA_HEAP_OPTS: "-Xmx64M -Xms32M"
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms128M"
 
       # МИНИМАЛЬНЫЕ настройки производительности
       KAFKA_NUM_NETWORK_THREADS: 2
