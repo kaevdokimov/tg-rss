@@ -387,11 +387,16 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 	updates := []struct {
 		oldURL string
 		newURL string
+		name   string
 	}{
-		{"https://www.interfax.ru/rss.xml", "https://www.interfax.ru/rss.asp"},
-		{"https://www.rbc.ru/rss", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"},
-		{"https://www.travel.ru/inc/side/yandex.rdf", "https://www.travel.ru/news/feed/"},
-		{"https://www.fontanka.ru/_transmission_for_yandex.thtml", "https://www.fontanka.ru/rss"},
+		{"https://www.interfax.ru/rss.xml", "https://www.interfax.ru/rss.asp", "Интерфакс"},
+		{"https://www.rbc.ru/rss", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "РБК"},
+		{"https://www.travel.ru/inc/side/yandex.rdf", "https://www.travel.ru/news/feed/", "Travel.ru"},
+		{"https://www.fontanka.ru/_transmission_for_yandex.thtml", "https://www.fontanka.ru/rss", "Фонтанка.ру"},
+		{"https://ria.ru/export/rss2/politics/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Политика"},
+		{"https://ria.ru/export/rss2/economy/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Экономика"},
+		{"https://ria.ru/export/rss2/society/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Общество"},
+		{"https://sport.ria.ru/export/rss2/sport/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Спорт"},
 	}
 
 	for _, update := range updates {
@@ -402,11 +407,13 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 		`, update.oldURL, update.newURL)
 
 		if err != nil {
-			log.Printf("Ошибка обновления источника %s: %v", update.oldURL, err)
+			log.Printf("Ошибка обновления источника %s (%s): %v", update.name, update.oldURL, err)
 		} else {
 			rowsAffected, _ := result.RowsAffected()
 			if rowsAffected > 0 {
-				log.Printf("Обновлен источник: %s → %s", update.oldURL, update.newURL)
+				log.Printf("✅ Обновлен источник %s: %s → %s", update.name, update.oldURL, update.newURL)
+			} else {
+				log.Printf("ℹ️  Источник %s (%s) не найден для обновления", update.name, update.oldURL)
 			}
 		}
 	}
