@@ -29,7 +29,7 @@ services:
     cpus: ${BOT_CPUS:-0.5}
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.7.7
+    image: confluentinc/cp-zookeeper:7.8.6
     container_name: zookeeper
     # МИНИМАЛЬНЫЕ ограничения ресурсов для Zookeeper (увеличено для стабильности)
     mem_limit: ${ZOOKEEPER_MEM_LIMIT:-256m}
@@ -58,7 +58,7 @@ services:
     restart: unless-stopped
 
   kafka:
-    image: confluentinc/cp-kafka:7.7.7
+    image: confluentinc/cp-kafka:8.0.3
     container_name: kafka
     # Оптимальные ограничения ресурсов для Kafka (увеличено для heap)
     mem_limit: ${KAFKA_MEM_LIMIT:-384m}
