@@ -244,6 +244,10 @@ jobs:
           # Обновляем системные настройки если требуется
           # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
 
+          # Гарантируем наличие ролей в правильной директории
+          mkdir -p playbooks/roles
+          cp -r ../roles/* playbooks/roles/ 2>/dev/null || echo "Roles already in place"
+
             # 🔒 БЕЗОПАСНЫЙ ДЕПЛОЙ: сохраняем все данные PostgreSQL и Redis
             echo '💾 Создаем резервную копию перед деплоем...'
             mkdir -p ~/backups/pre-deploy
