@@ -72,7 +72,7 @@ services:
       - ./ansible/files/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./ansible/files/postgres/news_bot_init.sql:/docker-entrypoint-initdb.d/02-news_bot_init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d news_bot"]
       interval: 30s
       timeout: 10s
       retries: 3
