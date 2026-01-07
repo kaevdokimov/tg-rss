@@ -69,7 +69,6 @@ services:
     restart: always
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./ansible/files/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 30s
