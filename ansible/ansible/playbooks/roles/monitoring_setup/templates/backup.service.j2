@@ -1,0 +1,8 @@
+[Unit]
+Description=TG-RSS Database Backup
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tg-rss-backup.sh
+User=root

@@ -1,0 +1,25 @@
+---
+- name: Настройка SSH сервера для безопасности
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?{{ item.key }}"
+    line: "{{ item.key }} {{ item.value }}"
+  loop:
+    - { key: 'PermitRootLogin', value: 'no' }
+    - { key: 'PasswordAuthentication', value: 'no' }
+    - { key: 'PermitEmptyPasswords', value: 'no' }
+    - { key: 'ChallengeResponseAuthentication', value: 'no' }
+    - { key: 'UsePAM', value: 'yes' }
+    - { key: 'X11Forwarding', value: 'no' }
+    - { key: 'MaxAuthTries', value: '3' }
+    - { key: 'LoginGraceTime', value: '30' }
+    - { key: 'ClientAliveInterval', value: '300' }
+    - { key: 'ClientAliveCountMax', value: '2' }
+  notify: restart ssh
+
+- name: Добавление SSH ключа в authorized_keys (если указан)
+  authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ lookup('env', 'SSH_PUBLIC_KEY') }}"
+  when: lookup('env', 'SSH_PUBLIC_KEY') != ''

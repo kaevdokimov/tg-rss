@@ -1,0 +1,14 @@
+---
+- name: Установка Docker Compose v2 (уже включена в docker-compose-plugin)
+  package:
+    name: docker-compose-plugin
+    state: present
+
+- name: Проверка установки Docker Compose
+  command: docker compose version
+  register: compose_version
+  changed_when: false
+
+- name: Вывод версии Docker Compose
+  debug:
+    msg: "Docker Compose version: {{ compose_version.stdout }}"
