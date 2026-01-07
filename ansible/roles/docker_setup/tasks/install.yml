@@ -20,16 +20,22 @@
   when: ansible_distribution == "Ubuntu" and (ansible_facts.packages is defined and (ansible_facts.packages['docker'] is defined or ansible_facts.packages['docker-ce'] is defined))
   ignore_errors: true
 
-- name: Очистка всех Docker-related настроек
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /etc/apt/sources.list.d/docker.list
-    - /etc/apt/sources.list.d/docker-ce.list
-    - /usr/share/keyrings/docker-archive-keyring.gpg
-    - /etc/apt/trusted.gpg.d/docker.gpg
-    - /usr/share/keyrings/docker-ce-archive-keyring.gpg
+- name: Полная очистка Docker repository настроек
+  shell: |
+    set -e
+    # Удаляем все Docker repository файлы
+    rm -f /etc/apt/sources.list.d/docker*.list
+    rm -f /usr/share/keyrings/docker*.gpg
+    rm -f /etc/apt/trusted.gpg.d/docker*.gpg
+
+    # Очищаем apt cache для Docker
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*docker*
+
+    # Обновляем apt cache
+    apt-get update
+  args:
+    executable: /bin/bash
   ignore_errors: true
   when: ansible_distribution == "Ubuntu"
 
@@ -63,10 +69,6 @@
     repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     state: present
     filename: docker
-  when: ansible_distribution == "Ubuntu"
-
-- name: Обновление apt cache после добавления репозитория
-  apt:
     update_cache: yes
   when: ansible_distribution == "Ubuntu"
 
@@ -75,7 +77,7 @@
     update_cache: yes
   when: ansible_distribution == "Ubuntu"
 
-- name: Установка Docker CE
+- name: Установка Docker CE с повторной попыткой
   package:
     name:
       - docker-ce
@@ -84,6 +86,10 @@
       - docker-buildx-plugin
       - docker-compose-plugin
     state: present
+  register: docker_install_result
+  retries: 3
+  delay: 10
+  until: docker_install_result is succeeded
 
 - name: Добавление пользователя в группу docker
   user:
