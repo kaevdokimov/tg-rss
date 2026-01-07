@@ -293,6 +293,20 @@ jobs:
             echo '🛑 Stopping containers...'
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down --remove-orphans || true
 
+            # Проверяем и очищаем повреждённые volumes
+            echo '🔧 Checking volumes integrity...'
+            if docker volume ls | grep -q db_data; then
+              echo '🔍 Checking PostgreSQL volume...'
+              if ! docker run --rm -v db_data:/data alpine ls /data/base >/dev/null 2>&1; then
+                echo '⚠️ PostgreSQL volume corrupted, recreating...'
+                docker volume rm db_data
+                docker volume create db_data
+                echo '✅ PostgreSQL volume recreated'
+              else
+                echo '✅ PostgreSQL volume OK'
+              fi
+            fi
+
             # Запускаем сервисы
             echo '▶️ Starting services...'
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull || true
