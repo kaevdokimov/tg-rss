@@ -1,0 +1,20 @@
+---
+- name: Установка Alertmanager
+  include_tasks: alertmanager.yml
+
+- name: Настройка правил алертинга для Prometheus
+  template:
+    src: templates/alert_rules.yml.j2
+    dest: /etc/prometheus/alert_rules.yml
+    mode: '0644'
+    owner: prometheus
+    group: prometheus
+  notify: reload prometheus
+
+- name: Настройка Alertmanager
+  template:
+    src: templates/alertmanager.yml.j2
+    dest: /etc/prometheus/alertmanager.yml
+    mode: '0644'
+    owner: prometheus
+    group: prometheus

@@ -1,0 +1,15 @@
+---
+- name: Отключение неиспользуемых служб
+  include_tasks: disable_services.yml
+
+- name: Настройка SSH для безопасности
+  include_tasks: ssh_hardening.yml
+
+- name: Настройка AppArmor/SElinux
+  include_tasks: apparmor.yml
+
+- name: Настройка аудита системы
+  include_tasks: audit.yml
+
+- name: Установка и настройка rkhunter
+  include_tasks: rkhunter.yml

@@ -1,0 +1,32 @@
+---
+- name: Включение UFW
+  ufw:
+    state: enabled
+
+- name: Разрешение SSH
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Разрешение HTTP для health checks (опционально)
+  ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+
+- name: Разрешение HTTPS (опционально)
+  ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+
+- name: Установка политики по умолчанию (запретить входящие)
+  ufw:
+    direction: incoming
+    policy: deny
+
+- name: Установка политики по умолчанию (разрешить исходящие)
+  ufw:
+    direction: outgoing
+    policy: allow

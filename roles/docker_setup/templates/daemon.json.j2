@@ -1,0 +1,29 @@
+{
+  "storage-driver": "overlay2",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "default-ulimits": {
+    "nofile": {
+      "soft": 65536,
+      "hard": 65536
+    }
+  },
+  "iptables": false,
+  "bridge": "none",
+  "ip-masq": false,
+  "userland-proxy": false,
+  "live-restore": true,
+  "oom-score-adjust": -500,
+  "max-concurrent-downloads": 1,
+  "max-concurrent-uploads": 1,
+  "registry-mirrors": [],
+  "insecure-registries": [],
+  "experimental": false,
+  "metrics-addr": "127.0.0.1:9323",
+  "features": {
+    "buildkit": true
+  }
+}
