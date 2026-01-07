@@ -1,7 +1,7 @@
 """Генерация текстового резюме отчета."""
 
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from ..utils.logger import get_logger
 
@@ -16,7 +16,7 @@ class SummaryGenerator:
         narratives: List[Dict[str, Any]],
         total_news: int,
         analysis_date: datetime,
-        clustering_metrics: Dict[str, Any] = None
+        clustering_metrics: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Генерирует текстовое резюме отчета.
