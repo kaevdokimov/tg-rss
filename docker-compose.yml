@@ -82,7 +82,7 @@ services:
         mkdir -p /var/lib/postgresql/data/pgdata &&
         chown -R postgres:postgres /var/lib/postgresql/data &&
         chmod 700 /var/lib/postgresql/data/pgdata &&
-        exec su postgres -c 'docker-entrypoint.sh postgres -c config_file=/etc/postgresql/postgresql.conf'
+        exec su postgres -c 'docker-entrypoint.sh postgres'
       "
 
   # NEWS-ANALYZER ВКЛЮЧЕН с оптимизированными ресурсами для сервера 900MB RAM, 1 CPU
