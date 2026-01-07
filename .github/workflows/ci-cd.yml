@@ -128,62 +128,22 @@ jobs:
           mkdir -p inventory
           cat > inventory/hosts.ini << EOF
           [tg_rss_servers]
-          ${{ secrets.SERVER_HOST }} ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/tmp/ssh_key ansible_port=${{ secrets.SERVER_PORT || 22 }}
+          ${{ secrets.SERVER_HOST }} ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_port=${{ secrets.SERVER_PORT || 22 }}
           EOF
 
           # Проверяем inventory файл
           echo "📋 Inventory файл:"
           cat inventory/hosts.ini
 
-          # Настраиваем SSH ключ с проверкой
-          echo "🔐 Проверяем секрет SERVER_SSH_KEY..."
-          if [ -z "${{ secrets.SERVER_SSH_KEY }}" ]; then
-            echo "❌ Секрет SERVER_SSH_KEY не найден или пустой"
-            echo "📋 Инструкция по настройке SSH ключа:"
-            echo "1. Сгенерируйте SSH ключ: ssh-keygen -t ed25519 -C 'github-ci'"
-            echo "2. Скопируйте приватный ключ: cat ~/.ssh/id_ed25519"
-            echo "3. Добавьте его в GitHub Secrets как SERVER_SSH_KEY"
-            echo "4. Добавьте публичный ключ на сервер: ssh-copy-id user@server"
-            exit 1
-          fi
-
-          echo "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > /tmp/ssh_key
-          chmod 600 /tmp/ssh_key
-
-          # Проверяем SSH ключ
-          echo "🔐 Проверяем SSH ключ..."
-          KEY_INFO=$(ssh-keygen -l -f /tmp/ssh_key 2>/dev/null)
-          if [ $? -eq 0 ]; then
-            echo "✅ SSH ключ валиден: $KEY_INFO"
-          else
-            echo "❌ SSH ключ поврежден или имеет неправильный формат"
-            echo "📋 Содержимое ключа (первые 2 строки):"
-            head -2 /tmp/ssh_key
-            echo ""
-            echo "🔧 Возможные решения:"
-            echo "1. Убедитесь, что скопировали ПРИВАТНЫЙ ключ (начинается с '-----BEGIN OPENSSH PRIVATE KEY-----')"
-            echo "2. Проверьте, что нет лишних пробелов или символов"
-            echo "3. Попробуйте другой тип ключа: ssh-keygen -t rsa -b 4096"
-            echo ""
-            echo "Пробуем конвертировать ключ..."
-            # Пробуем конвертировать из разных форматов
-            ssh-keygen -i -f /tmp/ssh_key > /tmp/ssh_key_converted 2>/dev/null && mv /tmp/ssh_key_converted /tmp/ssh_key && echo "✅ Конвертация удалась"
-            chmod 600 /tmp/ssh_key
-
-            if ssh-keygen -l -f /tmp/ssh_key > /dev/null 2>&1; then
-              echo "✅ Ключ успешно конвертирован и валиден"
-            else
-              echo "❌ Не удалось исправить SSH ключ"
-              echo "🔍 Детальная диагностика:"
-              file /tmp/ssh_key
-              echo "Размер файла: $(wc -c < /tmp/ssh_key) байт"
-              exit 1
-            fi
-          fi
+          # Настраиваем SSH ключ (упрощенная версия, как в deploy job)
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts || true
 
           # Тестируем SSH подключение
           echo "🔗 Тестируем SSH подключение..."
-          ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH подключение успешно'" || exit 1
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH подключение успешно'" || exit 1
 
           # Запускаем ansible-playbook для инфраструктуры
           echo "🔧 Версия Ansible: $(ansible-playbook --version | head -1)"
