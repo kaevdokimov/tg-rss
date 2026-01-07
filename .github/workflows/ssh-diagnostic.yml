@@ -1,0 +1,35 @@
+name: SSH Diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_ssh:
+        description: 'Test SSH connection'
+        required: true
+        default: 'true'
+
+jobs:
+  ssh-test:
+    name: Test SSH Connection
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts || true
+
+      - name: Test SSH connection
+        run: |
+          echo "🔗 Testing SSH connection..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH connection successful!' && uname -a"
+
+      - name: Check SSH key format
+        run: |
+          echo "🔐 SSH key information:"
+          ssh-keygen -l -f ~/.ssh/id_rsa
+          echo ""
+          echo "📋 SSH key format:"
+          head -2 ~/.ssh/id_rsa
