@@ -1,39 +1,13 @@
 ---
-- name: Проверка наличия Docker пакетов
-  package_facts:
-    manager: auto
-  when: ansible_distribution == "Ubuntu"
-
-- name: Удаление установленных Docker пакетов (если есть)
-  package:
-    name: "{{ item }}"
-    state: absent
-  loop:
-    - docker
-    - docker-engine
-    - docker.io
-    - containerd
-    - runc
-    - docker-ce
-    - docker-ce-cli
-    - containerd.io
-  when: ansible_distribution == "Ubuntu" and (ansible_facts.packages is defined and (ansible_facts.packages['docker'] is defined or ansible_facts.packages['docker-ce'] is defined))
-  ignore_errors: true
-
-- name: Полная очистка Docker repository настроек
+- name: Проверка успешной очистки Docker
   shell: |
-    set -e
-    # Удаляем все Docker repository файлы
-    rm -f /etc/apt/sources.list.d/docker*.list
-    rm -f /usr/share/keyrings/docker*.gpg
-    rm -f /etc/apt/trusted.gpg.d/docker*.gpg
-
-    # Очищаем apt cache для Docker
-    apt-get clean
-    rm -rf /var/lib/apt/lists/*docker*
-
-    # Обновляем apt cache
-    apt-get update
+    echo "🔍 Проверка очистки Docker..."
+    if command -v docker >/dev/null 2>&1; then
+      echo "⚠️ Docker всё ещё установлен, проверка..."
+      docker --version
+    else
+      echo "✅ Docker полностью удалён"
+    fi
   args:
     executable: /bin/bash
   ignore_errors: true

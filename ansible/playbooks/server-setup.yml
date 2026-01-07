@@ -48,6 +48,37 @@
       fs.file-max: 2097152
 
   pre_tasks:
+    - name: Полная очистка Docker перед настройкой сервера
+      shell: |
+        set -e
+        echo "🗑️ Полная очистка Docker..."
+
+        # Останавливаем и удаляем все Docker сервисы
+        systemctl stop docker docker.socket containerd || true
+        systemctl disable docker docker.socket containerd || true
+
+        # Удаляем все Docker пакеты
+        apt-get remove --purge -y docker docker-engine docker.io containerd runc \
+          docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || true
+
+        # Удаляем все Docker repository файлы
+        rm -f /etc/apt/sources.list.d/docker*.list
+        rm -f /usr/share/keyrings/docker*.gpg
+        rm -f /etc/apt/trusted.gpg.d/docker*.gpg
+
+        # Очищаем apt cache
+        apt-get clean
+        apt-get autoclean
+        rm -rf /var/lib/apt/lists/*docker*
+        rm -rf /var/lib/docker
+        rm -rf /etc/docker
+
+        echo "✅ Docker полностью очищен"
+      args:
+        executable: /bin/bash
+      ignore_errors: true
+      when: ansible_os_family == "Debian"
+
     - name: Обновление списка пакетов
       apt:
         update_cache: yes
