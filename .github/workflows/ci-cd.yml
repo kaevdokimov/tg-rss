@@ -197,27 +197,28 @@ jobs:
           TELEGRAM_API_KEY=${{ secrets.TELEGRAM_API_KEY }}
           # Telegram (бот для отчетов анализа)
           TELEGRAM_SIGNAL_API_KEY=${{ secrets.TELEGRAM_SIGNAL_API_KEY }}
-          
+
           # PostgreSQL
-          POSTGRES_HOST=${{ secrets.POSTGRES_HOST || 'localhost' }}
-          POSTGRES_PORT=${{ secrets.POSTGRES_PORT || '5432' }}
+          POSTGRES_HOST=db
+          POSTGRES_PORT=5432
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-          
+
           # Kafka
-          KAFKA_BROKERS=${{ secrets.KAFKA_BROKERS || 'localhost:29092' }}
-          KAFKA_NEWS_TOPIC=${{ secrets.KAFKA_NEWS_TOPIC || 'news-items' }}
-          KAFKA_NOTIFY_TOPIC=${{ secrets.KAFKA_NOTIFY_TOPIC || 'news-notifications' }}
-          
+          KAFKA_BROKERS=kafka:29092
+          KAFKA_NEWS_TOPIC=news-items
+          KAFKA_NOTIFY_TOPIC=news-notifications
+
           # Application
-          TZ=${{ secrets.TZ || 'Europe/Moscow' }}
-          TIMEOUT=${{ secrets.TIMEOUT || '60' }}
-          
+          TZ=Europe/Moscow
+          TIMEOUT=60
+
           # Content scraper configuration
-          CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL || '2' }}
-          CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH || '20' }}
-          CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT || '6' }}
+          CONTENT_SCRAPER_INTERVAL=2
+          CONTENT_SCRAPER_BATCH=20
+          CONTENT_SCRAPER_CONCURRENT=6
+          GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
           EOL
 
       # Деплой на сервер
