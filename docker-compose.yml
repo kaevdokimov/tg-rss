@@ -82,7 +82,15 @@ services:
         mkdir -p /var/lib/postgresql/data/pgdata &&
         chown -R postgres:postgres /var/lib/postgresql/data &&
         chmod 700 /var/lib/postgresql/data/pgdata &&
-        exec su postgres -c 'docker-entrypoint.sh postgres'
+        exec su postgres -c '
+          docker-entrypoint.sh postgres &
+          POSTGRES_PID=$!
+          sleep 5
+          if [ \"$POSTGRES_DB\" != \"postgres\" ]; then
+            psql -U postgres -c \"CREATE DATABASE $POSTGRES_DB OWNER $POSTGRES_USER;\" || echo \"Database $POSTGRES_DB already exists\"
+          fi
+          wait $POSTGRES_PID
+        '
       "
 
   # NEWS-ANALYZER ВКЛЮЧЕН с оптимизированными ресурсами для сервера 900MB RAM, 1 CPU
