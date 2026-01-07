@@ -1,8 +1,6 @@
 -- Setup script for news_bot database
 -- This runs after the database is created
-
--- Connect to news_bot database
-\c news_bot
+-- Note: Script already runs in news_bot database context
 
 -- Ensure the user has proper privileges
 GRANT ALL ON SCHEMA public TO postgres;
