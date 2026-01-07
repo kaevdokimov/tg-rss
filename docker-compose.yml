@@ -69,7 +69,8 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./ansible/files/postgres/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
-      - ./ansible/files/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./ansible/files/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./ansible/files/postgres/news_bot_init.sql:/docker-entrypoint-initdb.d/02-news_bot_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 30s
