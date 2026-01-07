@@ -105,6 +105,12 @@ EOF
         if: env.SNYK_TOKEN_AVAILABLE == 'true'
         run: |
           echo "🔍 Validating SARIF file..."
+          # Install jq if not available
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "📦 Installing jq for JSON validation..."
+            apt-get update && apt-get install -y jq
+          fi
+
           if [ -f "snyk-code.sarif" ] && jq empty snyk-code.sarif 2>/dev/null; then
             echo "✅ SARIF file is valid JSON"
           else
