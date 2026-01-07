@@ -206,14 +206,14 @@ func TestLoadTgBotConfig(t *testing.T) {
 	if cfg.Timeout != 60 {
 		t.Errorf("Ожидался Timeout 60, получено %d", cfg.Timeout)
 	}
-	if cfg.ContentScraperInterval != 2 {
-		t.Errorf("Ожидался ContentScraperInterval 2, получено %d", cfg.ContentScraperInterval)
+	if cfg.ContentScraperInterval != 1 {
+		t.Errorf("Ожидался ContentScraperInterval 1, получено %d", cfg.ContentScraperInterval)
 	}
-	if cfg.ContentScraperBatch != 20 {
-		t.Errorf("Ожидался ContentScraperBatch 20, получено %d", cfg.ContentScraperBatch)
+	if cfg.ContentScraperBatch != 50 {
+		t.Errorf("Ожидался ContentScraperBatch 50, получено %d", cfg.ContentScraperBatch)
 	}
-	if cfg.ContentScraperConcurrent != 6 {
-		t.Errorf("Ожидался ContentScraperConcurrent 6, получено %d", cfg.ContentScraperConcurrent)
+	if cfg.ContentScraperConcurrent != 3 {
+		t.Errorf("Ожидался ContentScraperConcurrent 3, получено %d", cfg.ContentScraperConcurrent)
 	}
 
 	// Тест с кастомными значениями
