@@ -42,7 +42,7 @@ jobs:
         mkdir -p ansible/inventory
         cat > ansible/inventory/hosts.ini << EOF
         [tg_rss_servers]
-        ${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/tmp/ssh_key
+        ${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=~/.ssh/id_rsa
 
         [all:vars]
         ansible_python_interpreter=/usr/bin/python3
@@ -50,17 +50,18 @@ jobs:
 
     - name: Setup SSH key
       run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
-        chmod 600 /tmp/ssh_key
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
 
     - name: Run Ansible playbook
       run: |
         cd ansible
-        ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml --extra-vars "ansible_ssh_private_key_file=/tmp/ssh_key"
+        ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml
 
     - name: Deploy application
       run: |
-        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
           cd /opt/tg-rss
           git pull origin main
           docker-compose pull
@@ -74,4 +75,4 @@ jobs:
         curl -f http://${{ secrets.SERVER_HOST }}:8080/health || exit 1
 
     - name: Cleanup
-      run: rm -f /tmp/ssh_key
+      run: rm -f ~/.ssh/id_rsa
