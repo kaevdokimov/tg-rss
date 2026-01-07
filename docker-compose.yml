@@ -64,7 +64,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
       PGDATA: /var/lib/postgresql/data/pgdata
-    user: postgres
     ports:
       - "5432:5432"
     restart: always
@@ -77,10 +76,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command:
-      - "postgres"
-      - "-c"
-      - "config_file=/etc/postgresql/postgresql.conf"
+    # Исправляем permissions для postgres пользователя
+    user: root
+    command: >
+      sh -c "
+        mkdir -p /var/lib/postgresql/data/pgdata &&
+        chown -R postgres:postgres /var/lib/postgresql/data &&
+        chmod 700 /var/lib/postgresql/data/pgdata &&
+        exec su-exec postgres postgres -c config_file=/etc/postgresql/postgresql.conf
+      "
 
   # NEWS-ANALYZER ВКЛЮЧЕН с оптимизированными ресурсами для сервера 900MB RAM, 1 CPU
   news-analyzer:
