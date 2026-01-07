@@ -76,13 +76,13 @@ jobs:
           else
             echo "⚠️ Snyk Code analysis failed, creating empty SARIF file..."
             # Create minimal valid SARIF file if analysis fails
-            cat > snyk-code.sarif << 'EOF'
+            cat > snyk-code.sarif << SNYK_EOF
 {
-  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "\$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
   "version": "2.1.0",
   "runs": []
 }
-EOF
+SNYK_EOF
           fi
 
           # Runs Snyk Open Source (SCA) analysis and uploads result to Snyk.
