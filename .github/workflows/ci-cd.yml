@@ -51,7 +51,7 @@ jobs:
 
       # Настройка Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       # Логин в GitHub Container Registry
       - name: Login to GitHub Container Registry
@@ -85,7 +85,7 @@ jobs:
 
       # Настройка Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       # Логин в GitHub Container Registry
       - name: Login to GitHub Container Registry
