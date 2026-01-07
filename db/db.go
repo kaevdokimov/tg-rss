@@ -400,21 +400,38 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 	}
 
 	for _, update := range updates {
-		result, err := db.Exec(`
-			UPDATE sources
-			SET url = $2
-			WHERE url = $1
-		`, update.oldURL, update.newURL)
+		// Проверяем, существует ли уже источник с новым URL
+		var existingID int
+		err := db.QueryRow("SELECT id FROM sources WHERE url = $1", update.newURL).Scan(&existingID)
 
-		if err != nil {
-			log.Printf("Ошибка обновления источника %s (%s): %v", update.name, update.oldURL, err)
-		} else {
-			rowsAffected, _ := result.RowsAffected()
-			if rowsAffected > 0 {
-				log.Printf("✅ Обновлен источник %s: %s → %s", update.name, update.oldURL, update.newURL)
+		if err == nil {
+			// Новый URL уже существует, удаляем старый источник
+			_, err = db.Exec("DELETE FROM sources WHERE url = $1", update.oldURL)
+			if err != nil {
+				log.Printf("Ошибка удаления старого источника %s (%s): %v", update.name, update.oldURL, err)
 			} else {
-				log.Printf("ℹ️  Источник %s (%s) не найден для обновления", update.name, update.oldURL)
+				log.Printf("✅ Удален старый источник %s (%s), новый URL уже существует", update.name, update.oldURL)
 			}
+		} else if err == sql.ErrNoRows {
+			// Новый URL не существует, обновляем старый
+			result, err := db.Exec(`
+				UPDATE sources
+				SET url = $2
+				WHERE url = $1
+			`, update.oldURL, update.newURL)
+
+			if err != nil {
+				log.Printf("Ошибка обновления источника %s (%s): %v", update.name, update.oldURL, err)
+			} else {
+				rowsAffected, _ := result.RowsAffected()
+				if rowsAffected > 0 {
+					log.Printf("✅ Обновлен источник %s: %s → %s", update.name, update.oldURL, update.newURL)
+				} else {
+					log.Printf("ℹ️  Источник %s (%s) не найден для обновления", update.name, update.oldURL)
+				}
+			}
+		} else {
+			log.Printf("Ошибка проверки существования источника %s (%s): %v", update.name, update.newURL, err)
 		}
 	}
 

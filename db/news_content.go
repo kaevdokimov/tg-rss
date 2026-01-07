@@ -4,14 +4,42 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lib/pq"
 )
 
+// cleanUTF8String очищает строку от некорректных UTF-8 последовательностей
+func cleanUTF8String(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+
+	// Заменяем некорректные UTF-8 последовательности на безопасные символы
+	return strings.ToValidUTF8(s, "�")
+}
+
 // SaveNewsContent сохраняет полный контент новости
 func SaveNewsContent(db *sql.DB, newsID int64, fullText, author, category string, tags, images []string,
 	metaKeywords, metaDescription string, metaData map[string]string, contentHTML string) error {
+
+	// Очищаем все строковые поля от некорректных UTF-8 последовательностей
+	fullText = cleanUTF8String(fullText)
+	author = cleanUTF8String(author)
+	category = cleanUTF8String(category)
+	metaKeywords = cleanUTF8String(metaKeywords)
+	metaDescription = cleanUTF8String(metaDescription)
+	contentHTML = cleanUTF8String(contentHTML)
+
+	// Очищаем массивы строк
+	for i, tag := range tags {
+		tags[i] = cleanUTF8String(tag)
+	}
+	for i, image := range images {
+		images[i] = cleanUTF8String(image)
+	}
 
 	// Преобразуем tags и images в массивы PostgreSQL
 	// Используем pq.Array для правильного форматирования
