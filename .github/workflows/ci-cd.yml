@@ -273,13 +273,13 @@ jobs:
             echo '✅ Environment loaded'
           "
 
-          # Проверяем роли
+          # Проверяем наличие docker и docker-compose
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
-            echo '🔍 Checking roles...'
-            if [ -d 'playbooks/roles' ] && [ -d 'playbooks/roles/system_optimization' ]; then
-              echo '✅ Roles found'
+            echo '🔍 Checking Docker installation...'
+            if command -v docker >/dev/null 2>&1 && command -v docker-compose >/dev/null 2>&1; then
+              echo '✅ Docker and Docker Compose found'
             else
-              echo '❌ Roles not found'
+              echo '❌ Docker or Docker Compose not found'
               exit 1
             fi
           "
