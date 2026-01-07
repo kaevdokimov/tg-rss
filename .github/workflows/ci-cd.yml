@@ -262,11 +262,21 @@ jobs:
 
           # Гарантируем наличие ролей в правильной директории
           echo "🔍 Проверяем наличие ролей..."
-          ls -la ../roles/ | head -5 || echo "No roles in ../roles/"
-          mkdir -p playbooks/roles
-          cp -r ../roles/* playbooks/roles/ 2>/dev/null || echo "Roles copy failed or already in place"
-          echo "📁 Содержимое playbooks/roles/:"
-          ls -la playbooks/roles/ | head -10
+          if [ -d "../roles" ]; then
+            echo "✅ Роли найдены в ../roles/"
+            ls -la ../roles/ | head -5
+            mkdir -p playbooks/roles
+            cp -r ../roles/* playbooks/roles/ 2>/dev/null && echo "✅ Роли скопированы" || echo "⚠️ Роли уже существуют или копирование не удалось"
+          else
+            echo "ℹ️ Роли не найдены в ../roles/, проверяем локальные..."
+            if [ -d "playbooks/roles" ]; then
+              echo "✅ Роли найдены в playbooks/roles/"
+              ls -la playbooks/roles/ | head -5
+            else
+              echo "❌ Роли не найдены ни в одном месте!"
+              exit 1
+            fi
+          fi
 
             # 🔒 БЕЗОПАСНЫЙ ДЕПЛОЙ: сохраняем все данные PostgreSQL и Redis
             echo '💾 Создаем резервную копию перед деплоем...'
