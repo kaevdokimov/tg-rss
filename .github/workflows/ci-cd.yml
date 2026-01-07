@@ -134,6 +134,10 @@ jobs:
           # Проверяем inventory файл
           echo "📋 Inventory файл:"
           cat inventory/hosts.ini
+          echo ""
+          echo "🔑 Проверяем SSH ключ:"
+          ls -la ~/.ssh/id_rsa || echo "SSH ключ не найден!"
+          ssh-keygen -l -f ~/.ssh/id_rsa 2>/dev/null || echo "Не удалось проверить SSH ключ"
 
           # Настраиваем SSH ключ (упрощенная версия, как в deploy job)
           mkdir -p ~/.ssh
@@ -150,7 +154,17 @@ jobs:
           echo "📋 Проверяем роли перед запуском:"
           find playbooks/roles -name "system_optimization" -type d || echo "system_optimization not found in playbooks/roles"
           find ../roles -name "system_optimization" -type d || echo "system_optimization not found in ../roles"
-          ANSIBLE_ROLES_PATH="../roles:playbooks/roles" ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml -v
+          echo "🔍 Финальная проверка перед Ansible:"
+          echo "Inventory файл:"
+          cat inventory/hosts.ini
+          echo ""
+          echo "Ansible config:"
+          cat ansible.cfg
+          echo ""
+          # Очищаем кэш Ansible и запускаем playbook
+          export ANSIBLE_CACHE_DIR=/tmp/ansible_cache
+          rm -rf /tmp/ansible_cache
+          ANSIBLE_ROLES_PATH="../roles:playbooks/roles" ANSIBLE_INVENTORY="/home/runner/work/tg-rss/tg-rss/ansible/inventory/hosts.ini" ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml -v
 
   deploy:
     name: Deploy to Server
