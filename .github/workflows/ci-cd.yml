@@ -355,7 +355,7 @@ jobs:
             
             # Проверяем статус контейнеров
             echo '📊 Статус контейнеров после запуска:'
-            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|kafka|zookeeper|news-analyzer)' || true
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|redis|news-analyzer)' || true
 
             # 🔒 КРИТИЧНАЯ ПРОВЕРКА: PostgreSQL данные не потерялись
             echo '🔍 Проверяем доступность PostgreSQL...'
