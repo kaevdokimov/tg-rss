@@ -254,13 +254,13 @@ jobs:
           CONTENT_SCRAPER_CONCURRENT=6
           EOF
 
+          # Сначала логинимся в GitHub Container Registry локально
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
           # Копируем файлы на сервер
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "mkdir -p ~/news-bot" || true
           scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:~/news-bot/docker-compose.yml
           scp -P $SSH_PORT /tmp/.env $SSH_USER@$SSH_HOST:~/news-bot/.env
-
-          # Сначала логинимся в GitHub Container Registry локально
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
           # Выполнение команд на сервере
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
