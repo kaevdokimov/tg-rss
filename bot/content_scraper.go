@@ -77,7 +77,7 @@ func (cs *ContentScraper) scrapeBatch() {
 
 			// Добавляем задержку между запросами для избежания rate limiting
 			if idx > 0 {
-				time.Sleep(time.Duration(idx) * 500 * time.Millisecond)
+				time.Sleep(time.Duration(idx%cs.concurrent) * 200 * time.Millisecond)
 			}
 
 			cs.scrapeNews(n, results)

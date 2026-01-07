@@ -37,17 +37,41 @@ type NewsContent struct {
 func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 	scraperLogger.Debug("Начинаем парсинг страницы: %s", articleURL)
 
-	// Загружаем страницу один раз
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(articleURL)
-	if err != nil {
-		return nil, fmt.Errorf("ошибка загрузки страницы: %w", err)
+	// Загружаем страницу с retry логикой
+	client := &http.Client{
+		Timeout: 45 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+
+	var resp *http.Response
+	var err error
+	maxRetries := 2
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		resp, err = client.Get(articleURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+
+		if attempt < maxRetries {
+			scraperLogger.Debug("Попытка %d/%d не удалась для %s: %v. Повтор через 1 сек", attempt+1, maxRetries+1, articleURL, err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("ошибка загрузки страницы после %d попыток: %w", maxRetries+1, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("неверный статус код после %d попыток: %d", maxRetries+1, resp.StatusCode)
+		}
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("неверный статус код: %d", resp.StatusCode)
-	}
 
 	// Читаем body в память для повторного использования
 	bodyBytes, err := io.ReadAll(resp.Body)

@@ -273,6 +273,8 @@ func InitSchema(db *sql.DB) {
 	-- Индексы
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_url ON sources (url);
 	CREATE INDEX IF NOT EXISTS idx_news_published_at ON news (published_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_news_scrape_status ON news (scrape_status);
+	CREATE INDEX IF NOT EXISTS idx_news_id_desc ON news (id DESC);
 	CREATE INDEX IF NOT EXISTS idx_news_tsvector ON news USING GIN (tvs);
 
 	CREATE OR REPLACE FUNCTION lowercase_url()

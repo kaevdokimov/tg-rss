@@ -54,15 +54,15 @@ func LoadTgBotConfig() *TgBotConfig {
 	if err != nil {
 		log.Fatalf("Некорректное значение таймаута: %v", err)
 	}
-	ContentScraperInterval, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_INTERVAL", "2"))
+	ContentScraperInterval, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_INTERVAL", "1"))
 	if err != nil {
 		log.Fatalf("Некорректное значение интервала парсера контента: %v", err)
 	}
-	ContentScraperBatch, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_BATCH", "20"))
+	ContentScraperBatch, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_BATCH", "50"))
 	if err != nil {
 		log.Fatalf("Некорректное значение размера батча парсера контента: %v", err)
 	}
-	ContentScraperConcurrent, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_CONCURRENT", "6"))
+	ContentScraperConcurrent, err := strconv.Atoi(getEnv("CONTENT_SCRAPER_CONCURRENT", "3"))
 	if err != nil {
 		log.Fatalf("Некорректное значение количества параллельных запросов парсера контента: %v", err)
 	}
