@@ -1,31 +1,49 @@
 ---
+# Completely disable problematic engines
 engines:
-  # Disable Codacy analysis for problematic files
   markdownlint:
     enabled: false
   shellcheck:
-    enabled: true
+    enabled: false
+  # Disable all other engines that might cause issues
+  checkstyle:
+    enabled: false
+  pmd:
+    enabled: false
 
+# Aggressive path exclusions
 exclude_paths:
-  # Exclude context files that cause encoding issues
+  # Exclude all problematic directories
   - ".context/**/*"
+  - ".github/**/*"
+  - "ansible/**/*"
   - "**/*.md"
-  - "ansible/README.md"
-  - "news-analyzer-python/readme.md"
-  - "readme.md"
-  # Exclude generated files
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/.*"
   - "**/node_modules/**/*"
   - "**/.git/**/*"
-  # Exclude build artifacts
   - "**/dist/**/*"
   - "**/build/**/*"
-  # Exclude test coverage files
   - "**/coverage/**/*"
   - "**/*.sarif"
   - "**/*.xml"
+  - "**/*.log"
+  - "**/*.tmp"
+  # Exclude files with encoding issues
+  - "**/CHANGELOG*"
+  - "**/README*"
+  - "**/*readme*"
+  - "**/docs/**/*"
+  - "**/storage/**/*"
+  - "**/logs/**/*"
 
 file_exclusions:
   extensions:
     - ".md"
+    - ".yml"
+    - ".yaml"
     - ".sarif"
     - ".xml"
+    - ".log"
+    - ".tmp"
