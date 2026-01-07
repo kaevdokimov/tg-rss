@@ -39,27 +39,17 @@ services:
     cpus: ${REDIS_CPUS:-0.05}
     ports:
       - "6379:6379"
-    environment:
-      # Оптимизированные настройки для Redis
-      REDIS_MAXMEMORY: 50mb
-      REDIS_MAXMEMORY_POLICY: allkeys-lru
-      REDIS_TCP_BACKLOG: 128
-      REDIS_TCP_KEEPALIVE: 300
-      REDIS_TIMEOUT: 0
-      # Включение persistence
-      REDIS_SAVE: "60 1000"  # Сохранение каждые 60 секунд если 1000 изменений
-      REDIS_APPENDONLY: "yes"
-      REDIS_APPENDFSYNC: "everysec"
     volumes:
       - redis_data:/data
+      - ./ansible/files/redis/redis.conf:/etc/redis/redis.conf:ro
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
-    command: redis-server --protected-mode no
+    command: redis-server /etc/redis/redis.conf
 
   db:
     image: postgres:18.1-alpine3.23
@@ -72,18 +62,23 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     restart: always
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./ansible/files/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # Упрощенная команда без дополнительных параметров для стабильности
-    command: ["postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command:
+      - "postgres"
+      - "-c"
+      - "config_file=/etc/postgresql/postgresql.conf"
 
   # NEWS-ANALYZER ВКЛЮЧЕН с оптимизированными ресурсами для сервера 900MB RAM, 1 CPU
   news-analyzer:

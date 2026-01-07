@@ -1,0 +1,75 @@
+name: Deploy TG-RSS to Server
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deployment target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Ansible
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible
+
+    - name: Create Ansible inventory
+      run: |
+        mkdir -p ansible/inventory
+        cat > ansible/inventory/hosts.ini << EOF
+        [tg_rss_servers]
+        ${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/tmp/ssh_key
+
+        [all:vars]
+        ansible_python_interpreter=/usr/bin/python3
+        EOF
+
+    - name: Setup SSH key
+      run: |
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+        chmod 600 /tmp/ssh_key
+
+    - name: Run Ansible playbook
+      run: |
+        cd ansible
+        ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml --extra-vars "ansible_ssh_private_key_file=/tmp/ssh_key"
+
+    - name: Deploy application
+      run: |
+        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          cd /opt/tg-rss
+          git pull origin main
+          docker-compose pull
+          docker-compose up -d --build
+          docker system prune -f
+        EOF
+
+    - name: Health check
+      run: |
+        sleep 30
+        curl -f http://${{ secrets.SERVER_HOST }}:8080/health || exit 1
+
+    - name: Cleanup
+      run: rm -f /tmp/ssh_key

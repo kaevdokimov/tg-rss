@@ -1,0 +1,15 @@
+---
+- name: Установка Node Exporter
+  include_tasks: node_exporter.yml
+
+- name: Установка Prometheus
+  include_tasks: prometheus.yml
+
+- name: Настройка Grafana
+  include_tasks: grafana.yml
+
+- name: Настройка алертинга
+  include_tasks: alerting.yml
+
+- name: Создание systemd служб для мониторинга приложения
+  include_tasks: app_monitoring.yml

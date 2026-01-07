@@ -1,0 +1,81 @@
+---
+- name: Скачивание Prometheus
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v2.53.2/prometheus-2.53.2.linux-amd64.tar.gz"
+    dest: /tmp/prometheus.tar.gz
+
+- name: Распаковка Prometheus
+  unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Создание пользователя prometheus
+  user:
+    name: prometheus
+    system: yes
+    shell: /bin/false
+    create_home: no
+
+- name: Создание директорий для Prometheus
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Копирование бинарных файлов Prometheus
+  copy:
+    src: "/tmp/prometheus-2.53.2.linux-amd64/{{ item.src }}"
+    dest: "/usr/local/bin/{{ item.dest }}"
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+    remote_src: yes
+  loop:
+    - { src: 'prometheus', dest: 'prometheus' }
+    - { src: 'promtool', dest: 'promtool' }
+
+- name: Копирование консолей Prometheus
+  copy:
+    src: "/tmp/prometheus-2.53.2.linux-amd64/{{ item }}"
+    dest: "/etc/prometheus/{{ item }}"
+    owner: prometheus
+    group: prometheus
+    remote_src: yes
+  loop:
+    - consoles
+    - console_libraries
+
+- name: Настройка prometheus.yml
+  template:
+    src: templates/prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    mode: '0644'
+    owner: prometheus
+    group: prometheus
+
+- name: Создание systemd службы для Prometheus
+  template:
+    src: templates/prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    mode: '0644'
+
+- name: Включение и запуск Prometheus
+  systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Очистка временных файлов
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/prometheus.tar.gz
+    - /tmp/prometheus-2.53.2.linux-amd64

@@ -1,0 +1,61 @@
+---
+- name: Настройка сервера для TG-RSS приложения
+  hosts: tg_rss_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # Защита данных
+    create_backups: true
+    backup_retention_days: 7
+
+    # Настройки swap
+    swap_file_size: "1G"
+    swap_file_path: "/swapfile"
+
+    # Настройки Docker
+    docker_daemon_config:
+      storage-driver: "overlay2"
+      log-driver: "json-file"
+      log-opts:
+        max-size: "10m"
+        max-file: "3"
+      default-ulimits:
+        nofile:
+          soft: 65536
+          hard: 65536
+      iptables: false
+      bridge: "none"
+      ip-masq: false
+      userland-proxy: false
+
+    # Системные оптимизации для ограниченных ресурсов
+    sysctl_params:
+      # Swap
+      vm.swappiness: 60
+      vm.vfs_cache_pressure: 50
+
+      # Network
+      net.core.somaxconn: 1024
+      net.ipv4.tcp_tw_reuse: 1
+      net.ipv4.ip_local_port_range: "1024 65535"
+
+      # Memory
+      vm.overcommit_memory: 1
+      vm.overcommit_ratio: 50
+
+      # Filesystem
+      fs.file-max: 2097152
+
+  pre_tasks:
+    - name: Обновление списка пакетов
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+  roles:
+    - system_optimization
+    - docker_setup
+    - monitoring_setup
+    - security_hardening

@@ -1,0 +1,128 @@
+---
+- name: Восстановление данных PostgreSQL и Redis
+  hosts: tg_rss_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    backup_dir: "/opt/tg-rss/backups"
+    recovery_timestamp: "{{ lookup('env', 'RECOVERY_TIMESTAMP') | default('latest') }}"
+
+  tasks:
+    - name: Проверяем существование директории с бэкапами
+      stat:
+        path: "{{ backup_dir }}"
+      register: backup_dir_stat
+
+    - name: Выходим если бэкапы не найдены
+      fail:
+        msg: "Директория с бэкапами {{ backup_dir }} не найдена"
+      when: not backup_dir_stat.stat.exists
+
+    - name: Находим последний бэкап
+      shell: |
+        if [ "{{ recovery_timestamp }}" = "latest" ]; then
+          find {{ backup_dir }} -name "postgres_backup_*.tar.gz" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-
+        else
+          find {{ backup_dir }} -name "postgres_backup_{{ recovery_timestamp }}.tar.gz" -type f
+        fi
+      register: postgres_backup
+      when: recovery_timestamp != "skip"
+
+    - name: Находим бэкап Redis
+      shell: |
+        if [ "{{ recovery_timestamp }}" = "latest" ]; then
+          find {{ backup_dir }} -name "redis_backup_*.tar.gz" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-
+        else
+          find {{ backup_dir }} -name "redis_backup_{{ recovery_timestamp }}.tar.gz" -type f
+        fi
+      register: redis_backup
+      when: recovery_timestamp != "skip"
+
+    - name: Останавливаем все контейнеры
+      shell: |
+        cd /opt/tg-rss
+        docker compose down --remove-orphans || true
+      ignore_errors: yes
+
+    - name: Восстанавливаем PostgreSQL данные
+      block:
+        - name: Создаем volume для PostgreSQL если не существует
+          shell: docker volume create db_data || true
+
+        - name: Восстанавливаем данные PostgreSQL из бэкапа
+          shell: |
+            docker run --rm -v db_data:/data -v {{ backup_dir }}:/backup alpine sh -c "
+              rm -rf /data/*
+              cd /data
+              tar xzf /backup/$(basename '{{ postgres_backup.stdout }}')
+            "
+          when: postgres_backup.stdout != ""
+
+        - name: Выводим сообщение об успешном восстановлении PostgreSQL
+          debug:
+            msg: "✅ PostgreSQL данные восстановлены из {{ postgres_backup.stdout }}"
+          when: postgres_backup.stdout != ""
+
+      when: postgres_backup.stdout != ""
+
+    - name: Восстанавливаем Redis данные
+      block:
+        - name: Создаем volume для Redis если не существует
+          shell: docker volume create redis_data || true
+
+        - name: Восстанавливаем данные Redis из бэкапа
+          shell: |
+            docker run --rm -v redis_data:/data -v {{ backup_dir }}:/backup alpine sh -c "
+              rm -rf /data/*
+              cd /data
+              tar xzf /backup/$(basename '{{ redis_backup.stdout }}')
+            "
+          when: redis_backup.stdout != ""
+
+        - name: Выводим сообщение об успешном восстановлении Redis
+          debug:
+            msg: "✅ Redis данные восстановлены из {{ redis_backup.stdout }}"
+          when: redis_backup.stdout != ""
+
+      when: redis_backup.stdout != ""
+
+    - name: Запускаем сервисы после восстановления
+      shell: |
+        cd /opt/tg-rss
+        docker compose up -d db redis
+
+    - name: Ждем готовности PostgreSQL
+      shell: |
+        for i in {1..30}; do
+          if docker exec db pg_isready -U tg_rss -d tg_rss >/dev/null 2>&1; then
+            echo "PostgreSQL готов"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "PostgreSQL не стал доступен"
+        exit 1
+      when: postgres_backup.stdout != ""
+
+    - name: Проверяем Redis
+      shell: |
+        if docker exec redis redis-cli ping | grep -q PONG; then
+          echo "Redis доступен"
+        else
+          echo "Redis недоступен"
+          exit 1
+        fi
+      when: redis_backup.stdout != ""
+
+    - name: Выводим статус восстановления
+      debug:
+        msg: |
+          🎉 Восстановление данных завершено!
+          PostgreSQL: {{ 'восстановлен' if postgres_backup.stdout != '' else 'не найден бэкап' }}
+          Redis: {{ 'восстановлен' if redis_backup.stdout != '' else 'не найден бэкап' }}
+
+    - name: Запускаем все сервисы
+      shell: |
+        cd /opt/tg-rss
+        docker compose up -d

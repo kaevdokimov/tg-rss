@@ -1,0 +1,48 @@
+---
+- name: Скачивание Node Exporter
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz"
+    dest: /tmp/node_exporter.tar.gz
+
+- name: Распаковка Node Exporter
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Создание пользователя node_exporter
+  user:
+    name: node_exporter
+    system: yes
+    shell: /bin/false
+    create_home: no
+
+- name: Копирование бинарного файла Node Exporter
+  copy:
+    src: "/tmp/node_exporter-1.8.2.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: '0755'
+    owner: node_exporter
+    group: node_exporter
+    remote_src: yes
+
+- name: Создание systemd службы для Node Exporter
+  template:
+    src: templates/node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: '0644'
+
+- name: Включение и запуск Node Exporter
+  systemd:
+    name: node_exporter
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Очистка временных файлов
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/node_exporter.tar.gz
+    - /tmp/node_exporter-1.8.2.linux-amd64
