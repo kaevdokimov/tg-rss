@@ -295,7 +295,7 @@ jobs:
             if docker volume ls | grep -q db_data; then
               echo '📦 Создаем бэкап PostgreSQL...'
               docker run --rm -v db_data:/data -v ~/backups/pre-deploy:/backup \
-                alpine tar czf /backup/postgres_backup_$TIMESTAMP.tar.gz -C /data . || \
+                alpine tar czf "/backup/postgres_backup_$TIMESTAMP.tar.gz" -C /data . || \
                 echo '⚠️ Не удалось создать бэкап PostgreSQL'
             fi
 
@@ -303,7 +303,7 @@ jobs:
             if docker volume ls | grep -q redis_data; then
               echo '📦 Создаем бэкап Redis...'
               docker run --rm -v redis_data:/data -v ~/backups/pre-deploy:/backup \
-                alpine tar czf /backup/redis_backup_$TIMESTAMP.tar.gz -C /data . || \
+                alpine tar czf "/backup/redis_backup_$TIMESTAMP.tar.gz" -C /data . || \
                 echo '⚠️ Не удалось создать бэкап Redis'
             fi
 
@@ -322,7 +322,7 @@ jobs:
             else
               echo '❌ КРИТИЧНАЯ ОШИБКА: PostgreSQL volume потерян!'
               echo '🔄 Пытаемся восстановить из бэкапа...'
-              if [ -f ~/backups/pre-deploy/postgres_backup_$TIMESTAMP.tar.gz ]; then
+              if [ -f "~/backups/pre-deploy/postgres_backup_$TIMESTAMP.tar.gz" ]; then
                 docker volume create db_data
                 docker run --rm -v db_data:/data -v ~/backups/pre-deploy:/backup \
                   alpine sh -c "cd /data && tar xzf /backup/postgres_backup_$TIMESTAMP.tar.gz"
