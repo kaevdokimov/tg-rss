@@ -20,7 +20,7 @@ jobs:
     steps:
       # Проверка репозитория
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Установка Go
       - name: Setup Go
@@ -47,7 +47,7 @@ jobs:
     steps:
       # Проверка репозитория
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Настройка Docker Buildx
       - name: Set up Docker Buildx
@@ -81,7 +81,7 @@ jobs:
     steps:
       # Проверка репозитория
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Настройка Docker Buildx
       - name: Set up Docker Buildx
@@ -115,7 +115,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(github.event.head_commit.message, '[infra]')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Ansible
         run: |
@@ -175,7 +175,7 @@ jobs:
     steps:
       # Проверка репозитория
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Настройка SSH подключения
       - name: Setup SSH connection
