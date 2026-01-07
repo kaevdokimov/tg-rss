@@ -489,7 +489,7 @@ class Database:
                 cursor.execute(create_index1_query)
                 cursor.execute(create_index2_query)
                 
-                cursor.execute(create_query)
+                # Таблица уже создана выше
                 self._conn.commit()
                 logger.info(f"Таблица {table_name} успешно создана")
                 return True

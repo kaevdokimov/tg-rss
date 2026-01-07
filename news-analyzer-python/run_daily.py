@@ -98,8 +98,9 @@ def main():
             # чтобы избежать перегрузки сервера
             # Используем ANALYZER_MAX_NEWS_LIMIT для контейнера, если установлена,
             # иначе MAX_NEWS_LIMIT для обратной совместимости
+            # Увеличиваем лимит для лучшего анализа тем
             max_news_limit = int(os.getenv("ANALYZER_MAX_NEWS_LIMIT",
-                                          os.getenv("MAX_NEWS_LIMIT", "1000")))
+                                          os.getenv("MAX_NEWS_LIMIT", "2000")))
             if len(news_items) > max_news_limit:
                 logger.warning(
                     f"Обнаружено {len(news_items)} новостей, что превышает лимит {max_news_limit}. "
@@ -180,7 +181,14 @@ def main():
                     processed_texts.append(processed)
             
             logger.info(f"Предобработано {len(processed_texts)} текстов")
-            
+
+            # Проверяем качество предобработки
+            non_empty_texts = [t for t in processed_texts if t.strip()]
+            logger.info(f"Непустых текстов после предобработки: {len(non_empty_texts)} из {len(processed_texts)}")
+
+            if len(non_empty_texts) < 10:
+                logger.warning("Слишком мало непустых текстов для качественного анализа")
+
             # 2. Векторизация
             logger.info("Векторизация текстов...")
             vectorizer = TextVectorizer(
@@ -189,6 +197,7 @@ def main():
                 max_df=settings.max_df
             )
             vectors = vectorizer.fit_transform(processed_texts)
+            logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
             
             # 3. Кластеризация
             logger.info("Кластеризация новостей...")
@@ -197,17 +206,24 @@ def main():
                 min_samples=settings.cluster_min_samples,
                 metric=settings.cluster_metric
             )
-            labels = clusterer.fit_predict(vectors)
+            labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
             
             # 4. Построение нарративов
             logger.info("Построение нарративов...")
-            narrative_builder = NarrativeBuilder()
-            narratives = narrative_builder.build_narratives(
-                news_items=news_items,
-                labels=labels,
-                vectorizer=vectorizer,
-                top_n=settings.top_narratives
-            )
+            try:
+                narrative_builder = NarrativeBuilder()
+                narratives = narrative_builder.build_narratives(
+                    news_items=news_items,
+                    labels=labels,
+                    vectorizer=vectorizer,
+                    top_n=settings.top_narratives
+                )
+                print(f"DEBUG: Построено {len(narratives)} нарративов из {n_clusters} кластеров")
+                logger.info(f"Построено {len(narratives)} нарративов из {n_clusters} кластеров")
+            except Exception as e:
+                print(f"DEBUG: Ошибка при построении нарративов: {e}")
+                logger.error(f"Ошибка при построении нарративов: {e}")
+                narratives = []  # Fallback to empty list
             
             # 5. Генерация отчета
             logger.info("Генерация отчета...")
@@ -229,24 +245,45 @@ def main():
             try:
                 # Убеждаемся, что таблица существует
                 db.ensure_analysis_table_exists()
-                
-                # Сохраняем результат
-                analysis_id = db.save_analysis_result(
-                    analysis_date=analysis_date,
-                    total_news=len(news_items),
-                    narratives=narratives
-                )
-                logger.info(f"Результат анализа сохранен в БД с ID: {analysis_id}")
+
+                # Проверяем, не выполнялся ли анализ сегодня
+                today_start = analysis_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                today_end = analysis_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+                # Проверяем, не выполнялся ли анализ сегодня (отключено для тестирования)
+                # recent_analysis = db.get_recent_analysis(hours=24)
+                # if recent_analysis and len(recent_analysis) > 0:
+                #     logger.info(f"Найден недавний анализ (ID: {recent_analysis[0].id}). Пропускаем сохранение для избежания дублирования.")
+                # else:
+                    # Сохраняем результат
+                    analysis_id = db.save_analysis_result(
+                        analysis_date=analysis_date,
+                        total_news=len(news_items),
+                        narratives=narratives
+                    )
+                    logger.info(f"Результат анализа сохранен в БД с ID: {analysis_id}")
             except Exception as e:
                 logger.error(f"Ошибка при сохранении результата анализа в БД: {e}")
                 logger.warning("Продолжаем работу, отчет сохранен в файл")
             
-            # Генерируем текстовое резюме
+            # Генерируем текстовое резюме с дополнительными метриками
             summary_gen = SummaryGenerator()
+
+            # Добавляем метрики качества кластеризации
+            clustering_metrics = {
+                'total_clusters': n_clusters,
+                'noise_points': n_noise,
+                'noise_percentage': n_noise / len(labels) * 100 if labels else 0,
+                'avg_cluster_size': sum(labels.count(cid) for cid in unique_labels if cid != -1) / n_clusters if n_clusters > 0 else 0,
+                'max_cluster_size': max((labels.count(cid) for cid in unique_labels if cid != -1), default=0),
+                'min_cluster_size': min((labels.count(cid) for cid in unique_labels if cid != -1), default=0)
+            }
+
             summary = summary_gen.generate(
                 narratives=narratives,
                 total_news=len(news_items),
-                analysis_date=analysis_date
+                analysis_date=analysis_date,
+                clustering_metrics=clustering_metrics
             )
             
             # Выводим резюме в консоль и логи

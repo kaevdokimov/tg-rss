@@ -17,13 +17,13 @@ logger = get_logger(__name__)
 class NarrativeBuilder:
     """Класс для построения нарративов из кластеров."""
     
-    def __init__(self, top_keywords: int = 10, top_titles: int = 5):
+    def __init__(self, top_keywords: int = 20, top_titles: int = 10):
         """
         Инициализация builder.
-        
+
         Args:
-            top_keywords: Количество ключевых слов для извлечения
-            top_titles: Количество репрезентативных заголовков
+            top_keywords: Количество ключевых слов для извлечения (увеличено для лучшего описания тем)
+            top_titles: Количество репрезентативных заголовков (увеличено для лучшего понимания)
         """
         self.top_keywords = top_keywords
         self.top_titles = top_titles
@@ -100,24 +100,61 @@ class NarrativeBuilder:
         """
         cluster_news = [news_items[i] for i in indices]
         
-        # Извлекаем ключевые слова через TF-IDF внутри кластера
+        # Извлекаем ключевые слова через улучшенный TF-IDF внутри кластера
         texts = [item.title for item in cluster_news]
-        cluster_vectorizer = TfidfVectorizer(max_features=50, ngram_range=(1, 2))
         try:
+            # Используем более качественные параметры для извлечения ключевых слов
+            cluster_vectorizer = TfidfVectorizer(
+                max_features=150,  # Увеличиваем для лучшего выбора
+                ngram_range=(1, 3),  # Триграммы для более точных фраз
+                min_df=1,  # Минимум 1 документ
+                max_df=0.98,  # Максимум 98% документов для большего разнообразия
+                sublinear_tf=True,  # Логарифмическое масштабирование
+                use_idf=True,
+                norm='l2'  # L2 нормализация для лучшей кластеризации
+            )
+
             tfidf_matrix = cluster_vectorizer.fit_transform(texts)
             feature_names = cluster_vectorizer.get_feature_names_out()
-            
-            # Суммируем TF-IDF по всем документам кластера
-            scores = np.array(tfidf_matrix.sum(axis=0)).flatten()
-            top_indices = scores.argsort()[-self.top_keywords:][::-1]
+
+            # Улучшенное ранжирование: комбинируем TF-IDF с частотой
+            tfidf_scores = np.array(tfidf_matrix.sum(axis=0)).flatten()
+
+            # Добавляем бонус за частоту встречаемости в заголовках
+            word_freq_bonus = {}
+            for text in texts:
+                words = set(text.lower().split())  # Уникальные слова в каждом заголовке
+                for word in words:
+                    if word in feature_names:
+                        idx = list(feature_names).index(word)
+                        word_freq_bonus[idx] = word_freq_bonus.get(idx, 0) + 1
+
+            # Комбинируем TF-IDF с бонусом частоты
+            combined_scores = tfidf_scores.copy()
+            for idx, bonus in word_freq_bonus.items():
+                combined_scores[idx] *= (1 + bonus * 0.1)  # 10% бонус за каждое вхождение
+
+            # Выбираем топ ключевых слов
+            top_indices = combined_scores.argsort()[-self.top_keywords:][::-1]
             keywords = [feature_names[i] for i in top_indices]
+
+            # Фильтруем слишком короткие или слишком длинные слова
+            keywords = [kw for kw in keywords if 2 <= len(kw) <= 50]  # Ослабляем фильтр
+
+            # Если после фильтрации не осталось ключевых слов, используем fallback
+            if not keywords:
+                logger.warning("Все ключевые слова отфильтрованы, используем fallback")
+                raise Exception("No keywords after filtering")
+
         except Exception as e:
-            logger.warning(f"Ошибка при извлечении ключевых слов: {e}")
-            # Fallback: используем частоту слов
+            logger.warning(f"Ошибка при извлечении ключевых слов через TF-IDF: {e}")
+            # Fallback: используем улучшенную частотную модель
             all_words = []
             for text in texts:
                 words = text.lower().split()
-                all_words.extend(words)
+                # Фильтруем стоп-слова и короткие слова
+                filtered_words = [w for w in words if len(w) >= 3 and w not in ['что', 'как', 'для', 'при', 'из', 'на', 'по', 'со', 'во']]
+                all_words.extend(filtered_words)
             word_freq = Counter(all_words)
             keywords = [word for word, _ in word_freq.most_common(self.top_keywords)]
         

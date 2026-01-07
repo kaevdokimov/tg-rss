@@ -45,8 +45,8 @@ class NewsClusterer:
         """
         logger.info(f"Кластеризация {len(vectors)} векторов...")
         
-        # Преобразуем в numpy array
-        X = np.array(vectors)
+        # Преобразуем в numpy array с оптимизацией памяти
+        X = np.array(vectors, dtype=np.float32)
         
         # Исправление для совместимости с новыми версиями sklearn:
         # Метрика 'cosine' не поддерживается напрямую, поэтому нормализуем векторы
@@ -63,8 +63,8 @@ class NewsClusterer:
         
         # Оптимизация: для больших объемов данных используем более быстрые параметры
         # core_dist_n_jobs позволяет использовать несколько ядер CPU
-        # но может быть слишком агрессивным, поэтому используем умеренное значение
-        n_jobs = min(4, os.cpu_count() or 1)  # Ограничиваем количество ядер
+        # Для контейнера с ограничением 0.1 CPU используем 1 поток
+        n_jobs = 1  # Фиксируем в 1 для стабильности в контейнере
         
         # Создаем и обучаем кластеризатор
         self.clusterer = hdbscan.HDBSCAN(
@@ -83,13 +83,33 @@ class NewsClusterer:
         unique_labels = set(labels)
         n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
         n_noise = list(labels).count(-1)
-        
+
         logger.info(
             f"Найдено {n_clusters} кластеров, "
-            f"{n_noise} новостей не кластеризовано (шум)"
+            f"{n_noise} новостей не кластеризовано (шум) из {len(vectors)} векторов"
         )
-        
-        return labels.tolist()
+
+        # Отладочная информация о распределении кластеров
+        if n_clusters > 0:
+            cluster_sizes = []
+            for label in unique_labels:
+                if label != -1:
+                    size = list(labels).count(label)
+                    cluster_sizes.append(size)
+                    logger.debug(f"Кластер {label}: {size} новостей")
+
+            if cluster_sizes:
+                logger.info(
+                    f"Размер кластеров: мин={min(cluster_sizes)}, макс={max(cluster_sizes)}, "
+                    f"среднее={sum(cluster_sizes)/len(cluster_sizes):.1f}"
+                )
+        else:
+            logger.warning(
+                f"Кластеризация не удалась: {n_clusters} кластеров из {len(vectors)} векторов. "
+                f"Параметры: min_cluster_size={self.min_cluster_size}, min_samples={self.min_samples}"
+            )
+
+        return labels.tolist(), n_clusters, n_noise, unique_labels
     
     def get_cluster_info(self, labels: List[int]) -> Dict[int, Dict[str, Any]]:
         """

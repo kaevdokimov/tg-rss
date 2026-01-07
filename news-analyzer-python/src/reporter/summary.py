@@ -15,7 +15,8 @@ class SummaryGenerator:
         self,
         narratives: List[Dict[str, Any]],
         total_news: int,
-        analysis_date: datetime
+        analysis_date: datetime,
+        clustering_metrics: Dict[str, Any] = None
     ) -> str:
         """
         Генерирует текстовое резюме отчета.
@@ -33,8 +34,30 @@ class SummaryGenerator:
         lines.append(f"КАРТА ДНЯ - {analysis_date.strftime('%d.%m.%Y')}")
         lines.append("=" * 60)
         lines.append("")
-        lines.append(f"Всего новостей проанализировано: {total_news}")
-        lines.append(f"Выявлено основных тем: {len(narratives)}")
+        lines.append(f"📰 Всего новостей: {total_news}")
+        lines.append(f"🎯 Выявлено тем: {len(narratives)}")
+
+        # Проверяем, есть ли темы
+        if len(narratives) == 0:
+            lines.append("")
+            lines.append("⚠️ Темы не найдены")
+            lines.append("──────────────────────────────")
+            lines.append("Автоматический анализ новостей")
+            lines.append("")
+            lines.append("=" * 60)
+            return "\n".join(lines)
+
+        # Добавляем метрики качества кластеризации
+        if clustering_metrics:
+            lines.append(f"📊 Метрики кластеризации:")
+            lines.append(f"   • Кластеров: {clustering_metrics.get('total_clusters', 0)}")
+            lines.append(f"   • Шумовых точек: {clustering_metrics.get('noise_points', 0)} ({clustering_metrics.get('noise_percentage', 0):.1f}%)")
+            if clustering_metrics.get('total_clusters', 0) > 0:
+                lines.append(f"   • Средний размер кластера: {clustering_metrics.get('avg_cluster_size', 0):.1f}")
+                lines.append(f"   • Максимальный кластер: {clustering_metrics.get('max_cluster_size', 0)} новостей")
+                lines.append(f"   • Минимальный кластер: {clustering_metrics.get('min_cluster_size', 0)} новостей")
+            lines.append("")
+
         lines.append("")
         
         for idx, narrative in enumerate(narratives, 1):

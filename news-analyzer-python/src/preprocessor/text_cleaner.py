@@ -24,8 +24,8 @@ class TextCleaner:
     def __init__(
         self,
         stopwords_extra: Optional[List[str]] = None,
-        min_word_length: int = 3,
-        max_word_length: int = 20
+        min_word_length: int = 2,
+        max_word_length: int = 30
     ):
         """
         Инициализация очистителя текста.
@@ -64,8 +64,8 @@ class TextCleaner:
         # Удаляем email
         text = re.sub(r"\S+@\S+", "", text)
         
-        # Оставляем только буквы, цифры и пробелы
-        text = re.sub(r"[^а-яёa-z0-9\s]", " ", text)
+        # Оставляем буквы, цифры, пробелы и дефисы (для составных слов)
+        text = re.sub(r"[^а-яёa-z0-9\s\-]", " ", text)
         
         # Удаляем множественные пробелы
         text = re.sub(r"\s+", " ", text)
@@ -100,12 +100,13 @@ class TextCleaner:
             if len(token) < self.min_word_length or len(token) > self.max_word_length:
                 continue
             
-            # Проверяем стоп-слова
+            # Проверяем стоп-слова (менее строго)
             if token in self.stopwords:
                 continue
-            
-            # Проверяем, что это не только цифры
-            if token.isdigit():
+
+            # Разрешаем слова с цифрами (важные для новостей: "2024", "5g", etc.)
+            # Полностью цифровые слова пропускаем, но слова с буквами и цифрами оставляем
+            if token.isdigit() and not any(c.isalpha() for c in token):
                 continue
             
             filtered_tokens.append(token)

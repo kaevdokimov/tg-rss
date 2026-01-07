@@ -100,17 +100,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       TZ: ${TZ:-Europe/Moscow}
       LOG_LEVEL: ${ANALYZER_LOG_LEVEL:-INFO}
-      ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-9:00,21:00}
+      ANALYZER_SCHEDULE_TIMES: ${ANALYZER_SCHEDULE_TIMES:-9:00,12:00,15:00,20:00,23:00}
       RUN_ON_STARTUP: ${ANALYZER_RUN_ON_STARTUP:-false}
       TELEGRAM_SIGNAL_API_KEY: ${TELEGRAM_SIGNAL_API_KEY}
-      MAX_NEWS_LIMIT: ${ANALYZER_MAX_NEWS_LIMIT:-300}
+      MAX_NEWS_LIMIT: ${ANALYZER_MAX_NEWS_LIMIT:-800}
       TELEGRAM_SEND_DELAY: ${ANALYZER_TELEGRAM_DELAY:-0.1}
       MIN_NEWS_THRESHOLD: ${ANALYZER_MIN_NEWS_THRESHOLD:-10}
     restart: unless-stopped
-    # Оптимизированные ресурсы для сервера с 900MB RAM
-    mem_limit: 128m
-    mem_reservation: 64m
-    cpus: 0.1
+    # Увеличенные ресурсы для обработки большего количества новостей
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.3
     volumes:
       - analyzer_reports:/app/storage/reports
       - analyzer_logs:/app/storage/logs
