@@ -369,22 +369,23 @@ jobs:
             if docker ps | grep -q db; then
               echo '⏳ Ждем готовности PostgreSQL...'
               for i in {1..30}; do
-                if docker exec db pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB >/dev/null 2>&1; then
+                if docker exec db pg_isready -U $POSTGRES_USER -d $POSTGRES_DB >/dev/null 2>&1; then
                   echo '✅ PostgreSQL готов и доступен'
 
                   # Проверяем что база не пустая (если есть данные)
-                  TABLES_COUNT=\$(docker exec db psql -U \$POSTGRES_USER -d \$POSTGRES_DB -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "0")
+                  TABLES_COUNT=$(docker exec db psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "0")
                   if [ "$TABLES_COUNT" -gt 0 ]; then
                     echo "✅ Найдено $TABLES_COUNT таблиц в базе - данные сохранены!"
                   else
                     echo 'ℹ️ База данных пуста (возможно первый запуск)'
                   fi
+                  POSTGRES_READY=true
                   break
                 fi
                 sleep 2
               done
 
-              if [ $i -eq 30 ]; then
+              if [ "$POSTGRES_READY" != "true" ]; then
                 echo '❌ PostgreSQL не стал доступен за 60 секунд'
                 docker logs db --tail 20
                 exit 1
