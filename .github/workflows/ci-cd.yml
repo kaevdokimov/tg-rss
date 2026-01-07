@@ -131,8 +131,38 @@ jobs:
           ${{ secrets.SERVER_HOST }} ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/tmp/ssh_key ansible_port=${{ secrets.SERVER_PORT || 22 }}
           EOF
 
-          echo "${{ secrets.SERVER_SSH_KEY }}" > /tmp/ssh_key
+          # Проверяем inventory файл
+          echo "📋 Inventory файл:"
+          cat inventory/hosts.ini
+
+          # Настраиваем SSH ключ с проверкой
+          echo "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
+
+          # Проверяем SSH ключ
+          echo "🔐 Проверяем SSH ключ..."
+          if ssh-keygen -l -f /tmp/ssh_key > /dev/null 2>&1; then
+            echo "✅ SSH ключ валиден"
+            ssh-keygen -l -f /tmp/ssh_key
+          else
+            echo "❌ SSH ключ поврежден или имеет неправильный формат"
+            echo "Проверяем формат ключа:"
+            head -2 /tmp/ssh_key
+            echo "Пробуем конвертировать ключ..."
+            # Пробуем конвертировать из PKCS#8 формата
+            ssh-keygen -i -f /tmp/ssh_key > /tmp/ssh_key_converted 2>/dev/null && mv /tmp/ssh_key_converted /tmp/ssh_key
+            chmod 600 /tmp/ssh_key
+            if ssh-keygen -l -f /tmp/ssh_key > /dev/null 2>&1; then
+              echo "✅ Ключ успешно конвертирован"
+            else
+              echo "❌ Не удалось исправить SSH ключ"
+              exit 1
+            fi
+          fi
+
+          # Тестируем SSH подключение
+          echo "🔗 Тестируем SSH подключение..."
+          ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH подключение успешно'" || exit 1
 
           # Запускаем ansible-playbook для инфраструктуры
           echo "🔧 Версия Ansible: $(ansible-playbook --version | head -1)"
