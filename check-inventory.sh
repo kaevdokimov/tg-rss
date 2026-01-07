@@ -34,4 +34,18 @@ else
 fi
 echo
 
+echo "🔑 SSH настройки:"
+if [ -f "ansible/inventory/hosts.ini" ]; then
+    echo "✅ Inventory файл существует"
+    if grep -q "ansible_ssh_private_key_file" ansible/inventory/hosts.ini; then
+        echo "✅ SSH ключ настроен в inventory"
+        grep "ansible_ssh_private_key_file" ansible/inventory/hosts.ini
+    else
+        echo "❌ SSH ключ не найден в inventory"
+    fi
+else
+    echo "❌ Inventory файл не найден"
+fi
+echo
+
 echo "✅ Проверка завершена"
