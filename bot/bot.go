@@ -17,7 +17,7 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn
 
 	// Инициализация Telegram-бота
 	var bot *tgbotapi.BotAPI
-	log.Printf("🔍 Проверяем TELEGRAM_API_KEY: '%s'", cfgTgBot.ApiKey)
+	log.Printf("🔍 Проверяем TELEGRAM_API_KEY: значение задано (длина %d символов)", len(cfgTgBot.ApiKey))
 
 	if cfgTgBot.ApiKey == "" || cfgTgBot.ApiKey == "YOUR_TELEGRAM_BOT_TOKEN_HERE" {
 		log.Printf("⚠️  TELEGRAM_API_KEY не задан или содержит placeholder - бот будет работать без Telegram функционала")
