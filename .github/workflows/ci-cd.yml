@@ -274,6 +274,11 @@ jobs:
             set -e
             echo '✅ SSH connection successful'
 
+            # Загружаем переменные из .env файла
+            set -a
+            source ~/news-bot/.env
+            set +a
+
           # Обновляем системные настройки если требуется
           # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
 
@@ -344,8 +349,8 @@ jobs:
             fi
 
             # Принудительно обновляем образы из registry
-            docker pull ghcr.io/${{ github.repository_owner }}/news-bot:latest || true
-            docker pull ghcr.io/${{ github.repository_owner }}/news-analyzer:latest || true
+            docker pull ghcr.io/$GITHUB_REPOSITORY_OWNER/news-bot:latest || true
+            docker pull ghcr.io/$GITHUB_REPOSITORY_OWNER/news-analyzer:latest || true
 
             # Запускаем все сервисы через docker compose с принудительным обновлением образов
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull || true
