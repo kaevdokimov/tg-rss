@@ -403,7 +403,6 @@ curl http://localhost:8080/metrics | head -10
 /add https://lenta.ru/rss/top7                              # Лента.ру - топ новостей
 /add https://www.gazeta.ru/export/rss/first.xml            # Газета.Ru - первая полоса
 /add https://news.mail.ru/rss/                              # News.mail.ru - агрегация новостей
-/add https://newsru.com/plain/rss/all.xml                   # NEWSru.com - Россия и мир
 
 # 💼 Деловые издания
 /add https://www.vedomosti.ru/rss/news                      # Ведомости - экономика и бизнес
@@ -414,7 +413,6 @@ curl http://localhost:8080/metrics | head -10
 # 🎯 Тематические ресурсы
 /add https://www.ixbt.com/export/softnews.rss              # iXBT.com - технологии и IT
 /add https://www.sports.ru/sports_docs.xml                  # Sports.ru - спорт и соревнования
-/add https://www.travel.ru/inc/side/yandex.rdf              # Travel.ru - путешествия и туризм
 /add https://ecoportal.su/rss/news.xml                      # ECOportal.su - экология
 
 # 📊 Аналитика и мнения
@@ -423,17 +421,11 @@ curl http://localhost:8080/metrics | head -10
 /add https://globalaffairs.ru/feed/                         # Россия в глобальной политике
 
 # 🏙️ Региональные новости
-/add https://www.fontanka.ru/_transmission_for_yandex.thtml # Фонтанка.ру - Санкт-Петербург
 /add https://kuzbassnews.ru/engine/rss.php                  # Новости Кузбасса - региональная повестка
 
 # 🏛️ Официальные источники
 /add http://government.ru/all/rss/                          # Правительство РФ - официальные новости
 
-# 📂 Рубрики РИА Новости
-/add https://ria.ru/export/rss2/politics/index.xml         # РИА Новости - политика
-/add https://ria.ru/export/rss2/economy/index.xml          # РИА Новости - экономика
-/add https://ria.ru/export/rss2/society/index.xml          # РИА Новости - общество
-/add https://sport.ria.ru/export/rss2/sport/index.xml      # РИА Новости - спорт
 ```
 
 ## 🐳 Docker команды
