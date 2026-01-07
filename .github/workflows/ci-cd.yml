@@ -139,7 +139,7 @@ jobs:
           echo "📋 Проверяем роли перед запуском:"
           find playbooks/roles -name "system_optimization" -type d || echo "system_optimization not found in playbooks/roles"
           find ../roles -name "system_optimization" -type d || echo "system_optimization not found in ../roles"
-          ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml -v
+          ANSIBLE_ROLES_PATH="../roles:playbooks/roles" ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml -v
 
   deploy:
     name: Deploy to Server
