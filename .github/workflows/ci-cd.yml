@@ -134,7 +134,12 @@ jobs:
           echo "${{ secrets.SERVER_SSH_KEY }}" > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
 
-          ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml
+          # Запускаем ansible-playbook для инфраструктуры
+          echo "🔧 Версия Ansible: $(ansible-playbook --version | head -1)"
+          echo "📋 Проверяем роли перед запуском:"
+          find playbooks/roles -name "system_optimization" -type d || echo "system_optimization not found in playbooks/roles"
+          find ../roles -name "system_optimization" -type d || echo "system_optimization not found in ../roles"
+          ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml -v
 
   deploy:
     name: Deploy to Server
@@ -245,8 +250,12 @@ jobs:
           # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
 
           # Гарантируем наличие ролей в правильной директории
+          echo "🔍 Проверяем наличие ролей..."
+          ls -la ../roles/ | head -5 || echo "No roles in ../roles/"
           mkdir -p playbooks/roles
-          cp -r ../roles/* playbooks/roles/ 2>/dev/null || echo "Roles already in place"
+          cp -r ../roles/* playbooks/roles/ 2>/dev/null || echo "Roles copy failed or already in place"
+          echo "📁 Содержимое playbooks/roles/:"
+          ls -la playbooks/roles/ | head -10
 
             # 🔒 БЕЗОПАСНЫЙ ДЕПЛОЙ: сохраняем все данные PostgreSQL и Redis
             echo '💾 Создаем резервную копию перед деплоем...'
