@@ -205,10 +205,6 @@ jobs:
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}
 
-          # Kafka
-          KAFKA_BROKERS=kafka:29092
-          KAFKA_NEWS_TOPIC=news-items
-          KAFKA_NOTIFY_TOPIC=news-notifications
 
           # Application
           TZ=Europe/Moscow
@@ -247,10 +243,6 @@ jobs:
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-          # Kafka
-          KAFKA_BROKERS=kafka:29092
-          KAFKA_NEWS_TOPIC=news-items
-          KAFKA_NOTIFY_TOPIC=news-notifications
           # Application
           TZ=Europe/Moscow
           TIMEOUT=60
