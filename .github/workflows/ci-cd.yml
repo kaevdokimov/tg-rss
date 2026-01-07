@@ -128,7 +128,7 @@ jobs:
           mkdir -p inventory
           cat > inventory/hosts.ini << EOF
           [tg_rss_servers]
-          ${{ secrets.SERVER_HOST }} ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_port=${{ secrets.SERVER_PORT || 22 }}
+          ${{ secrets.SERVER_HOST }} ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/home/runner/.ssh/id_rsa ansible_port=${{ secrets.SERVER_PORT || 22 }}
           EOF
 
           # Проверяем inventory файл
@@ -139,8 +139,8 @@ jobs:
           grep "ansible_ssh_private_key_file" inventory/hosts.ini || echo "Путь к ключу не найден в inventory"
           echo ""
           echo "🔑 Проверяем SSH ключ:"
-          ls -la ~/.ssh/id_rsa || echo "SSH ключ не найден!"
-          ssh-keygen -l -f ~/.ssh/id_rsa 2>/dev/null || echo "Не удалось проверить SSH ключ"
+          ls -la /home/runner/.ssh/id_rsa || echo "SSH ключ не найден!"
+          ssh-keygen -l -f /home/runner/.ssh/id_rsa 2>/dev/null || echo "Не удалось проверить SSH ключ"
 
           # Настраиваем SSH ключ (упрощенная версия, как в deploy job)
           mkdir -p ~/.ssh
@@ -150,7 +150,7 @@ jobs:
 
           # Тестируем SSH подключение
           echo "🔗 Тестируем SSH подключение..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH подключение успешно'" || exit 1
+          ssh -i /home/runner/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH подключение успешно'" || exit 1
 
           # Запускаем ansible-playbook для инфраструктуры
           echo "🔧 Версия Ansible: $(ansible-playbook --version | head -1)"
