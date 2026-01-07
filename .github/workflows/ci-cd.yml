@@ -306,24 +306,33 @@ jobs:
             echo '📊 Container status:'
             docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|redis|news-analyzer)' || true
 
-            # Проверяем PostgreSQL
+            # Диагностика PostgreSQL
+            echo '🔍 PostgreSQL diagnostics:'
             if docker ps | grep -q db; then
-              echo '✅ PostgreSQL container running'
-              if docker exec db pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB >/dev/null 2>&1; then
-                echo '✅ PostgreSQL ready'
-              fi
+              echo '✅ PostgreSQL container exists'
+              docker logs db --tail 10 || true
+              echo 'Testing connection...'
+              docker exec db pg_isready -U postgres 2>/dev/null && echo '✅ Default postgres user works' || echo '❌ Default postgres user failed'
+              docker exec db pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB 2>/dev/null && echo '✅ Custom user works' || echo '❌ Custom user failed'
+              docker exec db psql -U postgres -l 2>/dev/null | head -10 || echo '❌ Cannot list databases'
+            else
+              echo '❌ PostgreSQL container not found'
+              docker logs db --tail 20 || true
+              exit 1
             fi
 
             # Проверяем Redis
             if docker ps | grep -q redis; then
               echo '✅ Redis container running'
+              docker exec redis redis-cli ping 2>/dev/null | grep -q PONG && echo '✅ Redis ping OK' || echo '⚠️ Redis ping failed'
             fi
 
             # Проверяем bot
             if docker ps | grep -q bot; then
               echo '✅ Bot container running'
             else
-              echo '❌ Bot container failed'
+              echo '❌ Bot container failed to start'
+              docker logs bot --tail 20 || true
               exit 1
             fi
 
