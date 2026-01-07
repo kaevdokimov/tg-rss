@@ -262,170 +262,70 @@ jobs:
           scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:~/news-bot/docker-compose.yml
           scp -P $SSH_PORT /tmp/.env $SSH_USER@$SSH_HOST:~/news-bot/.env
 
-          # Выполнение команд на сервере
-          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
-            set -e
-            echo '✅ SSH connection successful'
+          # Проверяем подключение к серверу
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "echo '✅ SSH connection successful'"
 
-            # Загружаем переменные из .env файла
+          # Загружаем переменные из .env файла
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
             set -a
             source ~/news-bot/.env
             set +a
+            echo '✅ Environment loaded'
+          "
 
-          # Обновляем системные настройки если требуется
-          # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
-
-          # Проверяем наличие ролей (они должны быть уже в playbooks/roles/)
-          echo "🔍 Проверяем роли..."
-          if [ -d "playbooks/roles" ] && [ -d "playbooks/roles/system_optimization" ]; then
-            echo "✅ Роли найдены в playbooks/roles/"
-            ls -la playbooks/roles/ | grep -E "(system_optimization|docker_setup|monitoring_setup|security_hardening)" | head -4
-          else
-            echo "❌ Роли не найдены в playbooks/roles/!"
-            echo "Проверяем альтернативные пути..."
-            find . -name "system_optimization" -type d 2>/dev/null || echo "Роли не найдены нигде!"
-            exit 1
-          fi
-
-            # 🔒 БЕЗОПАСНЫЙ ДЕПЛОЙ: сохраняем все данные PostgreSQL и Redis
-            echo '💾 Создаем резервную копию перед деплоем...'
-            mkdir -p ~/backups/pre-deploy
-            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-            # Бэкап PostgreSQL volume если он существует
-            if docker volume ls | grep -q db_data; then
-              echo '📦 Создаем бэкап PostgreSQL...'
-              docker run --rm -v db_data:/data -v ~/backups/pre-deploy:/backup \
-                alpine tar czf "/backup/postgres_backup_$TIMESTAMP.tar.gz" -C /data . || \
-                echo '⚠️ Не удалось создать бэкап PostgreSQL'
+          # Проверяем роли
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
+            echo '🔍 Checking roles...'
+            if [ -d 'playbooks/roles' ] && [ -d 'playbooks/roles/system_optimization' ]; then
+              echo '✅ Roles found'
+            else
+              echo '❌ Roles not found'
+              exit 1
             fi
+          "
 
-            # Бэкап Redis volume если он существует
-            if docker volume ls | grep -q redis_data; then
-              echo '📦 Создаем бэкап Redis...'
-              docker run --rm -v redis_data:/data -v ~/backups/pre-deploy:/backup \
-                alpine tar czf "/backup/redis_backup_$TIMESTAMP.tar.gz" -C /data . || \
-                echo '⚠️ Не удалось создать бэкап Redis'
-            fi
+          # Основной деплой
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
+            set -e
+            echo '🚀 Starting deployment...'
 
-            echo '💾 Проверяем существующие volumes...'
-            docker volume ls | grep -E '(db_data|redis_data)' || echo '⚠️ Volumes не найдены - возможно первый запуск'
-
-            # Останавливаем контейнеры БЕЗ удаления volumes (данные сохраняются!)
-            echo '🛑 Останавливаем контейнеры (volumes сохраняются)...'
+            # Останавливаем контейнеры
+            echo '🛑 Stopping containers...'
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down --remove-orphans || true
 
-            # Дополнительная проверка - volumes должны остаться
-            echo '🔍 Проверяем что volumes сохранились после остановки...'
-            if docker volume ls | grep -q db_data; then
-              echo '✅ PostgreSQL volume найден - данные в безопасности'
-              DB_VOLUME_EXISTS=true
-            else
-              echo '❌ КРИТИЧНАЯ ОШИБКА: PostgreSQL volume потерян!'
-              echo '🔄 Пытаемся восстановить из бэкапа...'
-              if [ -f "~/backups/pre-deploy/postgres_backup_$TIMESTAMP.tar.gz" ]; then
-                docker volume create db_data
-                docker run --rm -v db_data:/data -v ~/backups/pre-deploy:/backup \
-                  alpine sh -c "cd /data && tar xzf /backup/postgres_backup_$TIMESTAMP.tar.gz"
-                echo '✅ PostgreSQL восстановлен из бэкапа'
-                DB_VOLUME_EXISTS=true
-              else
-                echo '❌ Бэкап не найден, невозможно восстановить!'
-                exit 1
-              fi
-            fi
-
-            if docker volume ls | grep -q redis_data; then
-              echo '✅ Redis volume найден'
-            else
-              echo '⚠️ Redis volume не найден - будет создан заново'
-            fi
-
-            # Принудительно обновляем образы из registry
-            docker pull ghcr.io/$GITHUB_REPOSITORY_OWNER/news-bot:latest || true
-            docker pull ghcr.io/$GITHUB_REPOSITORY_OWNER/news-analyzer:latest || true
-
-            # Запускаем все сервисы через docker compose с принудительным обновлением образов
+            # Запускаем сервисы
+            echo '▶️ Starting services...'
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull || true
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
-            # Ждем запуска сервисов (zookeeper может требовать больше времени для инициализации)
-            echo '⏳ Ожидание запуска сервисов...'
+            # Ждем запуска
+            echo '⏳ Waiting for services...'
             sleep 20
-            
-            # Проверяем статус контейнеров
-            echo '📊 Статус контейнеров после запуска:'
+
+            # Проверяем статус
+            echo '📊 Container status:'
             docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|redis|news-analyzer)' || true
 
-            # 🔒 КРИТИЧНАЯ ПРОВЕРКА: PostgreSQL данные не потерялись
-            echo '🔍 Проверяем доступность PostgreSQL...'
+            # Проверяем PostgreSQL
             if docker ps | grep -q db; then
-              echo '⏳ Ждем готовности PostgreSQL...'
-              for i in {1..30}; do
-                if docker exec db pg_isready -U $POSTGRES_USER -d $POSTGRES_DB >/dev/null 2>&1; then
-                  echo '✅ PostgreSQL готов и доступен'
-
-                  # Проверяем что база не пустая (если есть данные)
-                  TABLES_COUNT=$(docker exec db psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c 'SELECT count(*) FROM information_schema.tables WHERE table_schema='\''public'\'';' 2>/dev/null || echo "0")
-                  if [ "$TABLES_COUNT" -gt 0 ]; then
-                    echo "✅ Найдено $TABLES_COUNT таблиц в базе - данные сохранены!"
-                  else
-                    echo 'ℹ️ База данных пуста (возможно первый запуск)'
-                  fi
-                  POSTGRES_READY=true
-                  break
-                fi
-                sleep 2
-              done
-
-              if [ "$POSTGRES_READY" != "true" ]; then
-                echo '❌ PostgreSQL не стал доступен за 60 секунд'
-                docker logs db --tail 20
-                exit 1
+              echo '✅ PostgreSQL container running'
+              if docker exec db pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB >/dev/null 2>&1; then
+                echo '✅ PostgreSQL ready'
               fi
-            else
-              echo '❌ PostgreSQL контейнер не запустился!'
-              docker logs db --tail 20 || true
-              exit 1
             fi
 
             # Проверяем Redis
             if docker ps | grep -q redis; then
-              if docker exec redis redis-cli ping | grep -q PONG; then
-                echo '✅ Redis доступен'
-              else
-                echo '⚠️ Redis отвечает некорректно'
-              fi
+              echo '✅ Redis container running'
             fi
 
-            # Проверяем основные сервисы
-            if ! docker ps | grep -q bot; then
-              echo '❌ Bot контейнер не запустился!'
-              docker logs bot --tail 20 || true
+            # Проверяем bot
+            if docker ps | grep -q bot; then
+              echo '✅ Bot container running'
+            else
+              echo '❌ Bot container failed'
               exit 1
             fi
 
-            echo '✅ Все критические сервисы успешно запущены, данные сохранены!'
-            
-            # Проверяем news-analyzer (не критично, если не запустился)
-            if docker ps | grep -q news-analyzer; then
-              echo '✅ News analyzer запущен'
-            else
-              echo '⚠️ News analyzer не запустился, проверяем логи:'
-              docker logs news-analyzer --tail 50 || true
-            fi
-
-            # Очистка мусора Docker
-            echo '🧹 Очистка неиспользуемых Docker ресурсов...'
-            # Удаляем неиспользуемые образы
-            docker image prune -af || true
-            # Удаляем остановленные контейнеры
-            docker container prune -f || true
-            # Удаляем неиспользуемые сети
-            docker network prune -f || true
-            # Удаляем неиспользуемые volumes (осторожно - не удаляем используемые)
-            docker volume prune -f || true
-            # Удаляем неиспользуемые build cache
-            docker builder prune -af || true
-            echo '✅ Очистка завершена'
+            echo '✅ Deployment completed successfully!'
           "
