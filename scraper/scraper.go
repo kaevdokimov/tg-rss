@@ -34,6 +34,11 @@ var httpClient = &http.Client{
 
 const maxContentSize = 2 * 1024 * 1024 // Максимальный размер контента 2MB
 
+// removeNullBytes удаляет null байты из строки
+func removeNullBytes(s string) string {
+	return strings.ReplaceAll(s, "\x00", "")
+}
+
 // NewsContent содержит полный контент новости со страницы
 type NewsContent struct {
 	FullText      string            // Полный текст новости
@@ -142,25 +147,25 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 		return nil, fmt.Errorf("ошибка парсинга страницы с помощью readability: %w", err)
 	}
 
-	// Извлекаем полный текст статьи (уже очищенный от лишнего)
-	content.FullText = strings.TrimSpace(article.TextContent)
+	// Извлекаем полный текст статьи (уже очищенный от лишнего и null байтов)
+	content.FullText = removeNullBytes(strings.TrimSpace(article.TextContent))
 	
-	// Сохраняем HTML контента (очищенный)
-	content.ContentHTML = article.Content
+	// Сохраняем HTML контента (очищенный от null байтов)
+	content.ContentHTML = removeNullBytes(article.Content)
 
 	// Извлекаем автора
 	if article.Byline != "" {
-		content.Author = strings.TrimSpace(article.Byline)
+		content.Author = removeNullBytes(strings.TrimSpace(article.Byline))
 	}
 
 	// Извлекаем метаданные из статьи
 	if article.Excerpt != "" {
-		content.MetaDescription = article.Excerpt
+		content.MetaDescription = removeNullBytes(article.Excerpt)
 	}
 
 	// Извлекаем изображение статьи
 	if article.Image != "" {
-		content.Images = append(content.Images, article.Image)
+		content.Images = append(content.Images, removeNullBytes(article.Image))
 	}
 
 	// Парсим оригинальный HTML для извлечения метаданных из head
@@ -199,14 +204,14 @@ func extractMetaData(doc *goquery.Document, content *NewsContent) {
 	// Keywords
 	doc.Find("meta[name='keywords'], meta[property='keywords']").Each(func(i int, s *goquery.Selection) {
 		if val, exists := s.Attr("content"); exists {
-			content.MetaKeywords = val
+			content.MetaKeywords = removeNullBytes(val)
 		}
 	})
 
 	// Description
 	doc.Find("meta[name='description'], meta[property='description'], meta[property='og:description']").Each(func(i int, s *goquery.Selection) {
 		if val, exists := s.Attr("content"); exists && content.MetaDescription == "" {
-			content.MetaDescription = val
+			content.MetaDescription = removeNullBytes(val)
 		}
 	})
 
@@ -221,7 +226,7 @@ func extractMetaData(doc *goquery.Document, content *NewsContent) {
 				key = name
 			}
 			if key != "" {
-				content.MetaData[key] = val
+				content.MetaData[key] = removeNullBytes(val)
 			}
 		}
 	})
@@ -354,9 +359,9 @@ func extractFullText(doc *goquery.Document, content *NewsContent) {
 	// Объединяем части текста
 	content.FullText = strings.Join(textParts, "\n\n")
 	content.FullText = strings.TrimSpace(content.FullText)
-	
+
 	// Очищаем от лишних пробелов и переносов
-	content.FullText = cleanText(content.FullText)
+	content.FullText = removeNullBytes(cleanText(content.FullText))
 }
 
 // isNonContentText проверяет, является ли текст навигацией, рекламой или другим нерелевантным контентом
@@ -493,14 +498,14 @@ func extractAuthor(doc *goquery.Document, content *NewsContent) {
 		if strings.HasPrefix(selector, "meta") {
 			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 				if val, exists := s.Attr("content"); exists {
-					content.Author = strings.TrimSpace(val)
+					content.Author = removeNullBytes(strings.TrimSpace(val))
 				}
 			})
 		} else {
 			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 				text := strings.TrimSpace(s.Text())
 				if text != "" {
-					content.Author = text
+					content.Author = removeNullBytes(text)
 				}
 			})
 		}
@@ -526,14 +531,14 @@ func extractCategory(doc *goquery.Document, content *NewsContent) {
 		if strings.HasPrefix(selector, "meta") {
 			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 				if val, exists := s.Attr("content"); exists {
-					content.Category = strings.TrimSpace(val)
+					content.Category = removeNullBytes(strings.TrimSpace(val))
 				}
 			})
 		} else {
 			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 				text := strings.TrimSpace(s.Text())
 				if text != "" {
-					content.Category = text
+					content.Category = removeNullBytes(text)
 				}
 			})
 		}
@@ -570,6 +575,7 @@ func extractTags(doc *goquery.Document, content *NewsContent) {
 		doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 			text := strings.TrimSpace(s.Text())
 			if text != "" {
+				text = removeNullBytes(text)
 				// Проверяем, нет ли уже такого тега
 				found := false
 				for _, tag := range content.Tags {
@@ -605,6 +611,7 @@ func extractImages(doc *goquery.Document, content *NewsContent) {
 				src, exists = s.Attr("data-src") // lazy loading
 			}
 			if exists && src != "" && !seen[src] {
+				src = removeNullBytes(src)
 				// Преобразуем относительные URL в абсолютные
 				if strings.HasPrefix(src, "//") {
 					src = "https:" + src
@@ -635,6 +642,7 @@ func extractPublishedDate(doc *goquery.Document, content *NewsContent) {
 		if strings.HasPrefix(selector, "meta") {
 			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 				if val, exists := s.Attr("content"); exists {
+					val = removeNullBytes(val)
 					if t, err := parseDate(val); err == nil {
 						content.PublishedAt = &t
 					}
@@ -649,7 +657,7 @@ func extractPublishedDate(doc *goquery.Document, content *NewsContent) {
 					}
 				} else {
 					// Пробуем текст
-					text := strings.TrimSpace(s.Text())
+					text := removeNullBytes(strings.TrimSpace(s.Text()))
 					if t, err := parseDate(text); err == nil {
 						content.PublishedAt = &t
 					}
@@ -725,7 +733,7 @@ func extractContentHTML(doc *goquery.Document, content *NewsContent) {
 
 	html, err := cleanContent.Html()
 	if err == nil && html != "" && len(html) > 100 {
-		content.ContentHTML = html
+		content.ContentHTML = removeNullBytes(html)
 	}
 }
 

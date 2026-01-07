@@ -11,8 +11,11 @@ import (
 	"github.com/lib/pq"
 )
 
-// cleanUTF8String очищает строку от некорректных UTF-8 последовательностей
+// cleanUTF8String очищает строку от некорректных UTF-8 последовательностей и null байтов
 func cleanUTF8String(s string) string {
+	// Сначала удаляем null байты, которые вызывают проблемы в PostgreSQL
+	s = strings.ReplaceAll(s, "\x00", "")
+
 	if utf8.ValidString(s) {
 		return s
 	}
@@ -51,6 +54,13 @@ func SaveNewsContent(db *sql.DB, newsID int64, fullText, author, category string
 	imagesArray := images
 	if imagesArray == nil {
 		imagesArray = []string{}
+	}
+
+	// Очищаем metaData от null байтов перед JSON маршалингом
+	if metaData != nil {
+		for key, value := range metaData {
+			metaData[key] = cleanUTF8String(value)
+		}
 	}
 
 	// Преобразуем metaData в JSON
