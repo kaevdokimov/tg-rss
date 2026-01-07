@@ -72,23 +72,23 @@ jobs:
           # Runs Snyk Code (SAST) analysis and uploads result into GitHub.
           # Use || true to not fail the pipeline
           echo "🔍 Running Snyk Code analysis..."
-          snyk code test --sarif > snyk-code.sarif || true
+          snyk code test --sarif --sarif-file-output=snyk-code.sarif || echo "⚠️ Snyk Code analysis failed, continuing..."
 
           # Runs Snyk Open Source (SCA) analysis and uploads result to Snyk.
           echo "🔍 Running Snyk Open Source monitor..."
-          snyk monitor --all-projects || true
+          snyk monitor --all-projects || echo "⚠️ Snyk Open Source monitor failed, continuing..."
 
           # Runs Snyk Infrastructure as Code (IaC) analysis and uploads result to Snyk.
           echo "🔍 Running Snyk IaC analysis..."
-          snyk iac test --report || true
+          snyk iac test --report || echo "⚠️ Snyk IaC analysis failed, continuing..."
 
           # Build the docker image for testing
           echo "🔍 Building Docker image for container scan..."
-          docker build -t your/image-to-test . || true
+          docker build -t your/image-to-test . || echo "⚠️ Docker build failed, skipping container scan..."
 
           # Runs Snyk Container (Container and SCA) analysis and uploads result to Snyk.
           echo "🔍 Running Snyk Container analysis..."
-          snyk container monitor your/image-to-test --file=Dockerfile || true
+          snyk container monitor your/image-to-test --file=Dockerfile || echo "⚠️ Snyk Container analysis failed, continuing..."
 
       - name: Upload Snyk results to GitHub Code Scanning
         if: env.SNYK_TOKEN_AVAILABLE == 'true'

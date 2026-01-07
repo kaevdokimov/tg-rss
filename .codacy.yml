@@ -1,0 +1,31 @@
+---
+engines:
+  # Disable Codacy analysis for problematic files
+  markdownlint:
+    enabled: false
+  shellcheck:
+    enabled: true
+
+exclude_paths:
+  # Exclude context files that cause encoding issues
+  - ".context/**/*"
+  - "**/*.md"
+  - "ansible/README.md"
+  - "news-analyzer-python/readme.md"
+  - "readme.md"
+  # Exclude generated files
+  - "**/node_modules/**/*"
+  - "**/.git/**/*"
+  # Exclude build artifacts
+  - "**/dist/**/*"
+  - "**/build/**/*"
+  # Exclude test coverage files
+  - "**/coverage/**/*"
+  - "**/*.sarif"
+  - "**/*.xml"
+
+file_exclusions:
+  extensions:
+    - ".md"
+    - ".sarif"
+    - ".xml"
