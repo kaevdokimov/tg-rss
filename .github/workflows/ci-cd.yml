@@ -257,9 +257,9 @@ jobs:
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
 
           # Content scraper configuration
-          CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL || '2' }}
-          CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH || '20' }}
-          CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT || '6' }}
+          CONTENT_SCRAPER_INTERVAL=2
+          CONTENT_SCRAPER_BATCH=20
+          CONTENT_SCRAPER_CONCURRENT=6
           EOF
 
           # Копируем файлы на сервер
