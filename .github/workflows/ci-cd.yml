@@ -254,13 +254,11 @@ jobs:
           TZ=Europe/Moscow
           TIMEOUT=60
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
-          
+
           # Content scraper configuration
           CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL || '2' }}
           CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH || '20' }}
           CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT || '6' }}
-          # GitHub repository owner для подстановки в docker-compose.yml
-          GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
           EOF
 
           # Копируем файлы на сервер
@@ -268,13 +266,13 @@ jobs:
           scp -P $SSH_PORT docker-compose.yml $SSH_USER@$SSH_HOST:~/news-bot/docker-compose.yml
           scp -P $SSH_PORT /tmp/.env $SSH_USER@$SSH_HOST:~/news-bot/.env
 
+          # Сначала логинимся в GitHub Container Registry локально
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
           # Выполнение команд на сервере
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
             set -e
             echo '✅ SSH connection successful'
-
-          # Логин в GitHub Container Registry
-          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
           # Обновляем системные настройки если требуется
           # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
@@ -351,8 +349,6 @@ jobs:
 
             # Запускаем все сервисы через docker compose с принудительным обновлением образов
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env pull || true
-            # Устанавливаем GITHUB_REPOSITORY_OWNER для правильной подстановки в docker-compose.yml
-            export GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env up -d
 
             # Ждем запуска сервисов (zookeeper может требовать больше времени для инициализации)
