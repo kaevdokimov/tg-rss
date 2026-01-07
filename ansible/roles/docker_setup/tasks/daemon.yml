@@ -12,6 +12,12 @@
     mode: '0644'
   notify: restart docker
 
+- name: Создание директории для systemd override Docker
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0755'
+
 - name: Настройка Docker systemd override для ограничений ресурсов
   template:
     src: templates/docker.service.d-override.conf.j2
