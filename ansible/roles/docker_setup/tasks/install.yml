@@ -62,7 +62,8 @@
     state: present
   register: docker_install_result
   retries: 3
-  delay: 10
+  delay: 30
+  timeout: 600
   until: docker_install_result is succeeded
 
 - name: Добавление пользователя в группу docker
