@@ -42,7 +42,7 @@ jobs:
         mkdir -p ansible/inventory
         cat > ansible/inventory/hosts.ini << EOF
         [tg_rss_servers]
-        ${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/home/runner/.ssh/id_rsa
+        ${{ secrets.SERVER_HOST }} ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }} ansible_ssh_private_key_file=/home/runner/.ssh/id_rsa ansible_port=${{ secrets.SERVER_PORT || 22 }}
 
         [all:vars]
         ansible_python_interpreter=/usr/bin/python3
@@ -62,7 +62,7 @@ jobs:
 
     - name: Deploy application
       run: |
-        ssh -i /home/runner/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
           cd /opt/tg-rss
           git pull origin main
           docker-compose pull
@@ -76,4 +76,4 @@ jobs:
         curl -f http://${{ secrets.SERVER_HOST }}:8080/health || exit 1
 
     - name: Cleanup
-      run: rm -f /home/runner/.ssh/id_rsa
+      run: rm -f ~/.ssh/id_rsa
