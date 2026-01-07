@@ -260,22 +260,16 @@ jobs:
           # Обновляем системные настройки если требуется
           # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
 
-          # Гарантируем наличие ролей в правильной директории
-          echo "🔍 Проверяем наличие ролей..."
-          if [ -d "../roles" ]; then
-            echo "✅ Роли найдены в ../roles/"
-            ls -la ../roles/ | head -5
-            mkdir -p playbooks/roles
-            cp -r ../roles/* playbooks/roles/ 2>/dev/null && echo "✅ Роли скопированы" || echo "⚠️ Роли уже существуют или копирование не удалось"
+          # Проверяем наличие ролей (они должны быть уже в playbooks/roles/)
+          echo "🔍 Проверяем роли..."
+          if [ -d "playbooks/roles" ] && [ -d "playbooks/roles/system_optimization" ]; then
+            echo "✅ Роли найдены в playbooks/roles/"
+            ls -la playbooks/roles/ | grep -E "(system_optimization|docker_setup|monitoring_setup|security_hardening)" | head -4
           else
-            echo "ℹ️ Роли не найдены в ../roles/, проверяем локальные..."
-            if [ -d "playbooks/roles" ]; then
-              echo "✅ Роли найдены в playbooks/roles/"
-              ls -la playbooks/roles/ | head -5
-            else
-              echo "❌ Роли не найдены ни в одном месте!"
-              exit 1
-            fi
+            echo "❌ Роли не найдены в playbooks/roles/!"
+            echo "Проверяем альтернативные пути..."
+            find . -name "system_optimization" -type d 2>/dev/null || echo "Роли не найдены нигде!"
+            exit 1
           fi
 
             # 🔒 БЕЗОПАСНЫЙ ДЕПЛОЙ: сохраняем все данные PostgreSQL и Redis
