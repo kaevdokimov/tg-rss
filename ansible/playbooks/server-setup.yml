@@ -48,6 +48,40 @@
       fs.file-max: 2097152
 
   pre_tasks:
+    - name: Ожидание освобождения apt locks
+      shell: |
+        set -e
+        echo "🔓 Ожидание освобождения apt locks..."
+
+        # Ждем максимум 5 минут
+        for i in {1..60}; do
+          if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 && \
+             ! fuser /var/lib/dpkg/lock >/dev/null 2>&1 && \
+             ! fuser /var/cache/apt/archives/lock >/dev/null 2>&1; then
+            echo "✅ Apt locks свободны"
+            exit 0
+          fi
+          echo "⏳ Ждем освобождения apt locks ($i/60)..."
+          sleep 5
+        done
+
+        echo "⚠️ Принудительное завершение apt процессов..."
+        killall apt apt-get dpkg || true
+        sleep 2
+        killall -9 apt apt-get dpkg || true
+        sleep 2
+
+        # Очищаем locks
+        rm -f /var/lib/dpkg/lock-frontend
+        rm -f /var/lib/dpkg/lock
+        rm -f /var/cache/apt/archives/lock
+
+        echo "✅ Apt locks очищены"
+      args:
+        executable: /bin/bash
+      ignore_errors: true
+      when: ansible_os_family == "Debian"
+
     - name: Полная очистка Docker перед настройкой сервера
       shell: |
         set -e
