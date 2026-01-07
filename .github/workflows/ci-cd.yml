@@ -242,7 +242,7 @@ jobs:
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
           # Обновляем системные настройки если требуется
-          # ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
+          # ANSIBLE_ROLES_PATH=roles ansible-playbook -i inventory/hosts.ini ansible/playbooks/app-config-update.yml || true
 
             # 🔒 БЕЗОПАСНЫЙ ДЕПЛОЙ: сохраняем все данные PostgreSQL и Redis
             echo '💾 Создаем резервную копию перед деплоем...'
