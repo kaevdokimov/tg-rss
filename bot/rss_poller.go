@@ -2,6 +2,7 @@ package bot
 
 import (
 	"database/sql"
+	"net/http"
 	"runtime"
 	"sync"
 	"time"
@@ -14,6 +15,18 @@ import (
 )
 
 var rssLogger = monitoring.NewLogger("RSS")
+
+// Оптимизированный HTTP клиент для RSS парсинга
+var rssHttpClient = &http.Client{
+	Timeout: 10 * time.Second, // Короткий таймаут для RSS
+	Transport: &http.Transport{
+		MaxIdleConns:        50,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     60 * time.Second,
+		DisableKeepAlives:   false,
+		DisableCompression:  false,
+	},
+}
 
 // parseResult результат парсинга одного источника
 type parseResult struct {
@@ -30,7 +43,7 @@ type newsCandidate struct {
 
 // parseSource парсит один RSS источник
 func parseSource(source db.Source, tz *time.Location) parseResult {
-	newsList, err := rss.ParseRSS(source.Url, tz)
+	newsList, err := rss.ParseRSSWithClient(source.Url, tz, rssHttpClient)
 	return parseResult{
 		source:   source,
 		newsList: newsList,

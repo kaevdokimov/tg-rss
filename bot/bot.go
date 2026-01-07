@@ -12,7 +12,7 @@ import (
 )
 
 // StartBotWithRedis запускает бота с использованием Redis для очередей сообщений
-func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn *sql.DB, redisProducer *redis.Producer, redisConsumer *redis.Consumer) {
+func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRedis *config.RedisConfig, dbConn *sql.DB, redisProducer *redis.Producer, redisConsumer *redis.Consumer) {
 	interval := time.Duration(cfgTgBot.Timeout) * time.Second
 
 	// Инициализация Telegram-бота
@@ -49,10 +49,21 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn
 	log.Printf("Запуск RSS парсера с интервалом %v", interval)
 	go StartRSSPolling(dbConn, interval, time.Local, redisProducer)
 
+	// Инициализация Redis кэша для контента
+	var contentCache *redis.ContentCache
+	contentCache, cacheErr := redis.NewContentCache(cfgRedis)
+	if cacheErr != nil {
+		log.Printf("⚠️  Ошибка инициализации Redis кэша для контента: %v", cacheErr)
+		log.Printf("🔄 Продолжаем без кэширования контента")
+	} else {
+		log.Printf("✅ Redis кэш для контента инициализирован")
+		defer contentCache.Close()
+	}
+
 	// Запуск фонового парсера контента новостей
 	// Парсит по батчу новостей с заданным интервалом
 	scraperInterval := time.Duration(cfgTgBot.ContentScraperInterval) * time.Minute
-	contentScraper := NewContentScraper(dbConn, scraperInterval, cfgTgBot.ContentScraperBatch, cfgTgBot.ContentScraperConcurrent)
+	contentScraper := NewContentScraper(dbConn, scraperInterval, cfgTgBot.ContentScraperBatch, cfgTgBot.ContentScraperConcurrent, contentCache)
 	go contentScraper.Start()
 	log.Printf("Запуск фонового парсера контента: интервал=%v, батч=%d, параллельно=%d", scraperInterval, cfgTgBot.ContentScraperBatch, cfgTgBot.ContentScraperConcurrent)
 

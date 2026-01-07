@@ -2,7 +2,9 @@ package redis
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -29,6 +31,20 @@ type NewsNotification struct {
 	Description string `json:"description"`
 	Link        string `json:"link"`
 	PublishedAt string `json:"published_at"`
+}
+
+// CachedNewsContent представляет контент новости для кэширования в Redis
+type CachedNewsContent struct {
+	FullText        string            `json:"full_text"`
+	Author          string            `json:"author"`
+	Category        string            `json:"category"`
+	Tags            []string          `json:"tags"`
+	Images          []string          `json:"images"`
+	PublishedAt     *time.Time        `json:"published_at,omitempty"`
+	MetaKeywords    string            `json:"meta_keywords"`
+	MetaDescription string            `json:"meta_description"`
+	MetaData        map[string]string `json:"meta_data"`
+	ContentHTML     string            `json:"content_html"`
 }
 
 type Producer struct {
@@ -183,6 +199,93 @@ func (c *Consumer) SubscribeNotifications(handler func(NewsNotification) error) 
 	}
 }
 
+// ContentCache представляет кэш для скрапированного контента
+type ContentCache struct {
+	client *redis.Client
+	prefix string
+}
+
+// NewContentCache создает новый кэш контента
+func NewContentCache(redisConfig *config.RedisConfig) (*ContentCache, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:         redisConfig.Addr,
+		Password:     redisConfig.Password,
+		DB:           redisConfig.DB,
+		PoolSize:     20, // больше соединений для кэша
+		MinIdleConns: 5,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+	})
+
+	// Проверяем подключение
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, err
+	}
+
+	log.Printf("Redis content cache подключен к %s", redisConfig.Addr)
+
+	return &ContentCache{
+		client: client,
+		prefix: "content:",
+	}, nil
+}
+
+// getCacheKey генерирует ключ кэша для URL
+func (cc *ContentCache) getCacheKey(url string) string {
+	// Используем простой хэш URL как ключ
+	return cc.prefix + fmt.Sprintf("%x", md5.Sum([]byte(url)))
+}
+
+// Get получает контент из кэша
+func (cc *ContentCache) Get(url string) (*CachedNewsContent, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	key := cc.getCacheKey(url)
+	data, err := cc.client.Get(ctx, key).Result()
+	if err != nil {
+		if err != redis.Nil {
+			log.Printf("Ошибка чтения из Redis кэша: %v", err)
+		}
+		return nil, false
+	}
+
+	var content CachedNewsContent
+	if err := json.Unmarshal([]byte(data), &content); err != nil {
+		log.Printf("Ошибка десериализации контента из кэша: %v", err)
+		return nil, false
+	}
+
+	return &content, true
+}
+
+// Set сохраняет контент в кэш
+func (cc *ContentCache) Set(url string, content *CachedNewsContent, ttl time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	key := cc.getCacheKey(url)
+	data, err := json.Marshal(content)
+	if err != nil {
+		return fmt.Errorf("ошибка сериализации контента: %w", err)
+	}
+
+	return cc.client.Set(ctx, key, data, ttl).Err()
+}
+
+// Delete удаляет контент из кэша
+func (cc *ContentCache) Delete(url string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	key := cc.getCacheKey(url)
+	return cc.client.Del(ctx, key).Err()
+}
+
 // Close закрывает соединения
 func (p *Producer) Close() error {
 	return p.client.Close()
@@ -190,4 +293,25 @@ func (p *Producer) Close() error {
 
 func (c *Consumer) Close() error {
 	return c.client.Close()
+}
+
+func (cc *ContentCache) Close() error {
+	return cc.client.Close()
+}
+
+// GetStats возвращает статистику использования кэша (для отладки)
+func (cc *ContentCache) GetStats() (map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	info, err := cc.client.Info(ctx, "keyspace").Result()
+	if err != nil {
+		return nil, err
+	}
+
+	// Парсим информацию о БД
+	stats := make(map[string]interface{})
+	stats["info"] = info
+
+	return stats, nil
 }

@@ -1,7 +1,9 @@
 package rss
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/mmcdole/gofeed"
@@ -14,9 +16,16 @@ type News struct {
 	PublishedAt time.Time
 }
 
-func ParseRSS(url string, tz *time.Location) ([]News, error) {
+// ParseRSSWithClient парсит RSS с использованием указанного HTTP клиента
+func ParseRSSWithClient(url string, tz *time.Location, client *http.Client) ([]News, error) {
 	fp := gofeed.NewParser()
-	feed, err := fp.ParseURL(url)
+	fp.Client = client
+
+	// Создаем контекст с таймаутом для RSS парсинга
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	feed, err := fp.ParseURLWithContext(url, ctx)
 	if err != nil {
 		log.Printf("Ошибка при парсинге RSS-ленты %s: %v", url, err)
 		return nil, err
@@ -36,4 +45,9 @@ func ParseRSS(url string, tz *time.Location) ([]News, error) {
 		})
 	}
 	return newsList, nil
+}
+
+func ParseRSS(url string, tz *time.Location) ([]News, error) {
+	// Используем стандартный HTTP клиент для обратной совместимости
+	return ParseRSSWithClient(url, tz, http.DefaultClient)
 }

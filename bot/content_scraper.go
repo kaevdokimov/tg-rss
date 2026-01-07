@@ -3,13 +3,49 @@ package bot
 import (
 	"database/sql"
 	"encoding/json"
+	"sync"
 	"tg-rss/db"
 	"tg-rss/monitoring"
+	"tg-rss/redis"
 	"tg-rss/scraper"
 	"time"
 )
 
 var contentScraperLogger = monitoring.NewLogger("ContentScraper")
+
+const redisCacheTTL = 30 * time.Minute // TTL для Redis кэша
+
+// convertToCachedNewsContent конвертирует scraper.NewsContent в redis.CachedNewsContent
+func convertToCachedNewsContent(content *scraper.NewsContent) *redis.CachedNewsContent {
+	return &redis.CachedNewsContent{
+		FullText:        content.FullText,
+		Author:          content.Author,
+		Category:        content.Category,
+		Tags:            content.Tags,
+		Images:          content.Images,
+		PublishedAt:     content.PublishedAt,
+		MetaKeywords:    content.MetaKeywords,
+		MetaDescription: content.MetaDescription,
+		MetaData:        content.MetaData,
+		ContentHTML:     content.ContentHTML,
+	}
+}
+
+// convertFromCachedNewsContent конвертирует redis.CachedNewsContent в scraper.NewsContent
+func convertFromCachedNewsContent(cached *redis.CachedNewsContent) *scraper.NewsContent {
+	return &scraper.NewsContent{
+		FullText:        cached.FullText,
+		Author:          cached.Author,
+		Category:        cached.Category,
+		Tags:            cached.Tags,
+		Images:          cached.Images,
+		PublishedAt:     cached.PublishedAt,
+		MetaKeywords:    cached.MetaKeywords,
+		MetaDescription: cached.MetaDescription,
+		MetaData:        cached.MetaData,
+		ContentHTML:     cached.ContentHTML,
+	}
+}
 
 // ContentScraper обрабатывает фоновый парсинг страниц новостей
 type ContentScraper struct {
@@ -17,15 +53,17 @@ type ContentScraper struct {
 	interval   time.Duration
 	batchSize  int
 	concurrent int // количество одновременных запросов
+	cache      *redis.ContentCache // Redis кэш для контента
 }
 
 // NewContentScraper создает новый обработчик парсинга контента
-func NewContentScraper(db *sql.DB, interval time.Duration, batchSize, concurrent int) *ContentScraper {
+func NewContentScraper(db *sql.DB, interval time.Duration, batchSize, concurrent int, cache *redis.ContentCache) *ContentScraper {
 	return &ContentScraper{
 		db:         db,
 		interval:   interval,
 		batchSize:  batchSize,
 		concurrent: concurrent,
+		cache:      cache,
 	}
 }
 
@@ -68,28 +106,37 @@ func (cs *ContentScraper) scrapeBatch() {
 	// Создаем канал для ограничения параллелизма
 	semaphore := make(chan struct{}, cs.concurrent)
 	results := make(chan scrapeResult, len(newsList))
+	var wg sync.WaitGroup
 
-	// Запускаем парсинг параллельно с задержкой между запросами
+	// Запускаем парсинг параллельно
 	for i, news := range newsList {
-		semaphore <- struct{}{} // занимаем слот
+		wg.Add(1)
 		go func(n db.NewsForScraping, idx int) {
-			defer func() { <-semaphore }() // освобождаем слот
+			defer wg.Done()
 
-			// Добавляем задержку между запросами для избежания rate limiting
+			// Занимаем слот в семафоре
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// Добавляем минимальную задержку между запросами для избежания rate limiting
+			// Задержка зависит от индекса в батче, но не превышает разумных пределов
 			if idx > 0 {
-				time.Sleep(time.Duration(idx%cs.concurrent) * 200 * time.Millisecond)
+				delay := time.Duration(min(idx, 10)) * 100 * time.Millisecond // максимум 1 секунда задержки
+				time.Sleep(delay)
 			}
 
 			cs.scrapeNews(n, results)
 		}(news, i)
 	}
 
-	// Ждем завершения всех горутин
-	for i := 0; i < cs.concurrent; i++ {
-		semaphore <- struct{}{}
-	}
+	// Закрываем канал результатов после завершения всех горутин
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
-	close(results)
+	// Ждем завершения всех горутин
+	wg.Wait()
 
 	// Собираем результаты
 	successCount := 0
@@ -113,16 +160,38 @@ type scrapeResult struct {
 func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scrapeResult) {
 	contentScraperLogger.Debug("Парсинг новости ID=%d: %s", news.ID, news.Link)
 
-	// Парсим страницу
-	content, err := scraper.ScrapeNewsContent(news.Link)
-	if err != nil {
-		contentScraperLogger.Warn("Ошибка парсинга новости ID=%d: %v", news.ID, err)
-		// Сохраняем ошибку
-		if saveErr := db.MarkNewsScrapeFailed(cs.db, news.ID, err.Error()); saveErr != nil {
-			contentScraperLogger.Error("Ошибка сохранения статуса ошибки для новости ID=%d: %v", news.ID, saveErr)
+	// Сначала проверяем Redis кэш
+	var content *scraper.NewsContent
+	if cs.cache != nil {
+		if cached, found := cs.cache.Get(news.Link); found {
+			contentScraperLogger.Debug("Контент новости ID=%d найден в Redis кэше", news.ID)
+			content = convertFromCachedNewsContent(cached)
 		}
-		results <- scrapeResult{success: false}
-		return
+	}
+
+	// Если не найдено в кэше, парсим страницу
+	if content == nil {
+		var err error
+		content, err = scraper.ScrapeNewsContent(news.Link)
+		if err != nil {
+			contentScraperLogger.Warn("Ошибка парсинга новости ID=%d: %v", news.ID, err)
+			// Сохраняем ошибку
+			if saveErr := db.MarkNewsScrapeFailed(cs.db, news.ID, err.Error()); saveErr != nil {
+				contentScraperLogger.Error("Ошибка сохранения статуса ошибки для новости ID=%d: %v", news.ID, saveErr)
+			}
+			results <- scrapeResult{success: false}
+			return
+		}
+
+		// Сохраняем в Redis кэш
+		if cs.cache != nil {
+			cachedContent := convertToCachedNewsContent(content)
+			if err := cs.cache.Set(news.Link, cachedContent, redisCacheTTL); err != nil {
+				contentScraperLogger.Warn("Ошибка сохранения в Redis кэш для новости ID=%d: %v", news.ID, err)
+			} else {
+				contentScraperLogger.Debug("Контент новости ID=%d сохранен в Redis кэш", news.ID)
+			}
+		}
 	}
 
 	// Преобразуем metaData в map[string]string для сохранения
@@ -132,7 +201,7 @@ func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scr
 	}
 
 	// Сохраняем контент
-	err = db.SaveNewsContent(
+	err := db.SaveNewsContent(
 		cs.db,
 		news.ID,
 		content.FullText,

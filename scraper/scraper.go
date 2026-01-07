@@ -2,6 +2,8 @@ package scraper
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +20,20 @@ import (
 
 var scraperLogger = monitoring.NewLogger("Scraper")
 
+// Глобальный оптимизированный HTTP клиент для переиспользования соединений
+var httpClient = &http.Client{
+	Timeout: 15 * time.Second, // Сократили таймаут с 45 до 15 секунд
+	Transport: &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,  // Увеличили с 10 до 20
+		IdleConnTimeout:     90 * time.Second,
+		DisableKeepAlives:   false,
+		DisableCompression:  false, // Включаем сжатие
+	},
+}
+
+const maxContentSize = 2 * 1024 * 1024 // Максимальный размер контента 2MB
+
 // NewsContent содержит полный контент новости со страницы
 type NewsContent struct {
 	FullText      string            // Полный текст новости
@@ -32,51 +48,79 @@ type NewsContent struct {
 	ContentHTML   string            // HTML контента статьи (для будущего анализа)
 }
 
+
 // ScrapeNewsContent парсит страницу новости и извлекает полный контент
 // Использует библиотеку go-readability (порт Mozilla Readability.js) для качественного извлечения контента
 func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 	scraperLogger.Debug("Начинаем парсинг страницы: %s", articleURL)
 
-	// Загружаем страницу с retry логикой
-	client := &http.Client{
-		Timeout: 45 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 10,
-			IdleConnTimeout:     90 * time.Second,
-		},
-	}
-
 	var resp *http.Response
 	var err error
-	maxRetries := 2
+	maxRetries := 3 // Увеличили количество попыток
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		resp, err = client.Get(articleURL)
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Создаем контекст с таймаутом для каждого запроса
+		ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+		defer cancel()
+
+		req, reqErr := http.NewRequestWithContext(ctx, "GET", articleURL, nil)
+		if reqErr != nil {
+			return nil, fmt.Errorf("ошибка создания запроса: %w", reqErr)
+		}
+
+		// Добавляем заголовки для лучшей совместимости с сайтами
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; NewsBot/1.0; +https://github.com/kaevdokimov/tg-rss)")
+		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		req.Header.Set("Accept-Language", "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7")
+		req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+		req.Header.Set("Cache-Control", "no-cache")
+
+		resp, err = httpClient.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			break
 		}
 
-		if attempt < maxRetries {
-			scraperLogger.Debug("Попытка %d/%d не удалась для %s: %v. Повтор через 1 сек", attempt+1, maxRetries+1, articleURL, err)
-			time.Sleep(1 * time.Second)
+		if attempt < maxRetries-1 {
+			// Экспоненциальная задержка между попытками
+			delay := time.Duration(attempt+1) * time.Second
+			scraperLogger.Debug("Попытка %d/%d не удалась для %s: %v. Повтор через %v", attempt+1, maxRetries, articleURL, err, delay)
+			time.Sleep(delay)
 			continue
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("ошибка загрузки страницы после %d попыток: %w", maxRetries+1, err)
+			return nil, fmt.Errorf("ошибка загрузки страницы после %d попыток: %w", maxRetries, err)
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			return nil, fmt.Errorf("неверный статус код после %d попыток: %d", maxRetries+1, resp.StatusCode)
+			return nil, fmt.Errorf("неверный статус код после %d попыток: %d", maxRetries, resp.StatusCode)
 		}
 	}
 	defer resp.Body.Close()
 
+	// Читаем body с поддержкой сжатия и ограничением размера
+	var reader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка создания gzip reader: %w", err)
+		}
+		defer gzipReader.Close()
+		reader = gzipReader
+	}
+
+	// Ограничиваем размер читаемых данных для предотвращения перегрузки памяти
+	limitedReader := io.LimitReader(reader, maxContentSize)
+
 	// Читаем body в память для повторного использования
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка чтения body: %w", err)
+	}
+
+	// Проверяем, не был ли контент обрезан из-за лимита
+	if len(bodyBytes) >= maxContentSize {
+		scraperLogger.Warn("Контент страницы %s был обрезан из-за превышения лимита %d байт", articleURL, maxContentSize)
 	}
 
 	// Парсим URL для передачи в readability

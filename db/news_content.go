@@ -116,7 +116,7 @@ func GetNewsForScraping(db *sql.DB, limit int) ([]NewsForScraping, error) {
 		FROM news
 		WHERE (scrape_status IS NULL OR scrape_status = 'pending' OR scrape_status = 'failed')
 		  AND published_at > NOW() - INTERVAL '7 days' -- только новости за последние 7 дней
-		ORDER BY id DESC
+		ORDER BY published_at DESC, id DESC -- сортировка по дате публикации для приоритета свежих новостей
 		LIMIT $1
 	`
 

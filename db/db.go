@@ -270,10 +270,16 @@ func InitSchema(db *sql.DB) {
 		UNIQUE (chat_id, news_id)
 	);
 
-	-- Индексы
+	-- Индексы для оптимизации производительности
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_url ON sources (url);
+	CREATE INDEX IF NOT EXISTS idx_news_link ON news (link); -- для быстрой проверки дубликатов
 	CREATE INDEX IF NOT EXISTS idx_news_published_at ON news (published_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_news_scrape_status ON news (scrape_status);
+	CREATE INDEX IF NOT EXISTS idx_news_scrape_status_published ON news (scrape_status, published_at DESC); -- композитный индекс для GetNewsForScraping
+	CREATE INDEX IF NOT EXISTS idx_news_source_id ON news (source_id);
+	CREATE INDEX IF NOT EXISTS idx_subscriptions_chat_id ON subscriptions (chat_id);
+	CREATE INDEX IF NOT EXISTS idx_subscriptions_source_id ON subscriptions (source_id);
+	CREATE INDEX IF NOT EXISTS idx_messages_chat_id_sent ON messages (chat_id, sent_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_news_id_desc ON news (id DESC);
 	CREATE INDEX IF NOT EXISTS idx_news_tsvector ON news USING GIN (tvs);
 
