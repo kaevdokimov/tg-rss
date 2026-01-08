@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	readability "github.com/go-shiori/go-readability"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/andybalholm/brotli"
 )
 
 var scraperLogger = monitoring.NewLogger("Scraper")
@@ -32,7 +34,93 @@ var httpClient = &http.Client{
 	},
 }
 
+// SetDisableCompression отключает сжатие для HTTP клиента (для дебага)
+func SetDisableCompression(disable bool) {
+	httpClient.Transport.(*http.Transport).DisableCompression = disable
+}
+
 const maxContentSize = 2 * 1024 * 1024 // Максимальный размер контента 2MB
+
+// peekReader позволяет заглянуть вперед в поток данных для определения типа сжатия
+type peekReader struct {
+	reader io.Reader
+	buf    []byte
+	pos    int
+}
+
+func (pr *peekReader) Read(p []byte) (n int, err error) {
+	if pr.pos < len(pr.buf) {
+		n = copy(p, pr.buf[pr.pos:])
+		pr.pos += n
+		return n, nil
+	}
+	return pr.reader.Read(p)
+}
+
+func (pr *peekReader) peek(n int) ([]byte, error) {
+	if pr.pos >= len(pr.buf) {
+		buf := make([]byte, n)
+		m, err := pr.reader.Read(buf)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		pr.buf = append(pr.buf, buf[:m]...)
+	}
+	return pr.buf[:min(len(pr.buf), n)], nil
+}
+
+func (pr *peekReader) isGzip() bool {
+	data, _ := pr.peek(2)
+	return len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b
+}
+
+func (pr *peekReader) isDeflate() bool {
+	data, _ := pr.peek(1)
+	return len(data) >= 1 && data[0]&0x0f == 0x08 // ZLIB header
+}
+
+func (pr *peekReader) isBrotli() bool {
+	data, _ := pr.peek(4)
+	if len(data) < 4 {
+		return false
+	}
+	// Brotli magic bytes: 0xCE, 0xB2, 0xCF, 0x81 (little-endian)
+	return data[0] == 0xce && data[1] == 0xb2 && data[2] == 0xcf && data[3] == 0x81
+}
+
+// isCompressedData проверяет, являются ли данные сжатыми
+func isCompressedData(reader io.Reader) bool {
+	peekReader := &peekReader{reader: reader}
+	data, _ := peekReader.peek(4)
+	if len(data) < 2 {
+		return false
+	}
+
+	// Gzip magic bytes: 0x1F 0x8B
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		return true
+	}
+
+	// ZLIB (deflate) magic bytes: первый байт должен быть 0x78 (метод сжатия deflate)
+	// Второй байт содержит уровень сжатия
+	if len(data) >= 2 && data[0] == 0x78 && (data[1] == 0x01 || data[1] == 0x5e || data[1] == 0x9c || data[1] == 0xda) {
+		return true
+	}
+
+	// Brotli magic bytes: 0xCE 0xB2 0xCF 0x81 (little-endian)
+	if len(data) >= 4 && data[0] == 0xce && data[1] == 0xb2 && data[2] == 0xcf && data[3] == 0x81 {
+		return true
+	}
+
+	return false
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 // removeNullBytes удаляет null байты из строки
 func removeNullBytes(s string) string {
@@ -105,13 +193,67 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 
 	// Читаем body с поддержкой сжатия и ограничением размера
 	var reader io.Reader = resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
+	contentEncoding := resp.Header.Get("Content-Encoding")
+
+	// Логируем заголовки для диагностики проблем со сжатием
+	scraperLogger.Debug("HTTP Response - Status: %s, Content-Encoding: %s, Content-Type: %s, Content-Length: %s",
+		resp.Status, contentEncoding, resp.Header.Get("Content-Type"), resp.Header.Get("Content-Length"))
+
+	switch strings.ToLower(contentEncoding) {
+	case "gzip":
 		gzipReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("ошибка создания gzip reader: %w", err)
 		}
 		defer gzipReader.Close()
 		reader = gzipReader
+		scraperLogger.Debug("Распаковываем данные с использованием gzip")
+
+	case "deflate":
+		flateReader := flate.NewReader(resp.Body)
+		defer flateReader.Close()
+		reader = flateReader
+		scraperLogger.Debug("Распаковываем данные с использованием deflate")
+
+	case "br", "brotli":
+		brReader := brotli.NewReader(resp.Body)
+		reader = brReader
+		scraperLogger.Debug("Распаковываем данные с использованием brotli")
+
+	case "":
+		// Нет сжатия, используем тело как есть
+		scraperLogger.Debug("Данные без сжатия")
+
+	default:
+		scraperLogger.Warn("Неизвестный тип сжатия: %s, пробуем обработать как обычные данные", contentEncoding)
+		// Пробуем определить сжатие автоматически
+		if isCompressedData(resp.Body) {
+			scraperLogger.Debug("Обнаружены сжатые данные без указания Content-Encoding, пробуем распаковать")
+			// Читаем первые байты для определения типа сжатия
+			peekReader := &peekReader{reader: resp.Body}
+			if peekReader.isGzip() {
+				gzipReader, err := gzip.NewReader(peekReader)
+				if err == nil {
+					defer gzipReader.Close()
+					reader = gzipReader
+					scraperLogger.Debug("Автоматически распаковали как gzip")
+				} else {
+					reader = peekReader
+				}
+			} else if peekReader.isDeflate() {
+				flateReader := flate.NewReader(peekReader)
+				defer flateReader.Close()
+				reader = flateReader
+				scraperLogger.Debug("Автоматически распаковали как deflate")
+			} else if peekReader.isBrotli() {
+				brReader := brotli.NewReader(peekReader)
+				reader = brReader
+				scraperLogger.Debug("Автоматически распаковали как brotli")
+			} else {
+				reader = peekReader
+				scraperLogger.Warn("Не удалось определить тип сжатия, используем данные как есть")
+			}
+		}
 	}
 
 	// Ограничиваем размер читаемых данных для предотвращения перегрузки памяти
