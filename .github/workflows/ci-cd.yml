@@ -207,9 +207,9 @@ jobs:
           TIMEOUT=60
 
           # Content scraper configuration
-          CONTENT_SCRAPER_INTERVAL=2
-          CONTENT_SCRAPER_BATCH=20
-          CONTENT_SCRAPER_CONCURRENT=6
+          CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL }}
+          CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH }}
+          CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT }}
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
           EOL
 
@@ -245,9 +245,9 @@ jobs:
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
 
           # Content scraper configuration
-          CONTENT_SCRAPER_INTERVAL=2
-          CONTENT_SCRAPER_BATCH=20
-          CONTENT_SCRAPER_CONCURRENT=6
+          CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL }}
+          CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH }}
+          CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT }}
           EOF
 
           # Сначала логинимся в GitHub Container Registry локально
