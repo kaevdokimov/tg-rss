@@ -95,7 +95,7 @@
     - name: Ждем готовности PostgreSQL
       shell: |
         for i in {1..30}; do
-          if docker exec db pg_isready -U tg_rss -d tg_rss >/dev/null 2>&1; then
+          if docker exec db pg_isready -U postgres -d news_bot >/dev/null 2>&1; then
             echo "PostgreSQL готов"
             exit 0
           fi
