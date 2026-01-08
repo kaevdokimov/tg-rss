@@ -100,7 +100,7 @@ def main():
             # иначе MAX_NEWS_LIMIT для обратной совместимости
             # Увеличиваем лимит для лучшего анализа тем
             max_news_limit = int(os.getenv("ANALYZER_MAX_NEWS_LIMIT",
-                                          os.getenv("MAX_NEWS_LIMIT", "2000")))
+                                          os.getenv("MAX_NEWS_LIMIT", "2400")))
             if len(news_items) > max_news_limit:
                 logger.warning(
                     f"Обнаружено {len(news_items)} новостей, что превышает лимит {max_news_limit}. "
