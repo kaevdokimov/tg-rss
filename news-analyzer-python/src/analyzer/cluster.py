@@ -1,7 +1,7 @@
 """Кластеризация новостей с помощью HDBSCAN."""
 
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import numpy as np
 import hdbscan
 
@@ -33,7 +33,7 @@ class NewsClusterer:
         self.clusterer = None
         self._fitted = False
     
-    def fit_predict(self, vectors: List[List[float]]) -> List[int]:
+    def fit_predict(self, vectors: List[List[float]]) -> Tuple[List[int], int, int, List[int]]:
         """
         Выполняет кластеризацию векторов.
         

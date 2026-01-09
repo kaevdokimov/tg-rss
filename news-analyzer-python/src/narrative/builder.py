@@ -33,7 +33,8 @@ class NarrativeBuilder:
         news_items: List[NewsItem],
         labels: List[int],
         vectorizer: "TextVectorizer",
-        top_n: int = 5
+        top_n: int = 5,
+        processed_texts: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         Строит нарративы из кластеров.
@@ -72,7 +73,8 @@ class NarrativeBuilder:
                 news_items,
                 indices,
                 vectorizer,
-                cluster_id
+                cluster_id,
+                processed_texts
             )
             narratives.append(narrative)
         
@@ -84,7 +86,8 @@ class NarrativeBuilder:
         news_items: List[NewsItem],
         indices: List[int],
         vectorizer: "TextVectorizer",
-        cluster_id: int
+        cluster_id: int,
+        processed_texts: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Строит один нарратив из кластера.
@@ -101,7 +104,11 @@ class NarrativeBuilder:
         cluster_news = [news_items[i] for i in indices]
         
         # Извлекаем ключевые слова через улучшенный TF-IDF внутри кластера
-        texts = [item.title for item in cluster_news]
+        # Используем предобработанные тексты, если они доступны, иначе - сырые заголовки
+        if processed_texts:
+            texts = [processed_texts[i] for i in indices]
+        else:
+            texts = [item.title for item in cluster_news]
         try:
             # Используем более качественные параметры для извлечения ключевых слов
             cluster_vectorizer = TfidfVectorizer(
@@ -138,8 +145,8 @@ class NarrativeBuilder:
             top_indices = combined_scores.argsort()[-self.top_keywords:][::-1]
             keywords = [feature_names[i] for i in top_indices]
 
-            # Фильтруем слишком короткие или слишком длинные слова
-            keywords = [kw for kw in keywords if 2 <= len(kw) <= 50]  # Ослабляем фильтр
+            # Фильтруем слишком короткие или слишком длинные слова (исключаем 2-буквенные слова)
+            keywords = [kw for kw in keywords if 3 <= len(kw) <= 50]
 
             # Если после фильтрации не осталось ключевых слов, используем fallback
             if not keywords:
@@ -150,10 +157,20 @@ class NarrativeBuilder:
             logger.warning(f"Ошибка при извлечении ключевых слов через TF-IDF: {e}")
             # Fallback: используем улучшенную частотную модель
             all_words = []
+            # Расширенный список стоп-слов для fallback (включает все предлоги, союзы и короткие слова)
+            extended_stopwords = {
+                # Предлоги
+                'в', 'из', 'на', 'для', 'по', 'а', 'от', 'с', 'у', 'о', 'к', 'до', 'после', 'перед', 'между', 'во', 'над', 'под', 'при', 'без', 'за', 'об', 'из-за',
+                # Союзы
+                'и', 'или', 'если', 'то', 'либо', 'нибудь', 'кое', 'как', 'что', 'это', 'его', 'её', 'их',
+                # Другие короткие слова
+                'не', 'да', 'ну', 'ой', 'ах', 'ох', 'ух', 'во', 'со', 'ко', 'го', 'то', 'же', 'бы', 'ли', 'ни'
+            }
+
             for text in texts:
                 words = text.lower().split()
-                # Фильтруем стоп-слова и короткие слова
-                filtered_words = [w for w in words if len(w) >= 3 and w not in ['что', 'как', 'для', 'при', 'из', 'на', 'по', 'со', 'во']]
+                # Фильтруем стоп-слова и короткие слова (минимум 3 символа)
+                filtered_words = [w for w in words if len(w) >= 3 and w not in extended_stopwords]
                 all_words.extend(filtered_words)
             word_freq = Counter(all_words)
             keywords = [word for word, _ in word_freq.most_common(self.top_keywords)]

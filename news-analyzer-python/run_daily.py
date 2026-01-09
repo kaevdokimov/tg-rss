@@ -141,13 +141,15 @@ def main():
                             executor.submit(preprocess_func, item): idx 
                             for idx, item in enumerate(news_items)
                         }
-                        # Создаем список результатов нужного размера
-                        processed_texts = [None] * len(news_items)
-                        # Собираем результаты в правильном порядке
+                        # Собираем результаты
+                        processed_texts = []
+                        success_count = 0
                         for future in as_completed(future_to_index):
                             idx = future_to_index[future]
                             try:
-                                processed_texts[idx] = future.result()
+                                result = future.result()
+                                processed_texts.append(result)
+                                success_count += 1
                             except Exception as e:
                                 logger.error(f"Ошибка при предобработке текста для элемента {idx}: {e}")
                                 # Fallback: обрабатываем последовательно при ошибке
@@ -159,6 +161,20 @@ def main():
                                         text = f"{item.title} {item.description}"
                                     processed_texts.append(cleaner.preprocess(text))
                                 break
+
+                        # Если параллельная обработка завершилась успешно, проверяем что все элементы обработаны
+                        if len(processed_texts) == len(news_items) and success_count == len(news_items):
+                            logger.info("Параллельная обработка завершена успешно")
+                        else:
+                            # Если не все элементы обработаны, используем последовательную обработку
+                            logger.warning("Параллельная обработка не завершена полностью, переключаемся на последовательную")
+                            processed_texts = []
+                            for item in news_items:
+                                if settings.use_titles_only:
+                                    text = item.title
+                                else:
+                                    text = f"{item.title} {item.description}"
+                                processed_texts.append(cleaner.preprocess(text))
                 except Exception as e:
                     logger.warning(f"Ошибка при параллельной обработке, переключаемся на последовательную: {e}")
                     # Fallback: последовательная обработка
@@ -216,7 +232,8 @@ def main():
                     news_items=news_items,
                     labels=labels,
                     vectorizer=vectorizer,
-                    top_n=settings.top_narratives
+                    top_n=settings.top_narratives,
+                    processed_texts=processed_texts
                 )
                 print(f"DEBUG: Построено {len(narratives)} нарративов из {n_clusters} кластеров")
                 logger.info(f"Построено {len(narratives)} нарративов из {n_clusters} кластеров")
