@@ -1,6 +1,6 @@
 """Построение нарративов (тем) из кластеров новостей."""
 
-from typing import List, Dict, Any, TYPE_CHECKING
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from collections import Counter
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
