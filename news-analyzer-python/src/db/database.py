@@ -23,6 +23,7 @@ class NewsItem:
     published_at: datetime
     full_text: Optional[str] = None
     source_id: Optional[int] = None
+    source_name: Optional[str] = None
 
 
 @dataclass
@@ -148,35 +149,39 @@ class Database:
         if use_titles_only:
             # Используем только заголовки для анализа
             query = sql.SQL("""
-                SELECT 
-                    id,
-                    title,
-                    description,
-                    link,
-                    published_at,
-                    full_text,
-                    source_id
-                FROM {}
-                WHERE published_at >= %s
-                  AND title IS NOT NULL
-                  AND title != ''
-                ORDER BY published_at DESC
+                SELECT
+                    n.id,
+                    n.title,
+                    n.description,
+                    n.link,
+                    n.published_at,
+                    n.full_text,
+                    n.source_id,
+                    s.name as source_name
+                FROM {} n
+                LEFT JOIN sources s ON n.source_id = s.id
+                WHERE n.published_at >= %s
+                  AND n.title IS NOT NULL
+                  AND n.title != ''
+                ORDER BY n.published_at DESC
             """).format(sql.Identifier(table_name))
         else:
             # Используем заголовки и описание
             query = sql.SQL("""
-                SELECT 
-                    id,
-                    title,
-                    description,
-                    link,
-                    published_at,
-                    full_text,
-                    source_id
-                FROM {}
-                WHERE published_at >= %s
-                  AND (title IS NOT NULL AND title != '')
-                ORDER BY published_at DESC
+                SELECT
+                    n.id,
+                    n.title,
+                    n.description,
+                    n.link,
+                    n.published_at,
+                    n.full_text,
+                    n.source_id,
+                    s.name as source_name
+                FROM {} n
+                LEFT JOIN sources s ON n.source_id = s.id
+                WHERE n.published_at >= %s
+                  AND (n.title IS NOT NULL AND n.title != '')
+                ORDER BY n.published_at DESC
             """).format(sql.Identifier(table_name))
         
         try:
@@ -193,7 +198,8 @@ class Database:
                         link=row["link"],
                         published_at=row["published_at"],
                         full_text=row.get("full_text"),
-                        source_id=row.get("source_id")
+                        source_id=row.get("source_id"),
+                        source_name=row.get("source_name")
                     )
                     news_items.append(news_item)
                 

@@ -65,10 +65,12 @@ class SummaryGenerator:
             lines.append("-" * 60)
             lines.append(f"Ключевые слова: {', '.join(narrative['keywords'][:5])}")
             lines.append("")
-            lines.append("Примеры заголовков:")
-            for title in narrative['titles'][:3]:
-                lines.append(f"  • {title}")
-            lines.append("")
+            lines.append("Примеры новостей:")
+            for news_item in narrative.get('news_examples', [])[:3]:
+                lines.append(f"  📄 {news_item['title']}")
+                lines.append(f"  📰 Источник: {news_item['source_name']}")
+                lines.append(f"  🔗 {news_item['link']}")
+                lines.append("")
         
         lines.append("=" * 60)
         

@@ -175,13 +175,19 @@ class NarrativeBuilder:
             word_freq = Counter(all_words)
             keywords = [word for word, _ in word_freq.most_common(self.top_keywords)]
         
-        # Репрезентативные заголовки (первые N)
-        titles = [item.title for item in cluster_news[:self.top_titles]]
-        
+        # Репрезентативные новости (первые N)
+        news_examples = []
+        for item in cluster_news[:self.top_titles]:
+            news_examples.append({
+                "title": item.title,
+                "link": item.link,
+                "source_name": item.source_name or "Неизвестный источник"
+            })
+
         return {
             "cluster_id": cluster_id,
             "size": len(cluster_news),
             "keywords": keywords,
-            "titles": titles,
+            "news_examples": news_examples,
             "news_count": len(cluster_news)
         }
