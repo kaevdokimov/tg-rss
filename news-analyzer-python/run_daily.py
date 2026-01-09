@@ -240,12 +240,16 @@ def main():
                     min_df=settings.min_df,
                     max_df=settings.max_df
                 )
+                logger.info(f"Начинаем векторизацию {len(processed_texts)} текстов...")
                 vectors = vectorizer.fit_transform(processed_texts)
                 logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
 
                 if not vectors or len(vectors) == 0:
                     logger.error("Векторизация вернула пустой результат!")
                     return
+
+                # Проверяем качество векторов
+                logger.info(f"Проверка векторов: тип={type(vectors)}, форма={vectors.shape if hasattr(vectors, 'shape') else 'no shape'}")
             except Exception as e:
                 logger.error(f"Ошибка при векторизации: {e}")
                 logger.exception("Подробности ошибки векторизации:")
@@ -260,16 +264,20 @@ def main():
                     min_samples=settings.cluster_min_samples,
                     metric=settings.cluster_metric
                 )
+                logger.info("Запуск кластеризации HDBSCAN...")
                 labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
                 logger.info(f"Кластеризация завершена: {n_clusters} кластеров, {n_noise} шумовых точек")
+                logger.info(f"Метки кластеров: {len(labels)} элементов, уникальные: {len(unique_labels)}")
             except Exception as e:
                 logger.error(f"Ошибка при кластеризации: {e}")
                 raise
             
             # 4. Построение нарративов
             logger.info("Построение нарративов...")
+            logger.info(f"Количество новостей: {len(news_items)}, меток: {len(labels)}")
             try:
                 narrative_builder = NarrativeBuilder()
+                logger.info("Инициализация NarrativeBuilder...")
                 narratives = narrative_builder.build_narratives(
                     news_items=news_items,
                     labels=labels,
@@ -277,8 +285,8 @@ def main():
                     top_n=settings.top_narratives,
                     processed_texts=processed_texts
                 )
+                logger.info(f"Нарративы построены: {len(narratives)} из {n_clusters} кластеров")
                 print(f"DEBUG: Построено {len(narratives)} нарративов из {n_clusters} кластеров")
-                logger.info(f"Построено {len(narratives)} нарративов из {n_clusters} кластеров")
             except Exception as e:
                 print(f"DEBUG: Ошибка при построении нарративов: {e}")
                 logger.error(f"Ошибка при построении нарративов: {e}")
@@ -351,6 +359,7 @@ def main():
 
             # 6. Отправка отчета в Telegram всем подписанным пользователям
             # Используется отдельный бот для отправки отчетов (TELEGRAM_SIGNAL_API_KEY)
+            logger.info("Проверка токена Telegram...")
             telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
             logger.info(f"TELEGRAM_SIGNAL_API_KEY: {'установлен' if telegram_token else 'НЕ установлен'}")
 
@@ -395,6 +404,9 @@ def main():
         except Exception as e:
             logger.error(f"Критическая ошибка в основной логике анализа: {e}")
             logger.exception("Подробности ошибки:")
+            logger.error(f"Тип ошибки: {type(e).__name__}")
+            import traceback
+            logger.error(f"Трассировка:\n{traceback.format_exc()}")
             raise
             
         finally:
