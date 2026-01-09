@@ -28,9 +28,14 @@ NLTK_DATA_DIR="${NLTK_DATA:-/app/nltk_data}"
 mkdir -p "$NLTK_DATA_DIR"
 log "Директория NLTK: $NLTK_DATA_DIR"
 
-# Инициализируем NLTK данные, если еще не загружены
+# Проверяем, загружены ли NLTK данные
 log "Проверка данных NLTK..."
-python setup_nltk.py || log "ПРЕДУПРЕЖДЕНИЕ: Не удалось загрузить данные NLTK"
+if python -c "import nltk; nltk.data.find('tokenizers/punkt')" 2>/dev/null; then
+    log "✓ NLTK punkt данные найдены"
+else
+    log "Загрузка данных NLTK..."
+    python setup_nltk.py || log "ПРЕДУПРЕЖДЕНИЕ: Не удалось загрузить данные NLTK"
+fi
 
 # Определяем расписание запусков (по умолчанию 3:00, 9:00, 12:00, 15:00, 21:00)
 # Формат: "HH:MM,HH:MM" или через переменную ANALYZER_SCHEDULE_TIMES

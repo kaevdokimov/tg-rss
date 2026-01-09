@@ -13,9 +13,14 @@ import os
 def main():
     """Загружает необходимые данные NLTK."""
     print("Загрузка данных NLTK...")
-    
+
     # Устанавливаем директорию для данных NLTK
     nltk_data_dir = os.getenv("NLTK_DATA", "/app/nltk_data")
+
+    # Добавляем директорию в пути поиска NLTK
+    if nltk_data_dir not in nltk.data.path:
+        nltk.data.path.insert(0, nltk_data_dir)
+        print(f"Добавлен путь NLTK: {nltk_data_dir}")
     if not os.path.exists(nltk_data_dir):
         try:
             os.makedirs(nltk_data_dir, exist_ok=True)

@@ -24,6 +24,12 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="hdbscan")
 # Добавляем src в путь для импортов
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+# Настраиваем NLTK
+import nltk
+nltk_data_dir = os.getenv("NLTK_DATA", "/app/nltk_data")
+if nltk_data_dir not in nltk.data.path:
+    nltk.data.path.insert(0, nltk_data_dir)
+
 from datetime import datetime
 
 from src.config import load_settings
