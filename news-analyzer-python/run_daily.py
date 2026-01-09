@@ -208,27 +208,50 @@ def main():
             non_empty_texts = [t for t in processed_texts if t.strip()]
             logger.info(f"Непустых текстов после предобработки: {len(non_empty_texts)} из {len(processed_texts)}")
 
+            # Проверяем, что processed_texts не пустые
+            if not processed_texts or len(processed_texts) == 0:
+                logger.error("processed_texts пустой!")
+                return
+
+            # Проверяем первые несколько текстов
+            sample_texts = processed_texts[:3]
+            logger.info(f"Примеры обработанных текстов: {sample_texts}")
+
             if len(non_empty_texts) < 10:
                 logger.warning("Слишком мало непустых текстов для качественного анализа")
 
             # 2. Векторизация
             logger.info("Векторизация текстов...")
-            vectorizer = TextVectorizer(
-                max_features=settings.max_features,
-                min_df=settings.min_df,
-                max_df=settings.max_df
-            )
-            vectors = vectorizer.fit_transform(processed_texts)
-            logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
+            try:
+                vectorizer = TextVectorizer(
+                    max_features=settings.max_features,
+                    min_df=settings.min_df,
+                    max_df=settings.max_df
+                )
+                vectors = vectorizer.fit_transform(processed_texts)
+                logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
+
+                if not vectors or len(vectors) == 0:
+                    logger.error("Векторизация вернула пустой результат!")
+                    return
+            except Exception as e:
+                logger.error(f"Ошибка при векторизации: {e}")
+                raise
             
             # 3. Кластеризация
             logger.info("Кластеризация новостей...")
-            clusterer = NewsClusterer(
-                min_cluster_size=settings.cluster_min_size,
-                min_samples=settings.cluster_min_samples,
-                metric=settings.cluster_metric
-            )
-            labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
+            logger.info(f"Количество векторов для кластеризации: {len(vectors)}")
+            try:
+                clusterer = NewsClusterer(
+                    min_cluster_size=settings.cluster_min_size,
+                    min_samples=settings.cluster_min_samples,
+                    metric=settings.cluster_metric
+                )
+                labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
+                logger.info(f"Кластеризация завершена: {n_clusters} кластеров, {n_noise} шумовых точек")
+            except Exception as e:
+                logger.error(f"Ошибка при кластеризации: {e}")
+                raise
             
             # 4. Построение нарративов
             logger.info("Построение нарративов...")
@@ -315,7 +338,8 @@ def main():
             # 6. Отправка отчета в Telegram всем подписанным пользователям
             # Используется отдельный бот для отправки отчетов (TELEGRAM_SIGNAL_API_KEY)
             telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
-            
+            logger.info(f"TELEGRAM_SIGNAL_API_KEY: {'установлен' if telegram_token else 'НЕ установлен'}")
+
             if telegram_token:
                 try:
                     logger.info("Получение списка пользователей из БД...")
@@ -353,6 +377,11 @@ def main():
             logger.info("Анализ завершен успешно")
             logger.info(f"Отчет сохранен: {report_path}")
             logger.info("=" * 60)
+
+        except Exception as e:
+            logger.error(f"Критическая ошибка в основной логике анализа: {e}")
+            logger.exception("Подробности ошибки:")
+            raise
             
         finally:
             db.disconnect()
