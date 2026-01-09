@@ -30,6 +30,13 @@ nltk_data_dir = os.getenv("NLTK_DATA", "/app/nltk_data")
 if nltk_data_dir not in nltk.data.path:
     nltk.data.path.insert(0, nltk_data_dir)
 
+# Проверяем доступность NLTK данных
+try:
+    nltk.data.find('tokenizers/punkt')
+    logger.info("✓ NLTK punkt данные найдены")
+except LookupError:
+    logger.warning("✗ NLTK punkt данные не найдены, будет использоваться fallback токенизация")
+
 from datetime import datetime
 
 from src.config import load_settings
@@ -54,7 +61,14 @@ def main():
         logger.info("=" * 60)
         logger.info("Запуск анализа новостей")
         logger.info("=" * 60)
-        
+
+        # Проверяем критически важные переменные окружения
+        telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
+        if not telegram_token:
+            logger.warning("⚠️ TELEGRAM_SIGNAL_API_KEY не установлен - отчеты не будут отправляться в Telegram")
+        else:
+            logger.info("✓ TELEGRAM_SIGNAL_API_KEY установлен")
+
         settings = load_settings()
         
         # Создаем необходимые директории
