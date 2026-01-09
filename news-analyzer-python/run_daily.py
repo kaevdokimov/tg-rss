@@ -61,6 +61,13 @@ def main():
         ensure_dir(settings.reports_dir)
         ensure_dir(settings.logs_dir)
         
+        # Проверяем настройки Telegram бота
+        telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
+        if not telegram_token:
+            logger.warning("TELEGRAM_SIGNAL_API_KEY не установлен - отчеты не будут отправляться в Telegram")
+        else:
+            logger.info("Telegram бот настроен для отправки отчетов")
+
         # Подключаемся к БД
         logger.info("Подключение к базе данных...")
         db = Database(settings.get_db_connection_string())
@@ -104,9 +111,9 @@ def main():
             # чтобы избежать перегрузки сервера
             # Используем ANALYZER_MAX_NEWS_LIMIT для контейнера, если установлена,
             # иначе MAX_NEWS_LIMIT для обратной совместимости
-            # Увеличиваем лимит для лучшего анализа тем
+            # Временно уменьшаем лимит для стабильности работы
             max_news_limit = int(os.getenv("ANALYZER_MAX_NEWS_LIMIT",
-                                          os.getenv("MAX_NEWS_LIMIT", "2400")))
+                                          os.getenv("MAX_NEWS_LIMIT", "1200")))
             if len(news_items) > max_news_limit:
                 logger.warning(
                     f"Обнаружено {len(news_items)} новостей, что превышает лимит {max_news_limit}. "
@@ -219,12 +226,17 @@ def main():
 
             if len(non_empty_texts) < 10:
                 logger.warning("Слишком мало непустых текстов для качественного анализа")
+                return
 
             # 2. Векторизация
             logger.info("Векторизация текстов...")
             try:
+                # Уменьшаем max_features для контейнера с ограниченными ресурсами
+                max_features = min(settings.max_features, 10000)  # Ограничиваем до 10k признаков
+                logger.info(f"Используем max_features={max_features}")
+
                 vectorizer = TextVectorizer(
-                    max_features=settings.max_features,
+                    max_features=max_features,
                     min_df=settings.min_df,
                     max_df=settings.max_df
                 )
@@ -236,6 +248,7 @@ def main():
                     return
             except Exception as e:
                 logger.error(f"Ошибка при векторизации: {e}")
+                logger.exception("Подробности ошибки векторизации:")
                 raise
             
             # 3. Кластеризация
@@ -334,7 +347,8 @@ def main():
             
             # Выводим резюме в консоль и логи
             logger.info("\n" + summary)
-            
+            logger.info(f"Отчет готов к отправке. Длина: {len(summary)} символов")
+
             # 6. Отправка отчета в Telegram всем подписанным пользователям
             # Используется отдельный бот для отправки отчетов (TELEGRAM_SIGNAL_API_KEY)
             telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
