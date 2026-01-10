@@ -34,8 +34,8 @@ class SummaryGenerator:
         lines.append(f"КАРТА ДНЯ - {analysis_date.strftime('%d.%m.%Y')}")
         lines.append("=" * 60)
         lines.append("")
-        lines.append(f"📰 Всего новостей: {total_news}")
-        lines.append(f"🎯 Выявлено тем: {len(narratives)}")
+        lines.append(f"Всего новостей: {total_news}")
+        lines.append(f"Выявлено тем: {len(narratives)}")
 
         # Проверяем, есть ли темы
         if len(narratives) == 0:
@@ -59,7 +59,7 @@ class SummaryGenerator:
             lines.append("")
 
         lines.append("")
-        
+
         for idx, narrative in enumerate(narratives, 1):
             lines.append(f"ТЕМА #{idx} (новостей: {narrative['size']})")
             lines.append("-" * 60)
@@ -67,9 +67,9 @@ class SummaryGenerator:
             lines.append("")
             lines.append("Примеры новостей:")
             for news_item in narrative.get('news_examples', [])[:3]:
-                lines.append(f"  📄 {news_item['title']}")
-                lines.append(f"  📰 Источник: {news_item['source_name']}")
-                lines.append(f"  🔗 {news_item['link']}")
+                lines.append(f"  Заголовок: {news_item['title']}")
+                lines.append(f"  Источник: {news_item['source_name']}")
+                lines.append(f"  Ссылка: {news_item['link']}")
                 lines.append("")
         
         lines.append("=" * 60)

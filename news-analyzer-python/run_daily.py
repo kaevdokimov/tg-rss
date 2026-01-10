@@ -396,14 +396,17 @@ def main():
                     else:
                         logger.info(f"Найдено {len(users)} пользователей. Отправка отчетов...")
                         
-                        # Создаем notifier
-                        notifier = TelegramNotifier(bot_token=telegram_token)
+                        # Создаем notifier (без markdown для надежности)
+                        notifier = TelegramNotifier(bot_token=telegram_token, parse_mode=None)
                         
                         # Получаем список chat_id
                         chat_ids = [user.chat_id for user in users]
                         
-                        # Отправляем текстовое резюме всем пользователям
-                        results = notifier.send_message_to_all(chat_ids, summary)
+                        # Отправляем текстовое резюме всем пользователям (с автоматическим разбиением на части при необходимости)
+                        results = {}
+                        for chat_id in chat_ids:
+                            success = notifier.send_summary(chat_id, summary)
+                            results[chat_id] = success
                         
                         # Статистика отправки
                         successful = sum(1 for success in results.values() if success)
