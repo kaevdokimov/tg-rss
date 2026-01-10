@@ -249,7 +249,7 @@ def main():
             logger.info("Векторизация текстов...")
             try:
                 # Уменьшаем max_features для контейнера с ограниченными ресурсами
-                max_features = min(settings.max_features, 10000)  # Ограничиваем до 10k признаков
+                max_features = min(settings.max_features, 5000)  # Ограничиваем до 5k признаков для экономии памяти
                 logger.info(f"Используем max_features={max_features}")
 
                 vectorizer = TextVectorizer(
@@ -258,6 +258,7 @@ def main():
                     max_df=settings.max_df
                 )
                 logger.info(f"Начинаем векторизацию {len(processed_texts)} текстов...")
+                logger.info(f"Векторизация {len(processed_texts)} текстов с {max_features} признаками...")
                 vectors = vectorizer.fit_transform(processed_texts)
                 logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
 
@@ -267,6 +268,11 @@ def main():
 
                 # Проверяем качество векторов
                 logger.info(f"Проверка векторов: тип={type(vectors)}, форма={vectors.shape if hasattr(vectors, 'shape') else 'no shape'}")
+
+                # Оцениваем использование памяти
+                if hasattr(vectors, 'shape'):
+                    estimated_memory_mb = (vectors.shape[0] * vectors.shape[1] * 4) / (1024 * 1024)  # float32 = 4 bytes
+                    logger.info(f"Оценка использования памяти векторами: {estimated_memory_mb:.1f} MB")
             except Exception as e:
                 logger.error(f"Ошибка при векторизации: {e}")
                 logger.exception("Подробности ошибки векторизации:")
