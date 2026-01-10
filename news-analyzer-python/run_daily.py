@@ -57,12 +57,18 @@ def main():
         logger.info("Запуск анализа новостей")
         logger.info("=" * 60)
 
-        # Проверяем доступность NLTK данных
+        # Проверяем и загружаем NLTK данные
         try:
             nltk.data.find('tokenizers/punkt')
             logger.info("✓ NLTK punkt данные найдены")
         except LookupError:
-            logger.warning("✗ NLTK punkt данные не найдены, будет использоваться fallback токенизация")
+            logger.warning("✗ NLTK punkt данные не найдены, пытаемся загрузить...")
+            try:
+                nltk.download('punkt', quiet=True)
+                logger.info("✓ NLTK punkt данные успешно загружены")
+            except Exception as e:
+                logger.error(f"✗ Не удалось загрузить NLTK punkt данные: {e}")
+                logger.warning("Будет использоваться fallback токенизация")
 
         # Проверяем критически важные переменные окружения
         telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
