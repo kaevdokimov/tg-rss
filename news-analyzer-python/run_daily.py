@@ -349,19 +349,11 @@ def main():
                         # Получаем список chat_id
                         chat_ids = [user.chat_id for user in users]
                         
-                        # Сначала попробуем отправить тестовое сообщение для проверки токена
-                        logger.info("Тестирование отправки в Telegram...")
-                        test_success = notifier.send_message(chat_ids[0], "🧪 Тестовое сообщение от анализатора новостей")
-                        if not test_success:
-                            logger.error("Тестовое сообщение не отправлено - проблема с токеном или ботом")
-                            results = {chat_id: False for chat_id in chat_ids}
-                        else:
-                            logger.info("✓ Тестовое сообщение отправлено успешно")
-                            # Отправляем текстовое резюме всем пользователям
-                            results = {}
-                            for chat_id in chat_ids:
-                                success = notifier.send_summary(chat_id, summary)
-                                results[chat_id] = success
+                        # Отправляем текстовое резюме всем пользователям
+                        results = {}
+                        for chat_id in chat_ids:
+                            success = notifier.send_themes_separately(chat_id, narratives, total_news, analysis_date, clustering_metrics)
+                            results[chat_id] = success
                         
                         # Статистика отправки
                         successful = sum(1 for success in results.values() if success)

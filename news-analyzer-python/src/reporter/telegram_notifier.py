@@ -334,6 +334,112 @@ class TelegramNotifier:
 
             return success
 
+    def send_themes_separately(
+        self,
+        chat_id: int,
+        narratives: List[Dict[str, Any]],
+        total_news: int,
+        analysis_date: datetime,
+        clustering_metrics: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Отправляет каждую тему отдельным сообщением.
+
+        Args:
+            chat_id: ID чата для отправки
+            narratives: Список нарративов
+            total_news: Общее количество новостей
+            analysis_date: Дата анализа
+            clustering_metrics: Метрики кластеризации
+
+        Returns:
+            True если успешно, False в противном случае
+        """
+        try:
+            logger.info(f"Отправка {len(narratives)} тем отдельными сообщениями")
+
+            # Сначала отправляем заголовок с общей информацией
+            header_text = self._format_analysis_header(total_news, len(narratives), analysis_date, clustering_metrics)
+            if not self.send_message(chat_id, header_text):
+                logger.error("Не удалось отправить заголовок анализа")
+                return False
+
+            # Затем отправляем каждую тему отдельно
+            for idx, narrative in enumerate(narratives, 1):
+                theme_text = self._format_single_theme(narrative, idx)
+                if not self.send_message(chat_id, theme_text):
+                    logger.error(f"Не удалось отправить тему #{idx}")
+                    return False
+
+                # Небольшая задержка между сообщениями
+                import time
+                time.sleep(0.1)
+
+            logger.info(f"Успешно отправлено {len(narratives)} тем")
+            return True
+
+        except Exception as e:
+            logger.error(f"Ошибка при отправке тем отдельно: {e}")
+            return False
+
+    def _format_analysis_header(
+        self,
+        total_news: int,
+        themes_count: int,
+        analysis_date: datetime,
+        clustering_metrics: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Форматирует заголовок анализа."""
+        lines = []
+        lines.append("=" * 60)
+        lines.append(f"КАРТА ДНЯ - {analysis_date.strftime('%d.%m.%Y')}")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append(f"Всего новостей: {total_news}")
+        lines.append(f"Выявлено тем: {themes_count}")
+
+        if clustering_metrics:
+            lines.append("")
+            lines.append("📊 Метрики кластеризации:")
+            lines.append(f"   • Кластеров: {clustering_metrics.get('total_clusters', 0)}")
+            lines.append(f"   • Шумовых точек: {clustering_metrics.get('noise_points', 0)} ({clustering_metrics.get('noise_percentage', 0):.1f}%)")
+            if clustering_metrics.get('total_clusters', 0) > 0:
+                lines.append(f"   • Средний размер кластера: {clustering_metrics.get('avg_cluster_size', 0):.1f}")
+                lines.append(f"   • Максимальный кластер: {clustering_metrics.get('max_cluster_size', 0)} новостей")
+                lines.append(f"   • Минимальный кластер: {clustering_metrics.get('min_cluster_size', 0)} новостей")
+
+        lines.append("")
+        lines.append("Каждая тема будет отправлена отдельным сообщением.")
+        lines.append("=" * 60)
+
+        return "\n".join(lines)
+
+    def _format_single_theme(self, narrative: Dict[str, Any], theme_number: int) -> str:
+        """Форматирует одну тему для отправки."""
+        lines = []
+
+        size = narrative.get('size', 0)
+        keywords = narrative.get('keywords', [])[:5]
+        news_examples = narrative.get('news_examples', [])[:3]  # Показываем до 3 примеров
+
+        lines.append(f"ТЕМА #{theme_number} (новостей: {size})")
+        lines.append("-" * 60)
+        lines.append(f"Ключевые слова: {', '.join(keywords)}")
+        lines.append("")
+        lines.append("Примеры новостей:")
+
+        for news_item in news_examples:
+            title = news_item.get('title', '')
+            source_name = news_item.get('source_name', 'Неизвестный источник')
+            link = news_item.get('link', '')
+
+            lines.append(title)
+            lines.append(source_name)
+            lines.append(link)
+            lines.append("")
+
+        return "\n".join(lines)
+
     def _split_by_topics(self, text: str, max_length: int) -> List[str]:
         """
         Разбивает текст на части по темам для лучшей читаемости.
