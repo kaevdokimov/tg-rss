@@ -154,76 +154,16 @@ def main():
                     text = f"{item.title} {item.description}"
                 return cleaner.preprocess(text)
             
-            # Используем параллельную обработку для больших объемов данных
-            # Для малых объемов последовательная обработка быстрее из-за накладных расходов
-            # Используем ThreadPoolExecutor вместо ProcessPoolExecutor для избежания проблем с сериализацией
-            if len(news_items) > 100:
-                logger.info("Используется параллельная обработка текста...")
-                max_workers = min(4, os.cpu_count() or 1)  # Ограничиваем количество потоков
-                preprocess_func = partial(preprocess_item, use_titles_only=settings.use_titles_only)
-                
-                processed_texts = []
-                try:
-                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                        # Отправляем задачи и сохраняем соответствие индексов
-                        future_to_index = {
-                            executor.submit(preprocess_func, item): idx 
-                            for idx, item in enumerate(news_items)
-                        }
-                        # Собираем результаты
-                        processed_texts = []
-                        success_count = 0
-                        for future in as_completed(future_to_index):
-                            idx = future_to_index[future]
-                            try:
-                                result = future.result()
-                                processed_texts.append(result)
-                                success_count += 1
-                            except Exception as e:
-                                logger.error(f"Ошибка при предобработке текста для элемента {idx}: {e}")
-                                # Fallback: обрабатываем последовательно при ошибке
-                                processed_texts = []
-                                for item in news_items:
-                                    if settings.use_titles_only:
-                                        text = item.title
-                                    else:
-                                        text = f"{item.title} {item.description}"
-                                    processed_texts.append(cleaner.preprocess(text))
-                                break
-
-                        # Если параллельная обработка завершилась успешно, проверяем что все элементы обработаны
-                        if len(processed_texts) == len(news_items) and success_count == len(news_items):
-                            logger.info("Параллельная обработка завершена успешно")
-                        else:
-                            # Если не все элементы обработаны, используем последовательную обработку
-                            logger.warning("Параллельная обработка не завершена полностью, переключаемся на последовательную")
-                            processed_texts = []
-                            for item in news_items:
-                                if settings.use_titles_only:
-                                    text = item.title
-                                else:
-                                    text = f"{item.title} {item.description}"
-                                processed_texts.append(cleaner.preprocess(text))
-                except Exception as e:
-                    logger.warning(f"Ошибка при параллельной обработке, переключаемся на последовательную: {e}")
-                    # Fallback: последовательная обработка
-                    processed_texts = []
-                    for item in news_items:
-                        if settings.use_titles_only:
-                            text = item.title
-                        else:
-                            text = f"{item.title} {item.description}"
-                        processed_texts.append(cleaner.preprocess(text))
-            else:
-                # Последовательная обработка для малых объемов
-                processed_texts = []
-                for item in news_items:
-                    if settings.use_titles_only:
-                        text = item.title
-                    else:
-                        text = f"{item.title} {item.description}"
-                    processed = cleaner.preprocess(text)
-                    processed_texts.append(processed)
+            # Используем последовательную обработку для надежности (параллельная вызывает проблемы с NLTK)
+            logger.info("Используется последовательная обработка текста...")
+            processed_texts = []
+            for item in news_items:
+                if settings.use_titles_only:
+                    text = item.title
+                else:
+                    text = f"{item.title} {item.description}"
+                processed = cleaner.preprocess(text)
+                processed_texts.append(processed)
             
             logger.info(f"Предобработано {len(processed_texts)} текстов")
 
