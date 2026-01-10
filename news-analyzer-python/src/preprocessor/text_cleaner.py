@@ -10,6 +10,39 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Флаг для отслеживания загрузки NLTK данных
+_nltk_initialized = False
+
+def _ensure_nltk_data():
+    """Обеспечивает загрузку необходимых NLTK данных."""
+    global _nltk_initialized
+    if _nltk_initialized:
+        return
+
+    try:
+        # Проверяем punkt
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        logger.warning("Загружаем NLTK punkt данные...")
+        try:
+            nltk.download('punkt', quiet=True)
+            logger.info("✓ NLTK punkt данные загружены")
+        except Exception as e:
+            logger.error(f"Не удалось загрузить NLTK punkt: {e}")
+
+    try:
+        # Проверяем stopwords
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        logger.warning("Загружаем NLTK stopwords...")
+        try:
+            nltk.download('stopwords', quiet=True)
+            logger.info("✓ NLTK stopwords загружены")
+        except Exception as e:
+            logger.error(f"Не удалось загрузить NLTK stopwords: {e}")
+
+    _nltk_initialized = True
+
 # Загружаем стоп-слова для русского языка
 try:
     russian_stopwords = set(stopwords.words("russian"))
@@ -75,21 +108,24 @@ class TextCleaner:
     def tokenize(self, text: str) -> List[str]:
         """
         Токенизирует текст и фильтрует стоп-слова.
-        
+
         Args:
             text: Очищенный текст
-            
+
         Returns:
             Список токенов
         """
         if not text:
             return []
-        
+
+        # Обеспечиваем загрузку NLTK данных
+        _ensure_nltk_data()
+
         try:
             # Токенизация
             tokens = word_tokenize(text, language="russian")
         except LookupError:
-            logger.warning("NLTK punkt не найден. Запустите: python -m nltk.downloader punkt")
+            logger.warning("NLTK punkt все еще не найден после загрузки, используем fallback")
             # Простая токенизация по пробелам
             tokens = text.split()
         

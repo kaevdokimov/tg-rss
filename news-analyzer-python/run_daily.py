@@ -66,11 +66,31 @@ def main():
         except LookupError:
             logger.warning("✗ NLTK punkt данные не найдены, пытаемся загрузить...")
             try:
-                nltk.download('punkt', quiet=True)
+                # Принудительная загрузка punkt с указанием директории
+                nltk.download('punkt', download_dir=nltk_data_dir, quiet=False)
+                # Повторная проверка после загрузки
+                nltk.data.find('tokenizers/punkt')
                 logger.info("✓ NLTK punkt данные успешно загружены")
             except Exception as e:
                 logger.error(f"✗ Не удалось загрузить NLTK punkt данные: {e}")
                 logger.warning("Будет использоваться fallback токенизация")
+                # Попытка загрузки без указания директории
+                try:
+                    nltk.download('punkt', quiet=False)
+                    logger.info("✓ NLTK punkt данные загружены в стандартную директорию")
+                except Exception as e2:
+                    logger.error(f"✗ Даже стандартная загрузка NLTK punkt не удалась: {e2}")
+
+        # Дополнительная проверка и принудительная загрузка stopwords
+        try:
+            nltk.data.find('corpora/stopwords')
+        except LookupError:
+            logger.warning("Загружаем NLTK stopwords...")
+            try:
+                nltk.download('stopwords', download_dir=nltk_data_dir, quiet=True)
+                logger.info("✓ NLTK stopwords загружены")
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить stopwords: {e}")
 
         # Проверяем критически важные переменные окружения
         telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
@@ -352,7 +372,7 @@ def main():
                         # Отправляем текстовое резюме всем пользователям
                         results = {}
                         for chat_id in chat_ids:
-                            success = notifier.send_themes_separately(chat_id, narratives, total_news, analysis_date, clustering_metrics)
+                            success = notifier.send_themes_separately(chat_id, narratives, len(news_items), analysis_date, clustering_metrics)
                             results[chat_id] = success
                         
                         # Статистика отправки
