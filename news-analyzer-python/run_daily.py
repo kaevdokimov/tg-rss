@@ -20,6 +20,8 @@ import time
 # Подавляем предупреждения SyntaxWarning из библиотеки hdbscan
 # Это предупреждение связано с форматированием строк в самой библиотеке
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="hdbscan")
+# Также подавляем все SyntaxWarning для надежности
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 # Добавляем src в путь для импортов
 sys.path.insert(0, str(Path(__file__).parent / "src"))

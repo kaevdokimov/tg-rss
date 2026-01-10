@@ -34,41 +34,72 @@ class TelegramNotifier:
     def send_message(self, chat_id: int, text: str, disable_notification: bool = False) -> bool:
         """
         Отправляет текстовое сообщение в Telegram конкретному пользователю.
-        
+
         Args:
             chat_id: ID чата для отправки
             text: Текст сообщения
             disable_notification: Отключить уведомление
-            
+
         Returns:
             True если успешно, False в противном случае
         """
         try:
             url = f"{self.api_url}/sendMessage"
+
+            # Временно отключаем parse_mode для диагностики проблем
+            parse_mode = None  # self.parse_mode
+
             payload = {
                 "chat_id": chat_id,
                 "text": text,
-                "parse_mode": self.parse_mode,
+                "parse_mode": parse_mode,
                 "disable_notification": disable_notification
             }
-            
+
+            logger.debug(f"Отправка сообщения в Telegram (chat_id: {chat_id}, длина: {len(text)}, parse_mode: {parse_mode})")
+
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
-            
+
             logger.debug(f"Сообщение успешно отправлено в Telegram (chat_id: {chat_id})")
             return True
-            
+
         except requests.exceptions.HTTPError as e:
+            # Более детальное логирование для диагностики проблем
+            logger.error(f"HTTP ошибка при отправке сообщения (chat_id: {chat_id}): {e}")
+            logger.error(f"URL: {url}")
+            logger.error(f"Статус код: {e.response.status_code}")
+            logger.error(f"Ответ сервера: {e.response.text}")
+
+            # Логируем первые 500 символов текста для диагностики
+            text_preview = text[:500] + "..." if len(text) > 500 else text
+            logger.error(f"Текст сообщения (первые 500 символов): {repr(text_preview)}")
+
             # Обрабатываем специфичные ошибки Telegram API
             if e.response.status_code == 403:
                 logger.warning(f"Бот заблокирован пользователем (chat_id: {chat_id})")
             elif e.response.status_code == 400:
-                logger.warning(f"Некорректный запрос для chat_id {chat_id}: {e}")
+                logger.error(f"Некорректный запрос для chat_id {chat_id}: {e}")
+                # Пробуем отправить без parse_mode, если была проблема с форматированием
+                if self.parse_mode is not None:
+                    logger.info(f"Повторная попытка без parse_mode для chat_id {chat_id}")
+                    try:
+                        payload_no_parse = {
+                            "chat_id": chat_id,
+                            "text": text,
+                            "disable_notification": disable_notification
+                        }
+                        response_retry = requests.post(url, json=payload_no_parse, timeout=10)
+                        response_retry.raise_for_status()
+                        logger.info(f"Сообщение успешно отправлено без parse_mode (chat_id: {chat_id})")
+                        return True
+                    except Exception as retry_e:
+                        logger.error(f"Повторная попытка также неудачна: {retry_e}")
             else:
                 logger.error(f"HTTP ошибка при отправке сообщения (chat_id: {chat_id}): {e}")
             return False
         except requests.exceptions.RequestException as e:
-            logger.error(f"Ошибка при отправке сообщения в Telegram (chat_id: {chat_id}): {e}")
+            logger.error(f"Ошибка сети при отправке сообщения в Telegram (chat_id: {chat_id}): {e}")
             return False
         except Exception as e:
             logger.error(f"Неожиданная ошибка при отправке в Telegram (chat_id: {chat_id}): {e}")
@@ -246,36 +277,59 @@ class TelegramNotifier:
     def send_summary(self, chat_id: int, summary_text: str) -> bool:
         """
         Отправляет текстовое резюме в Telegram конкретному пользователю.
-        
+
         Args:
             chat_id: ID чата для отправки
             summary_text: Текст резюме
-            
+
         Returns:
             True если успешно, False в противном случае
         """
         # Telegram имеет лимит на длину сообщения (4096 символов)
-        # Пробуем отправить одним сообщением, обрезав до безопасного лимита
-        safe_limit = 3500  # Безопасный лимит без разбиения
+        # Учитываем, что заголовки частей тоже занимают место
+        max_length_per_part = 1800  # Еще более консервативный лимит для надежности
 
-        logger.info(f"Отправка сообщения длиной {len(summary_text)} символов")
+        logger.info(f"Отправка сообщения длиной {len(summary_text)} символов (лимит на часть: {max_length_per_part})")
 
-        if len(summary_text) <= safe_limit:
+        if len(summary_text) <= max_length_per_part:
             logger.info("Отправка одним сообщением")
             return self.send_message(chat_id, summary_text)
         else:
-            # Разбиваем на части по темам для лучшей читаемости
-            logger.info("Разбиение на части по темам...")
-            parts = self._split_by_topics(summary_text, safe_limit)
+            # Разбиваем на части по строкам для надежности
+            logger.info("Разбиение на части...")
+            parts = []
+            current_part = ""
 
-            logger.info(f"Создано {len(parts)} частей")
+            for line in summary_text.split("\n"):
+                # Проверяем, не превысит ли добавление строки лимит
+                # Добавляем 1 для символа новой строки
+                if len(current_part) + len(line) + 1 > max_length_per_part:
+                    if current_part:  # Не добавляем пустые части
+                        parts.append(current_part)
+                    current_part = line + "\n"
+                else:
+                    current_part += line + "\n"
+
+            if current_part:  # Добавляем последнюю часть
+                parts.append(current_part)
+
+            logger.info(f"Создано {len(parts)} частей для отправки")
 
             # Отправляем все части
             success = True
             for i, part in enumerate(parts, 1):
                 if len(parts) > 1:
-                    part = f"📊 КАРТА ДНЯ - Часть {i}/{len(parts)}\n\n{part}"
+                    # Убираем эмодзи и Markdown из заголовков частей для надежности
+                    part_header = f"Часть {i}/{len(parts)}\n\n"
+                    # Проверяем, чтобы общая длина части с заголовком не превышала лимит
+                    if len(part_header) + len(part) > 3500:  # Консервативный лимит Telegram
+                        # Если часть все еще слишком длинная, обрезаем ее
+                        part = part[:3500 - len(part_header) - 50] + "\n\n[Сообщение было обрезано]"
+                        logger.warning(f"Часть {i} была обрезана из-за превышения лимита Telegram.")
+                    part = part_header + part
                     logger.info(f"Отправка части {i}/{len(parts)} (длина: {len(part)})")
+                else:
+                    logger.info(f"Отправка единственной части (длина: {len(part)})")
 
                 if not self.send_message(chat_id, part):
                     success = False
