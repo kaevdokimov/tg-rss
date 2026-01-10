@@ -46,17 +46,14 @@ class TelegramNotifier:
         try:
             url = f"{self.api_url}/sendMessage"
 
-            # Временно отключаем parse_mode для диагностики проблем
-            parse_mode = None  # self.parse_mode
-
+            # Полностью убираем parse_mode из запроса для совместимости
             payload = {
                 "chat_id": chat_id,
                 "text": text,
-                "parse_mode": parse_mode,
                 "disable_notification": disable_notification
             }
 
-            logger.debug(f"Отправка сообщения в Telegram (chat_id: {chat_id}, длина: {len(text)}, parse_mode: {parse_mode})")
+            logger.debug(f"Отправка сообщения в Telegram (chat_id: {chat_id}, длина: {len(text)})")
 
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
