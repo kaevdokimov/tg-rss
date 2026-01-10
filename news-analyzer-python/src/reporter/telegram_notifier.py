@@ -255,42 +255,21 @@ class TelegramNotifier:
             True если успешно, False в противном случае
         """
         # Telegram имеет лимит на длину сообщения (4096 символов)
-        max_length = 2000  # Еще больше уменьшаем с учетом заголовков частей
+        # Пробуем отправить одним сообщением, обрезав до безопасного лимита
+        safe_limit = 3500  # Безопасный лимит без разбиения
 
-        logger.info(f"Отправка сообщения длиной {len(summary_text)} символов (лимит {max_length})")
+        logger.info(f"Отправка сообщения длиной {len(summary_text)} символов")
 
-        if len(summary_text) <= max_length:
+        if len(summary_text) <= safe_limit:
             logger.info("Отправка одним сообщением")
             return self.send_message(chat_id, summary_text)
         else:
-            # Разбиваем на части
-            logger.info("Разбиение на части...")
-            parts = []
-            current_part = ""
+            # Обрезаем сообщение до безопасного лимита вместо разбиения
+            truncated_text = summary_text[:safe_limit]
+            # Обеспечиваем, что обрезание происходит на конце строки
+            if '\n' in truncated_text[-100:]:
+                last_newline = truncated_text.rfind('\n')
+                truncated_text = truncated_text[:last_newline]
 
-            for line in summary_text.split("\n"):
-                if len(current_part) + len(line) + 1 > max_length:
-                    parts.append(current_part)
-                    current_part = line + "\n"
-                else:
-                    current_part += line + "\n"
-
-            if current_part:
-                parts.append(current_part)
-
-            logger.info(f"Создано {len(parts)} частей для отправки")
-
-            # Отправляем все части
-            success = True
-            for i, part in enumerate(parts, 1):
-                if len(parts) > 1:
-                    part = f"Часть {i}/{len(parts)}\n\n{part}"
-                    logger.info(f"Отправка части {i}/{len(parts)} (длина: {len(part)})")
-                else:
-                    logger.info(f"Отправка единственной части (длина: {len(part)})")
-
-                if not self.send_message(chat_id, part):
-                    success = False
-                    logger.error(f"Не удалось отправить часть {i}")
-
-            return success
+            logger.info(f"Сообщение обрезано до {len(truncated_text)} символов")
+            return self.send_message(chat_id, truncated_text + "\n\n[Сообщение было обрезано для соответствия лимитам Telegram]")
