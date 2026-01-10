@@ -18,7 +18,7 @@ class TelegramNotifier:
     def __init__(
         self,
         bot_token: str,
-        parse_mode: str = "Markdown"
+        parse_mode: Optional[str] = None
     ):
         """
         Инициализация notifier.

@@ -59,7 +59,6 @@ def main():
 
         # Проверяем доступность NLTK данных
         try:
-            import nltk
             nltk.data.find('tokenizers/punkt')
             logger.info("✓ NLTK punkt данные найдены")
         except LookupError:
@@ -267,11 +266,11 @@ def main():
                     return
 
                 # Проверяем качество векторов
-                logger.info(f"Проверка векторов: тип={type(vectors)}, форма={vectors.shape if hasattr(vectors, 'shape') else 'no shape'}")
+                logger.info(f"Проверка векторов: тип={type(vectors)}, длина={len(vectors) if vectors else 0}")
 
-                # Оцениваем использование памяти
-                if hasattr(vectors, 'shape'):
-                    estimated_memory_mb = (vectors.shape[0] * vectors.shape[1] * 4) / (1024 * 1024)  # float32 = 4 bytes
+                # Оцениваем использование памяти (примерно)
+                if vectors and len(vectors) > 0 and vectors[0]:
+                    estimated_memory_mb = (len(vectors) * len(vectors[0]) * 4) / (1024 * 1024)  # float32 = 4 bytes
                     logger.info(f"Оценка использования памяти векторами: {estimated_memory_mb:.1f} MB")
             except Exception as e:
                 logger.error(f"Ошибка при векторизации: {e}")
