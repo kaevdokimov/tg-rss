@@ -264,12 +264,58 @@ class TelegramNotifier:
             logger.info("Отправка одним сообщением")
             return self.send_message(chat_id, summary_text)
         else:
-            # Обрезаем сообщение до безопасного лимита вместо разбиения
-            truncated_text = summary_text[:safe_limit]
-            # Обеспечиваем, что обрезание происходит на конце строки
-            if '\n' in truncated_text[-100:]:
-                last_newline = truncated_text.rfind('\n')
-                truncated_text = truncated_text[:last_newline]
+            # Разбиваем на части по темам для лучшей читаемости
+            logger.info("Разбиение на части по темам...")
+            parts = self._split_by_topics(summary_text, safe_limit)
 
-            logger.info(f"Сообщение обрезано до {len(truncated_text)} символов")
-            return self.send_message(chat_id, truncated_text + "\n\n[Сообщение было обрезано для соответствия лимитам Telegram]")
+            logger.info(f"Создано {len(parts)} частей")
+
+            # Отправляем все части
+            success = True
+            for i, part in enumerate(parts, 1):
+                if len(parts) > 1:
+                    part = f"📊 КАРТА ДНЯ - Часть {i}/{len(parts)}\n\n{part}"
+                    logger.info(f"Отправка части {i}/{len(parts)} (длина: {len(part)})")
+
+                if not self.send_message(chat_id, part):
+                    success = False
+                    logger.error(f"Не удалось отправить часть {i}")
+
+            return success
+
+    def _split_by_topics(self, text: str, max_length: int) -> List[str]:
+        """
+        Разбивает текст на части по темам для лучшей читаемости.
+
+        Args:
+            text: Полный текст отчета
+            max_length: Максимальная длина одной части
+
+        Returns:
+            Список частей текста
+        """
+        lines = text.split('\n')
+        parts = []
+        current_part = ""
+
+        for line in lines:
+            # Если это начало новой темы
+            if line.startswith('ТЕМА #') or line.startswith('============================================================'):
+                # Если текущая часть не пустая и достаточно большая, сохраняем её
+                if current_part and len(current_part) > max_length * 0.7:
+                    parts.append(current_part.rstrip())
+                    current_part = ""
+
+            # Добавляем строку к текущей части
+            if len(current_part) + len(line) + 1 > max_length:
+                if current_part:
+                    parts.append(current_part.rstrip())
+                current_part = line + "\n"
+            else:
+                current_part += line + "\n"
+
+        # Добавляем последнюю часть
+        if current_part:
+            parts.append(current_part.rstrip())
+
+        return parts
