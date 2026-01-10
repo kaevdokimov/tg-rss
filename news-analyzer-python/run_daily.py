@@ -402,8 +402,8 @@ def main():
                         # Получаем список chat_id
                         chat_ids = [user.chat_id for user in users]
                         
-                        # Отправляем отчет всем пользователям
-                        results = notifier.send_report_to_all(chat_ids, report_path)
+                        # Отправляем текстовое резюме всем пользователям
+                        results = notifier.send_message_to_all(chat_ids, summary)
                         
                         # Статистика отправки
                         successful = sum(1 for success in results.values() if success)

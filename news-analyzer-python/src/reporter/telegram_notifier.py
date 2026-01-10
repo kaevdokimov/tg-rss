@@ -215,21 +215,23 @@ class TelegramNotifier:
             for idx, narrative in enumerate(narratives[:5], 1):  # Топ-5
                 size = narrative.get("size", 0)
                 keywords = narrative.get("keywords", [])[:5]  # Первые 5 ключевых слов
-                titles = narrative.get("titles", [])[:2]  # Первые 2 заголовка
-                
+                news_examples = narrative.get("news_examples", [])[:2]  # Первые 2 примера новостей
+
                 lines.append(f"*{idx}. Тема #{narrative.get('cluster_id', idx-1)}* ({size} новостей)")
-                
+
                 if keywords:
                     keywords_str = ", ".join(keywords)
                     lines.append(f"🔑 Ключевые слова: {keywords_str}")
-                
-                if titles:
+
+                if news_examples:
                     lines.append("📰 Примеры:")
-                    for title in titles:
-                        # Обрезаем длинные заголовки
-                        title_short = title[:80] + "..." if len(title) > 80 else title
-                        lines.append(f"  • {title_short}")
-                
+                    for news_item in news_examples:
+                        title = news_item.get("title", "")
+                        source_name = news_item.get("source_name", "Неизвестный источник")
+                        # Обрезаем длинные заголовки для Telegram
+                        title_short = title[:60] + "..." if len(title) > 60 else title
+                        lines.append(f"  • {title_short} ({source_name})")
+
                 lines.append("")
         else:
             lines.append("⚠️ Темы не найдены")
