@@ -108,11 +108,9 @@ RUN rm -f /tmp/requirements.txt && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Устанавливаем PYTHONPATH для поиска пакетов
-ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
+ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages:/app/nltk_data
 # Устанавливаем директорию для данных NLTK
 ENV NLTK_DATA=/app/nltk_data
-# Добавляем в PYTHONPATH директорию данных NLTK для поиска
-ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages:/app/nltk_data
 
 # Копируем исходный код
 COPY --chown=appuser:appuser . .

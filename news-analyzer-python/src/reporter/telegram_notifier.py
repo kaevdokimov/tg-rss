@@ -254,7 +254,7 @@ class TelegramNotifier:
             True если успешно, False в противном случае
         """
         # Telegram имеет лимит на длину сообщения (4096 символов)
-        max_length = 4000
+        max_length = 3500  # Уменьшаем для надежности
         
         if len(summary_text) <= max_length:
             return self.send_message(chat_id, summary_text)
@@ -277,7 +277,7 @@ class TelegramNotifier:
             success = True
             for i, part in enumerate(parts, 1):
                 if len(parts) > 1:
-                    part = f"*Часть {i}/{len(parts)}*\n\n{part}"
+                    part = f"Часть {i}/{len(parts)}\n\n{part}"
                 if not self.send_message(chat_id, part):
                     success = False
             
