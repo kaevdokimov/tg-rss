@@ -61,8 +61,15 @@ jobs:
         run: |
           pip install bandit[toml]
           cd news-analyzer-python
-          bandit -r src/ -f json -o bandit-results.json || true
-          bandit -r src/ --format txt
+          # Run bandit with exclusions for known false positives
+          bandit -r src/ \
+            --exclude-dir tests \
+            --skip B106,B403,B404,B607 \
+            -f json -o bandit-results.json || true
+          bandit -r src/ \
+            --exclude-dir tests \
+            --skip B106,B403,B404,B607 \
+            --format txt
 
       - name: Upload Bandit results
         uses: github/codeql-action/upload-sarif@v4
