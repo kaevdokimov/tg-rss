@@ -10,8 +10,7 @@ import (
 
 // HTTPRateLimiter ограничивает количество одновременных HTTP запросов
 type HTTPRateLimiter struct {
-	semaphore chan struct{} // Семaphore для ограничения одновременных запросов
-	mu        sync.RWMutex
+	semaphore chan struct{} // Semaphore для ограничения одновременных запросов
 }
 
 // NewHTTPRateLimiter создает новый HTTP rate limiter

@@ -63,11 +63,11 @@ jobs:
           cd news-analyzer-python
           # Run bandit with exclusions for known false positives
           bandit -r src/ \
-            --exclude-dir tests \
+            -x tests \
             --skip B106,B403,B404,B607 \
             -f json -o bandit-results.json || true
           bandit -r src/ \
-            --exclude-dir tests \
+            -x tests \
             --skip B106,B403,B404,B607 \
             --format txt
 
@@ -175,11 +175,17 @@ jobs:
       - name: Install Yor (Infrastructure as Code scanner)
         run: |
           # Install Yor via binary download
-          curl -L -o yor.tar.gz https://github.com/bridgecrewio/yor/releases/download/0.1.142/yor_0.1.142_linux_amd64.tar.gz
+          # Get latest release version
+          YOR_VERSION=$(curl -s https://api.github.com/repos/bridgecrewio/yor/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Installing Yor version: $YOR_VERSION"
+
+          # Download and install
+          curl -L -o yor.tar.gz "https://github.com/bridgecrewio/yor/releases/download/${YOR_VERSION}/yor_${YOR_VERSION#v}_linux_amd64.tar.gz"
           tar -xzf yor.tar.gz
           sudo mv yor /usr/local/bin/yor
           sudo chmod +x /usr/local/bin/yor
           rm yor.tar.gz
+          yor --version
 
       - name: Scan Ansible playbooks with Yor
         run: |

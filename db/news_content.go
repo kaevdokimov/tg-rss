@@ -57,10 +57,8 @@ func SaveNewsContent(db *sql.DB, newsID int64, fullText, author, category string
 	}
 
 	// Очищаем metaData от null байтов перед JSON маршалингом
-	if metaData != nil {
-		for key, value := range metaData {
-			metaData[key] = cleanUTF8String(value)
-		}
+	for key, value := range metaData {
+		metaData[key] = cleanUTF8String(value)
 	}
 
 	// Преобразуем metaData в JSON

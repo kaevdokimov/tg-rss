@@ -114,7 +114,7 @@ func SendNewsToSubscribers(db *sql.DB, chatIDs []int64, sourceID int64, title, d
 	if err != nil {
 		return nil, fmt.Errorf("не удалось начать транзакцию: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Проверяем, есть ли уже такая новость в базе
 	var existingNewsID int64
@@ -420,7 +420,8 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 		var existingID int
 		err := db.QueryRow("SELECT id FROM sources WHERE url = $1", update.newURL).Scan(&existingID)
 
-		if err == nil {
+		switch err {
+		case nil:
 			// Новый URL уже существует, удаляем старый источник
 			_, err = db.Exec("DELETE FROM sources WHERE url = $1", update.oldURL)
 			if err != nil {
@@ -455,6 +456,7 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 }
 
 // fixEscapedCharactersInNews исправляет экранированные символы в заголовках новостей
+// TODO: одноразовая миграция - удалить после выполнения или интегрировать в основную логику
 func fixEscapedCharactersInNews(db *sql.DB) {
 	// Исправляем дефисы: заменяем \- на -
 	result, err := db.Exec(`
@@ -488,6 +490,7 @@ func fixEscapedCharactersInNews(db *sql.DB) {
 }
 
 // migrateNewsTable добавляет новые поля для скраппинга к существующей таблице news
+// TODO: миграционная функция - выполнить один раз при развертывании
 func migrateNewsTable(db *sql.DB) {
 	migrationQueries := []string{
 		`ALTER TABLE news ADD COLUMN IF NOT EXISTS full_text TEXT`,
@@ -625,7 +628,7 @@ func FindActiveSources(db *sql.DB) ([]Source, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения активных источников: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sources []Source
 	for rows.Next() {
@@ -685,7 +688,7 @@ func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]NewsWithSource,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var news []NewsWithSource
 	for rows.Next() {
@@ -713,7 +716,7 @@ func GetSubscriptions(db *sql.DB, sourceId int64) ([]Subscription, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения подписок для источника %d: %w", sourceId, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var subscriptions []Subscription
 	for rows.Next() {
@@ -750,7 +753,7 @@ func GetUserSubscriptionsWithDetails(db *sql.DB, chatId int64) ([]Subscription, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var subscriptions []Subscription
 	for rows.Next() {
