@@ -144,7 +144,9 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	if link == "" {
 		msg := tgbotapi.NewMessage(chatId, "❌ Укажите URL источника после команды /add")
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			handlerLogger.Error("Ошибка отправки сообщения о неправильном формате /add", "error", err)
+		}
 		return
 	}
 
@@ -152,7 +154,9 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	if err != nil {
 		msg := tgbotapi.NewMessage(chatId, "❌ Укажите валидный URL источника после команды /add")
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			handlerLogger.Error("Ошибка отправки сообщения о невалидном URL", "error", err)
+		}
 		return
 	}
 
@@ -188,7 +192,9 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 			msg = tgbotapi.NewMessage(chatId, "❌ Не удалось добавить источник.\n\nВозможные причины:\n• Неверный формат URL\n• Источник недоступен\n• Проблема с подключением\n\nПопробуйте позже или проверьте правильность URL.")
 		}
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			handlerLogger.Error("Ошибка отправки сообщения о результате добавления источника", "error", err)
+		}
 		return
 	}
 
