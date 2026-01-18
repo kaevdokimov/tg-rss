@@ -34,14 +34,15 @@ jobs:
 
       - name: Generate notification message
         id: notification
+        env:
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ACTOR: ${{ github.event.workflow_run.triggering_actor.login }}
         run: |
           # Определяем тип уведомления и содержимое
-          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
-          CONCLUSION="${{ github.event.workflow_run.conclusion }}"
-          REPO="${{ github.repository }}"
-          BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
-          RUN_ID="${{ github.event.workflow_run.id }}"
-          ACTOR="${{ github.event.workflow_run.triggering_actor.login }}"
           REPO_URL="https://github.com/$REPO"
 
           # Устанавливаем эмодзи и текст статуса
