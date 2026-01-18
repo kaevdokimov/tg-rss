@@ -51,6 +51,40 @@ func parseSource(source db.Source, tz *time.Location) parseResult {
 	}
 }
 
+// parseSourceWithCircuitBreaker парсит источник с использованием circuit breaker
+func parseSourceWithCircuitBreaker(source db.Source, tz *time.Location) parseResult {
+	var newsList []rss.News
+	var parseErr error
+
+	err := GetRSSCircuitBreaker().Call(func() error {
+		newsList, parseErr = rss.ParseRSSWithClient(source.Url, tz, rssHttpClient)
+		return parseErr
+	})
+
+	if err != nil {
+		// Если circuit breaker открыт, возвращаем ошибку circuit breaker
+		if _, ok := err.(*CircuitBreakerError); ok {
+			return parseResult{
+				source:   source,
+				newsList: nil,
+				err:      err,
+			}
+		}
+		// Иначе возвращаем оригинальную ошибку парсинга
+		return parseResult{
+			source:   source,
+			newsList: nil,
+			err:      parseErr,
+		}
+	}
+
+	return parseResult{
+		source:   source,
+		newsList: newsList,
+		err:      nil,
+	}
+}
+
 // min возвращает минимальное из двух целых чисел
 func min(a, b int) int {
 	if a < b {
@@ -150,7 +184,8 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 			defer wg.Done()
 			rssLogger.Debug("Воркер %d запущен", workerID)
 			for source := range jobs {
-				result := parseSource(source, tz)
+				// Используем circuit breaker для каждого источника
+				result := parseSourceWithCircuitBreaker(source, tz)
 				results <- result
 			}
 			rssLogger.Debug("Воркер %d завершен", workerID)

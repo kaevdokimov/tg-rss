@@ -232,6 +232,54 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 		fmt.Fprintf(w, "# HELP go_threads Number of OS threads\n")
 		fmt.Fprintf(w, "# TYPE go_threads gauge\n")
 		fmt.Fprintf(w, "go_threads %d\n", runtime.NumCPU())
+
+		// Метрики Circuit Breaker
+		metrics := monitoring.GetMetrics()
+		for name, calls := range metrics.CircuitBreakerCalls {
+			fmt.Fprintf(w, "# HELP circuit_breaker_calls_total Total number of calls to circuit breaker %s\n", name)
+			fmt.Fprintf(w, "# TYPE circuit_breaker_calls_total counter\n")
+			fmt.Fprintf(w, "circuit_breaker_calls_total{name=\"%s\"} %d\n", name, calls)
+		}
+
+		for name, failures := range metrics.CircuitBreakerFailures {
+			fmt.Fprintf(w, "# HELP circuit_breaker_failures_total Total number of failures in circuit breaker %s\n", name)
+			fmt.Fprintf(w, "# TYPE circuit_breaker_failures_total counter\n")
+			fmt.Fprintf(w, "circuit_breaker_failures_total{name=\"%s\"} %d\n", name, failures)
+		}
+
+		for name, rejected := range metrics.CircuitBreakerRejected {
+			fmt.Fprintf(w, "# HELP circuit_breaker_rejected_total Total number of rejected requests in circuit breaker %s\n", name)
+			fmt.Fprintf(w, "# TYPE circuit_breaker_rejected_total counter\n")
+			fmt.Fprintf(w, "circuit_breaker_rejected_total{name=\"%s\"} %d\n", name, rejected)
+		}
+
+		// HTTP метрики
+		fmt.Fprintf(w, "# HELP http_requests_total Total number of HTTP requests\n")
+		fmt.Fprintf(w, "# TYPE http_requests_total counter\n")
+		fmt.Fprintf(w, "http_requests_total %d\n", metrics.HTTPRequestsTotal)
+
+		fmt.Fprintf(w, "# HELP http_requests_active Current number of active HTTP requests\n")
+		fmt.Fprintf(w, "# TYPE http_requests_active gauge\n")
+		fmt.Fprintf(w, "http_requests_active %d\n", metrics.HTTPRequestsActive)
+
+		fmt.Fprintf(w, "# HELP http_requests_errors_total Total number of HTTP request errors\n")
+		fmt.Fprintf(w, "# TYPE http_requests_errors_total counter\n")
+		fmt.Fprintf(w, "http_requests_errors_total %d\n", metrics.HTTPRequestsErrors)
+
+		fmt.Fprintf(w, "# HELP http_requests_timeout_total Total number of HTTP request timeouts\n")
+		fmt.Fprintf(w, "# TYPE http_requests_timeout_total counter\n")
+		fmt.Fprintf(w, "http_requests_timeout_total %d\n", metrics.HTTPRequestsTimeout)
+
+		// Content validation метрики
+		fmt.Fprintf(w, "# HELP content_validations_total Total number of content validations\n")
+		fmt.Fprintf(w, "# TYPE content_validations_total counter\n")
+		fmt.Fprintf(w, "content_validations_total %d\n", metrics.ContentValidations)
+
+		for field, errors := range metrics.ContentValidationErrors {
+			fmt.Fprintf(w, "# HELP content_validation_errors_total Total number of content validation errors for %s\n", field)
+			fmt.Fprintf(w, "# TYPE content_validation_errors_total counter\n")
+			fmt.Fprintf(w, "content_validation_errors_total{field=\"%s\"} %d\n", field, errors)
+		}
 	})
 
 	server := &http.Server{

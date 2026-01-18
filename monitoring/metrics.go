@@ -28,18 +28,59 @@ type Metrics struct {
 	DBQueriesTotal  int64
 	DBQueriesErrors int64
 
+	// Circuit Breaker метрики
+	CircuitBreakerCalls    map[string]int64
+	CircuitBreakerFailures map[string]int64
+	CircuitBreakerRejected map[string]int64
+
+	// HTTP метрики
+	HTTPRequestsTotal   int64
+	HTTPRequestsActive  int64
+	HTTPRequestsErrors  int64
+	HTTPRequestsTimeout int64
+
+	// Content validation метрики
+	ContentValidations      int64
+	ContentValidationErrors map[string]int64
+
 	// Время последнего обновления
 	LastUpdate time.Time
 }
 
 var globalMetrics = &Metrics{
-	LastUpdate: time.Now(),
+	CircuitBreakerCalls:     make(map[string]int64),
+	CircuitBreakerFailures:  make(map[string]int64),
+	CircuitBreakerRejected:  make(map[string]int64),
+	ContentValidationErrors: make(map[string]int64),
+	LastUpdate:              time.Now(),
 }
 
 // GetMetrics возвращает текущие метрики
 func GetMetrics() *Metrics {
 	globalMetrics.mu.RLock()
 	defer globalMetrics.mu.RUnlock()
+
+	// Создаем копии map'ов для безопасности
+	cbCalls := make(map[string]int64)
+	cbFailures := make(map[string]int64)
+	cbRejected := make(map[string]int64)
+
+	globalMetrics.mu.RLock()
+	for k, v := range globalMetrics.CircuitBreakerCalls {
+		cbCalls[k] = v
+	}
+	for k, v := range globalMetrics.CircuitBreakerFailures {
+		cbFailures[k] = v
+	}
+	for k, v := range globalMetrics.CircuitBreakerRejected {
+		cbRejected[k] = v
+	}
+	// Копируем метрики content validation
+	contentValidationErrors := make(map[string]int64)
+	for k, v := range globalMetrics.ContentValidationErrors {
+		contentValidationErrors[k] = v
+	}
+	globalMetrics.mu.RUnlock()
 
 	// Возвращаем копию для безопасности
 	return &Metrics{
@@ -54,7 +95,16 @@ func GetMetrics() *Metrics {
 		TelegramCommandsTotal:  globalMetrics.TelegramCommandsTotal,
 		DBQueriesTotal:         globalMetrics.DBQueriesTotal,
 		DBQueriesErrors:        globalMetrics.DBQueriesErrors,
-		LastUpdate:             globalMetrics.LastUpdate,
+		CircuitBreakerCalls:      cbCalls,
+		CircuitBreakerFailures:   cbFailures,
+		CircuitBreakerRejected:   cbRejected,
+		HTTPRequestsTotal:        globalMetrics.HTTPRequestsTotal,
+		HTTPRequestsActive:       globalMetrics.HTTPRequestsActive,
+		HTTPRequestsErrors:       globalMetrics.HTTPRequestsErrors,
+		HTTPRequestsTimeout:      globalMetrics.HTTPRequestsTimeout,
+		ContentValidations:       globalMetrics.ContentValidations,
+		ContentValidationErrors:  contentValidationErrors,
+		LastUpdate:               globalMetrics.LastUpdate,
 	}
 }
 
@@ -214,10 +264,94 @@ func GetDBQueriesErrors() int64 {
 }
 
 // Reset сбрасывает все метрики
+// IncrementCircuitBreakerCalls увеличивает счетчик вызовов circuit breaker
+func IncrementCircuitBreakerCalls(name string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CircuitBreakerCalls[name]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementCircuitBreakerFailures увеличивает счетчик ошибок circuit breaker
+func IncrementCircuitBreakerFailures(name string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CircuitBreakerFailures[name]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementCircuitBreakerRejected увеличивает счетчик отклоненных запросов circuit breaker
+func IncrementCircuitBreakerRejected(name string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CircuitBreakerRejected[name]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementHTTPRequestsTotal увеличивает счетчик общих HTTP запросов
+func IncrementHTTPRequestsTotal() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.HTTPRequestsTotal++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementHTTPRequestsActive увеличивает счетчик активных HTTP запросов
+func IncrementHTTPRequestsActive() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.HTTPRequestsActive++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// DecrementHTTPRequestsActive уменьшает счетчик активных HTTP запросов
+func DecrementHTTPRequestsActive() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.HTTPRequestsActive--
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementHTTPRequestsErrors увеличивает счетчик ошибок HTTP запросов
+func IncrementHTTPRequestsErrors() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.HTTPRequestsErrors++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementHTTPRequestsTimeout увеличивает счетчик таймаутов HTTP запросов
+func IncrementHTTPRequestsTimeout() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.HTTPRequestsTimeout++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementContentValidations увеличивает счетчик успешных валидаций контента
+func IncrementContentValidations() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.ContentValidations++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// IncrementContentValidationErrors увеличивает счетчик ошибок валидации контента
+func IncrementContentValidationErrors(field string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.ContentValidationErrors[field]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
 func Reset() {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
 	globalMetrics = &Metrics{
-		LastUpdate: time.Now(),
+		CircuitBreakerCalls:     make(map[string]int64),
+		CircuitBreakerFailures:  make(map[string]int64),
+		CircuitBreakerRejected:  make(map[string]int64),
+		ContentValidationErrors: make(map[string]int64),
+		LastUpdate:              time.Now(),
 	}
 }

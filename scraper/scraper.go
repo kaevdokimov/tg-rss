@@ -337,6 +337,14 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 	scraperLogger.Debug("Парсинг завершен: текст=%d символов, изображений=%d, тегов=%d",
 		len(content.FullText), len(content.Images), len(content.Tags))
 
+	// Валидируем и санитизируем контент
+	validator := NewContentValidator()
+	if err := validator.ValidateAndSanitizeContent(content); err != nil {
+		scraperLogger.Warn("Валидация контента не удалась для %s: %v", articleURL, err)
+		// Возвращаем ошибку, так как контент не прошел валидацию
+		return nil, fmt.Errorf("content validation failed: %w", err)
+	}
+
 	return content, nil
 }
 

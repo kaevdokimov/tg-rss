@@ -62,11 +62,23 @@ func runSyncPollingCycle(dbConn *sql.DB, tz *time.Location, newsProcessor *NewsP
 
 	// Обрабатываем каждый источник синхронно
 	for _, source := range sources {
-		newsList, err := rss.ParseRSSWithClient(source.Url, tz, rssHttpClient)
+		var newsList []rss.News
+
+		// Используем circuit breaker для защиты от сбоев
+		err := GetRSSCircuitBreaker().Call(func() error {
+			var parseErr error
+			newsList, parseErr = rss.ParseRSSWithClient(source.Url, tz, rssHttpClient)
+			return parseErr
+		})
+
 		if err != nil {
 			monitoring.IncrementRSSPollsErrors()
 			sourcesWithErrors++
-			log.Printf("Ошибка парсинга RSS для источника %s: %v", source.Name, err)
+			if _, ok := err.(*CircuitBreakerError); ok {
+				log.Printf("Circuit breaker открыт для источника %s: %v", source.Name, err)
+			} else {
+				log.Printf("Ошибка парсинга RSS для источника %s: %v", source.Name, err)
+			}
 			continue
 		}
 
