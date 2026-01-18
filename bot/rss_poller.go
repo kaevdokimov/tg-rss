@@ -7,11 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lib/pq"
 	"tg-rss/db"
 	"tg-rss/monitoring"
 	"tg-rss/redis"
 	"tg-rss/rss"
+
+	"github.com/lib/pq"
 )
 
 var rssLogger = monitoring.NewLogger("RSS")
@@ -111,7 +112,8 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 	// Защита от паники - логируем ошибку, но не перезапускаем рекурсивно
 	defer func() {
 		if r := recover(); r != nil {
-			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере: %v. RSS парсинг остановлен", r)
+			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере. RSS парсинг остановлен",
+			"error", r)
 			// Не перезапускаем автоматически, чтобы избежать утечки горутин
 			// Перезапуск должен происходить на уровне оркестратора (systemd, docker, etc.)
 		}
@@ -119,13 +121,13 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 
 	// Первый цикл выполняется сразу
 	if err := runPollingCycle(dbConn, tz, redisProducer, &sourcesCache, &lastCacheUpdate, &firstRun); err != nil {
-		rssLogger.Error("Ошибка в первом цикле парсинга: %v", err)
+		rssLogger.Error("Ошибка в первом цикле парсинга", "error", err)
 	}
 
 	// Последующие циклы по таймеру
 	for range ticker.C {
 		if err := runPollingCycle(dbConn, tz, redisProducer, &sourcesCache, &lastCacheUpdate, &firstRun); err != nil {
-			rssLogger.Error("Ошибка в цикле парсинга: %v", err)
+			rssLogger.Error("Ошибка в цикле парсинга", "error", err)
 		}
 	}
 }
@@ -145,18 +147,21 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 		sources, err = fetchSources(dbConn)
 		if err != nil {
 			monitoring.IncrementRSSPollsErrors()
-			rssLogger.Error("Ошибка при получении источников: %v", err)
+			rssLogger.Error("Ошибка при получении источников", "error", err)
 			return err
 		}
 		*sourcesCache = sources
 		*lastCacheUpdate = time.Now()
-		rssLogger.Info("Кэш источников обновлен: %d источников", len(sources))
+		rssLogger.Info("Кэш источников обновлен",
+			"sources_count", len(sources))
 	} else {
 		sources = *sourcesCache
-		rssLogger.Debug("Используем кэшированные источники: %d источников", len(sources))
+		rssLogger.Debug("Используем кэшированные источники",
+			"sources_count", len(sources))
 	}
 
-	rssLogger.Info("Найдено активных источников: %d", len(sources))
+	rssLogger.Info("Найдено активных источников",
+		"active_sources_count", len(sources))
 
 	totalNewsFound := 0
 	totalNewsSent := 0
@@ -170,7 +175,8 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 		maxWorkers = len(sources)
 	}
 
-	rssLogger.Debug("Запуск параллельного парсинга с %d воркерами", maxWorkers)
+	rssLogger.Debug("Запуск параллельного парсинга",
+		"workers_count", maxWorkers)
 
 	// Каналы для коммуникации между воркерами
 	jobs := make(chan db.Source, len(sources))
@@ -182,13 +188,13 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			rssLogger.Debug("Воркер %d запущен", workerID)
+			rssLogger.Debug("Воркер запущен", "worker_id", workerID)
 			for source := range jobs {
 				// Используем circuit breaker для каждого источника
 				result := parseSourceWithCircuitBreaker(source, tz)
 				results <- result
 			}
-			rssLogger.Debug("Воркер %d завершен", workerID)
+			rssLogger.Debug("Воркер завершен", "worker_id", workerID)
 		}(i)
 	}
 
@@ -210,13 +216,18 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 		if result.err != nil {
 			monitoring.IncrementRSSPollsErrors()
 			sourcesWithErrors++
-			rssLogger.Warn("Ошибка парсинга RSS для источника %s (%s): %v", result.source.Name, result.source.Url, result.err)
+			rssLogger.Warn("Ошибка парсинга RSS для источника",
+			"source_name", result.source.Name,
+			"source_url", result.source.Url,
+			"error", result.err)
 			continue
 		}
 
 		sourcesProcessed++
 		totalNewsFound += len(result.newsList)
-		rssLogger.Debug("Источник %s: найдено новостей %d", result.source.Name, len(result.newsList))
+		rssLogger.Debug("Источник обработан",
+			"source_name", result.source.Name,
+			"news_count", len(result.newsList))
 
 		for _, item := range result.newsList {
 			// Пропускаем старые новости (старше MaxNewsAge)
@@ -255,7 +266,8 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 		return 0
 	}
 
-	rssLogger.Debug("Проверка батча из %d кандидатов на дубликаты", len(candidates))
+	rssLogger.Debug("Проверка батча на дубликаты",
+		"candidates_count", len(candidates))
 
 	// Собираем все ссылки для проверки дубликатов (дедупликация по контенту)
 	var links []string
@@ -275,7 +287,7 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 
 	rows, err := dbConn.Query(query, pq.Array(links))
 	if err != nil {
-		rssLogger.Error("Ошибка батч-проверки дубликатов: %v", err)
+		rssLogger.Error("Ошибка батч-проверки дубликатов", "error", err)
 		// Fallback: обрабатываем по одной новости
 		return processCandidatesSequential(dbConn, redisProducer, candidates)
 	}
@@ -286,7 +298,7 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 	for rows.Next() {
 		var link string
 		if err := rows.Scan(&link); err != nil {
-			rssLogger.Warn("Ошибка чтения результата проверки дубликатов: %v", err)
+			rssLogger.Warn("Ошибка чтения результата проверки дубликатов", "error", err)
 			continue
 		}
 		existingNews[link] = true
@@ -296,7 +308,8 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 	sent := 0
 	for link, candidate := range linkMap {
 		if existingNews[link] {
-			rssLogger.Debug("Новость уже есть в БД, пропускаем: %s", candidate.item.Title)
+			rssLogger.Debug("Новость уже есть в БД, пропускаем",
+				"title", candidate.item.Title)
 			continue
 		}
 
@@ -314,15 +327,19 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 
 		// Отправляем новость в Redis для обработки
 		if err := redisProducer.PublishNews(newsItem); err != nil {
-			rssLogger.Error("Ошибка отправки новости в Redis: %v", err)
+			rssLogger.Error("Ошибка отправки новости в Redis", "error", err)
 			continue
 		}
 
 		sent++
-		rssLogger.Info("Новость отправлена в Redis: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
+		rssLogger.Info("Новость отправлена в Redis",
+			"title", candidate.item.Title,
+			"source", candidate.source.Name)
 	}
 
-	rssLogger.Info("Батч обработан: %d кандидатов, %d отправлено в Redis", len(candidates), sent)
+	rssLogger.Info("Батч обработан",
+		"candidates_count", len(candidates),
+		"sent_to_redis", sent)
 	return sent
 }
 
@@ -338,10 +355,11 @@ func processCandidatesSequential(dbConn *sql.DB, redisProducer *redis.Producer, 
 		`, candidate.item.Link).Scan(&existingNewsID)
 
 		if err == nil {
-			rssLogger.Debug("Новость уже есть в БД, пропускаем: %s", candidate.item.Title)
+			rssLogger.Debug("Новость уже есть в БД, пропускаем",
+				"title", candidate.item.Title)
 			continue // Новость уже есть
 		} else if err != sql.ErrNoRows {
-			rssLogger.Warn("Ошибка проверки дубликата: %v", err)
+			rssLogger.Warn("Ошибка проверки дубликата", "error", err)
 			continue
 		}
 
@@ -358,13 +376,15 @@ func processCandidatesSequential(dbConn *sql.DB, redisProducer *redis.Producer, 
 
 		if err := redisProducer.PublishNews(newsItem); err != nil {
 			monitoring.IncrementRedisErrors()
-			rssLogger.Error("Ошибка отправки новости в Redis: %v", err)
+			rssLogger.Error("Ошибка отправки новости в Redis", "error", err)
 			continue
 		}
 
 		monitoring.IncrementRedisMessagesProduced()
 		sent++
-		rssLogger.Info("Новость отправлена в Redis: %s (источник: %s)", candidate.item.Title, candidate.source.Name)
+		rssLogger.Info("Новость отправлена в Redis",
+			"title", candidate.item.Title,
+			"source", candidate.source.Name)
 	}
 	return sent
 }

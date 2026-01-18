@@ -72,7 +72,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 	// Парсим время публикации
 	publishedAt, err := time.Parse("2006-01-02 15:04:05", newsItem.PublishedAt)
 	if err != nil {
-		newsLogger.Warn("Ошибка парсинга времени: %v", err)
+		newsLogger.Warn("Ошибка парсинга времени", "error", err)
 		publishedAt = time.Now()
 	}
 
@@ -90,19 +90,23 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 		return err
 	}
 
-	newsLogger.Debug("Новость сохранена в БД: ID=%d, Title=%s", newsID, newsItem.Title)
+	newsLogger.Debug("Новость сохранена в БД",
+		"news_id", newsID,
+		"title", newsItem.Title)
 
 	// Проверяем, является ли новость новой (не старше MaxNewsAge)
 	// Это предотвращает отправку старых новостей при первом запуске или перезапуске
 	if time.Since(publishedAt) > MaxNewsAge {
-		newsLogger.Debug("Пропускаем старую новость (старше 24ч): %s от %v", newsItem.Title, publishedAt)
+		newsLogger.Debug("Пропускаем старую новость (старше 24ч)",
+			"title", newsItem.Title,
+			"published_at", publishedAt)
 		return nil
 	}
 
 	// Получение списка пользователей, подписанных на источник (с кэшированием)
 	subscriptions, err := np.getSubscriptionsCached(newsItem.SourceID)
 	if err != nil {
-		newsLogger.Error("Ошибка при получении подписок: %v", err)
+		newsLogger.Error("Ошибка при получении подписок", "error", err)
 		return err
 	}
 
@@ -110,7 +114,9 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 	var sourceUrl string
 	err = np.db.QueryRow("SELECT url FROM sources WHERE id = $1", newsItem.SourceID).Scan(&sourceUrl)
 	if err != nil {
-		newsLogger.Warn("Не удалось получить URL источника %d: %v", newsItem.SourceID, err)
+		newsLogger.Warn("Не удалось получить URL источника",
+			"source_id", newsItem.SourceID,
+			"error", err)
 		sourceUrl = ""
 	}
 
@@ -118,11 +124,11 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 	// Используем news_id вместо source_id + link для дедупликации по контенту
 	newsAlreadySent, err := np.isNewsAlreadySentGlobally(newsID)
 	if err != nil {
-		newsLogger.Error("Ошибка при проверке глобальной отправки новости: %v", err)
+		newsLogger.Error("Ошибка при проверке глобальной отправки новости", "error", err)
 		return err
 	}
 	if newsAlreadySent {
-		newsLogger.Debug("Новость уже была отправлена глобально: %s", newsItem.Title)
+		newsLogger.Debug("Новость уже была отправлена глобально", "title", newsItem.Title)
 		return nil
 	}
 
@@ -133,11 +139,15 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 		// Проверяем, не отправляли ли уже эту новость пользователю
 		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsID)
 		if err != nil {
-			newsLogger.Error("Ошибка при проверке отправленной новости для пользователя %d: %v", subscription.ChatId, err)
+			newsLogger.Error("Ошибка при проверке отправленной новости для пользователя",
+				"user_id", subscription.ChatId,
+				"error", err)
 			continue
 		}
 		if sent {
-			newsLogger.Debug("Новость уже была отправлена пользователю %d: %s", subscription.ChatId, newsItem.Title)
+			newsLogger.Debug("Новость уже была отправлена пользователю",
+				"user_id", subscription.ChatId,
+				"title", newsItem.Title)
 			continue
 		}
 
@@ -154,17 +164,24 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 		}
 		np.pendingNews[subscription.ChatId] = append(np.pendingNews[subscription.ChatId], pending)
 		addedToQueue++
-		newsLogger.Debug("Новость добавлена в очередь для пользователя %d: %s (всего в очереди: %d)",
-			subscription.ChatId, newsItem.Title, len(np.pendingNews[subscription.ChatId]))
+		newsLogger.Debug("Новость добавлена в очередь для пользователя",
+			"user_id", subscription.ChatId,
+			"title", newsItem.Title,
+			"queue_size", len(np.pendingNews[subscription.ChatId]))
 	}
 	np.pendingMutex.Unlock()
 
 	if addedToQueue > 0 {
-		newsLogger.Info("Новость '%s' добавлена в очередь для %d пользователей", newsItem.Title, addedToQueue)
+		newsLogger.Info("Новость добавлена в очередь для пользователей",
+			"title", newsItem.Title,
+			"users_count", addedToQueue)
 	} else if len(subscriptions) > 0 {
-		newsLogger.Warn("Новость '%s' не была добавлена в очередь (возможно, уже отправлена всем подписчикам)", newsItem.Title)
+		newsLogger.Warn("Новость не была добавлена в очередь (возможно, уже отправлена всем подписчикам)",
+			"title", newsItem.Title)
 	} else {
-		newsLogger.Debug("Новость '%s' не была добавлена в очередь (нет подписчиков на источник %d)", newsItem.Title, newsItem.SourceID)
+		newsLogger.Debug("Новость не была добавлена в очередь (нет подписчиков на источник)",
+			"title", newsItem.Title,
+			"source_id", newsItem.SourceID)
 	}
 
 	return nil
@@ -188,7 +205,8 @@ func (np *NewsProcessor) isNewsAlreadySentGlobally(newsID int64) (bool, error) {
 
 // startPeriodicSending запускает периодическую отправку накопленных новостей
 func (np *NewsProcessor) startPeriodicSending() {
-	newsLogger.Info("Запуск периодической отправки новостей с интервалом %v", np.sendInterval)
+	newsLogger.Info("Запуск периодической отправки новостей с интервалом",
+		"interval", np.sendInterval)
 
 	// Создаем тикер для периодической отправки
 	ticker := time.NewTicker(np.sendInterval)
@@ -234,7 +252,9 @@ func (np *NewsProcessor) sendPendingNews() {
 		totalNews += len(newsList)
 	}
 
-	newsLogger.Info("Начинаем отправку накопленных новостей для %d пользователей (всего новостей: %d)", len(pendingCopy), totalNews)
+	newsLogger.Info("Начинаем отправку накопленных новостей",
+		"users_count", len(pendingCopy),
+		"total_news", totalNews)
 
 	// Отправляем новости каждому пользователю
 	for chatId, newsList := range pendingCopy {
@@ -244,7 +264,8 @@ func (np *NewsProcessor) sendPendingNews() {
 
 		// Проверяем глобальный rate limit перед отправкой
 		if !np.globalRateLimiter.AllowGlobal() {
-			newsLogger.Debug("Глобальный rate limit, пропускаем отправку списка новостей пользователю %d", chatId)
+			newsLogger.Debug("Глобальный rate limit, пропускаем отправку списка новостей пользователю",
+				"user_id", chatId)
 			// Возвращаем новости обратно в очередь
 			np.pendingMutex.Lock()
 			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList...)
@@ -312,10 +333,13 @@ func (np *NewsProcessor) sendPendingNews() {
 			np.pendingMutex.Lock()
 			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList[sentNewsCount:]...)
 			np.pendingMutex.Unlock()
-			newsLogger.Warn("Не все новости были отправлены пользователю %d, %d новостей возвращено в очередь",
-				chatId, len(newsList)-sentNewsCount)
+			newsLogger.Warn("Не все новости были отправлены пользователю",
+				"user_id", chatId,
+				"returned_to_queue", len(newsList)-sentNewsCount)
 		} else if sentNewsCount > 0 {
-			newsLogger.Info("Список из %d новостей отправлен пользователю %d", sentNewsCount, chatId)
+			newsLogger.Info("Список новостей отправлен пользователю",
+				"news_count", sentNewsCount,
+				"user_id", chatId)
 		}
 	}
 }
@@ -323,7 +347,8 @@ func (np *NewsProcessor) sendPendingNews() {
 // sendNewsMessage отправляет одно сообщение с новостями и сохраняет их в БД
 func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList []PendingNews) bool {
 	if len(message) == 0 {
-		newsLogger.Warn("Пустое сообщение для пользователя %d, пропускаем", chatId)
+		newsLogger.Warn("Пустое сообщение для пользователя, пропускаем",
+			"user_id", chatId)
 		return false
 	}
 
@@ -348,34 +373,43 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 				var newInterval time.Duration
 				if retryAfter > 3600 {
 					newInterval = MaxRateLimitInterval
-					newsLogger.Warn("Критический rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 1 минута",
-						chatId, retryAfter)
+					newsLogger.Warn("Критический rate limit для пользователя",
+						"user_id", chatId,
+						"retry_after", retryAfter)
 				} else if retryAfter > 300 {
 					newInterval = 30 * time.Second
-					newsLogger.Warn("Высокий rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 30 секунд",
-						chatId, retryAfter)
+					newsLogger.Warn("Высокий rate limit для пользователя",
+						"user_id", chatId,
+						"retry_after", retryAfter)
 				} else {
 					newInterval = time.Duration(retryAfter+5) * time.Second
 					if newInterval > MaxRateLimitInterval {
 						newInterval = MaxRateLimitInterval
 					}
-					newsLogger.Warn("Rate limit для пользователя %d (retry after %d сек), увеличиваем глобальный интервал до %v",
-						chatId, retryAfter, newInterval)
+					newsLogger.Warn("Rate limit для пользователя, увеличиваем глобальный интервал",
+					"user_id", chatId,
+					"retry_after", retryAfter,
+					"new_interval", newInterval)
 				}
 				np.globalRateLimiter.SetMinInterval(newInterval)
 			} else {
 				np.globalRateLimiter.SetMinInterval(5 * time.Second)
-				newsLogger.Warn("Rate limit для пользователя %d (время не указано), увеличиваем глобальный интервал до 5 секунд", chatId)
+				newsLogger.Warn("Rate limit для пользователя (время не указано), увеличиваем глобальный интервал до 5 секунд",
+					"user_id", chatId)
 			}
 			return false
 		}
 
 		errorMsg := handleTelegramError(err)
-		newsLogger.Error("Ошибка отправки списка новостей пользователю %d: %v (сообщение: %s)", chatId, err, errorMsg)
+		newsLogger.Error("Ошибка отправки списка новостей пользователю",
+			"user_id", chatId,
+			"error", err,
+			"message", errorMsg)
 
 		// Если ошибка связана с форматированием, пробуем отправить без Markdown
 		if strings.Contains(err.Error(), "can't parse entities") || strings.Contains(err.Error(), "Bad Request") {
-			newsLogger.Warn("Ошибка парсинга Markdown для пользователя %d, пробуем отправить без форматирования", chatId)
+			newsLogger.Warn("Ошибка парсинга Markdown для пользователя, пробуем отправить без форматирования",
+				"user_id", chatId)
 			// Формируем простое сообщение без Markdown
 			simpleMessage := ""
 			for i, news := range newsList {
@@ -392,7 +426,9 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 			// Не устанавливаем ParseMode, отправляем как обычный текст
 
 			if _, sendErr := np.bot.Send(simpleMsg); sendErr != nil {
-				newsLogger.Error("Ошибка отправки простого сообщения пользователю %d: %v", chatId, sendErr)
+				newsLogger.Error("Ошибка отправки простого сообщения пользователю",
+					"user_id", chatId,
+					"error", sendErr)
 				return false
 			}
 			// Если простое сообщение отправилось успешно, продолжаем
@@ -404,7 +440,7 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 	// Сохраняем информацию об отправке в таблицу messages
 	tx, err := np.db.Begin()
 	if err != nil {
-		newsLogger.Error("Ошибка начала транзакции для сохранения сообщений: %v", err)
+		newsLogger.Error("Ошибка начала транзакции для сохранения сообщений", "error", err)
 		return false
 	}
 
@@ -412,24 +448,29 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 	saveErrors := false
 	for _, news := range newsList {
 		if err := db.SaveMessage(tx, chatId, news.NewsID); err != nil {
-			newsLogger.Error("Ошибка сохранения сообщения для новости %d: %v", news.NewsID, err)
+			newsLogger.Error("Ошибка сохранения сообщения для новости",
+				"news_id", news.NewsID,
+				"error", err)
 			saveErrors = true
 			// Продолжаем сохранять остальные
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		newsLogger.Error("Ошибка коммита транзакции: %v", err)
+		newsLogger.Error("Ошибка коммита транзакции", "error", err)
 		return false
 	}
 
 	// Если были ошибки сохранения, но транзакция прошла, логируем предупреждение
 	if saveErrors {
-		newsLogger.Warn("Некоторые новости не были сохранены в БД для пользователя %d, но сообщение отправлено", chatId)
+		newsLogger.Warn("Некоторые новости не были сохранены в БД для пользователя, но сообщение отправлено",
+			"user_id", chatId)
 	}
 
 	monitoring.IncrementTelegramMessagesSent()
-	newsLogger.Debug("Сообщение с %d новостями отправлено пользователю %d", len(newsList), chatId)
+	newsLogger.Debug("Сообщение с новостями отправлено пользователю",
+		"news_count", len(newsList),
+		"user_id", chatId)
 
 	// После успешной отправки постепенно уменьшаем интервал, если он был увеличен
 	currentInterval = np.globalRateLimiter.GetMinInterval()
@@ -494,6 +535,7 @@ func (np *NewsProcessor) getSubscriptionsCached(sourceID int64) ([]db.Subscripti
 	np.subscriptionsCache = allSubscriptions
 	np.lastCacheUpdate = time.Now()
 
-	newsLogger.Debug("Кэш подписок обновлен, источников: %d", len(allSubscriptions))
+	newsLogger.Debug("Кэш подписок обновлен",
+		"sources_count", len(allSubscriptions))
 	return subscriptions, nil
 }

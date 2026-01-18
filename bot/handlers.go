@@ -32,7 +32,9 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 		// Обработка callback-запросов от inline кнопок
 		if update.CallbackQuery != nil {
 			monitoring.IncrementTelegramCommands()
-			handlerLogger.Debug("[%s] Callback: %s", update.CallbackQuery.From.UserName, update.CallbackQuery.Data)
+			handlerLogger.Debug("Callback received",
+				"username", update.CallbackQuery.From.UserName,
+				"data", update.CallbackQuery.Data)
 			handleCallback(bot, dbConn, update.CallbackQuery)
 			continue
 		}
@@ -45,7 +47,9 @@ func StartCommandHandler(bot *tgbotapi.BotAPI, dbConn *sql.DB, interval int) {
 		if update.Message.IsCommand() {
 			monitoring.IncrementTelegramCommands()
 		}
-		handlerLogger.Debug("[%s] %s", update.Message.From.UserName, update.Message.Text)
+		handlerLogger.Debug("Message received",
+			"username", update.Message.From.UserName,
+			"text", update.Message.Text)
 
 		// Проверяем, является ли сообщение командой
 		if update.Message.IsCommand() {
@@ -89,13 +93,15 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 
 	insertedId, err := db.SaveUser(dbConn, user)
 	if err != nil {
-		handlerLogger.Error("Ошибка добавления пользователя: %v", err)
+		handlerLogger.Error("Ошибка добавления пользователя", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при подключении к боту.\n\nПожалуйста, попробуйте позже или обратитесь к администратору, если проблема сохраняется.")
 		bot.Send(msg)
 		return
 	}
 
-	handlerLogger.Info("Пользователь %s подключился к боту с chatId %d", user.Username, insertedId)
+	handlerLogger.Info("Пользователь подключился к боту",
+		"username", user.Username,
+		"chat_id", insertedId)
 
 	// Проверяем, есть ли у пользователя подписки
 	subscriptions, err := db.GetUserSubscriptionsWithDetails(dbConn, chatId)
@@ -168,7 +174,7 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 
 	err = db.SaveSource(dbConn, source)
 	if err != nil {
-		handlerLogger.Error("Ошибка при добавлении источника: %v", err)
+		handlerLogger.Error("Ошибка при добавлении источника", "error", err)
 		// Проверяем, существует ли уже источник
 		var msg tgbotapi.MessageConfig
 		_, existsErr := db.FindSourceActiveByUrl(dbConn, link)
@@ -190,7 +196,7 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 
 	source, err = db.FindSourceActiveByUrl(dbConn, link)
 	if err != nil {
-		handlerLogger.Error("Ошибка при поиске источника: %v", err)
+		handlerLogger.Error("Ошибка при поиске источника", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось найти добавленный источник")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -200,7 +206,7 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 	// Проверяем, существует ли пользователь, если нет - регистрируем его
 	exists, err := db.UserExists(dbConn, chatId)
 	if err != nil {
-		handlerLogger.Error("Ошибка при проверке существования пользователя: %v", err)
+		handlerLogger.Error("Ошибка при проверке существования пользователя", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -215,13 +221,14 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 		}
 		_, err = db.SaveUser(dbConn, user)
 		if err != nil {
-			handlerLogger.Error("Ошибка при регистрации пользователя: %v", err)
+			handlerLogger.Error("Ошибка при регистрации пользователя", "error", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя")
 			msg.ReplyMarkup = createMainKeyboard()
 			bot.Send(msg)
 			return
 		}
-		handlerLogger.Info("Автоматически зарегистрирован пользователь с chatId %d", chatId)
+		handlerLogger.Info("Автоматически зарегистрирован пользователь",
+		"chat_id", chatId)
 	}
 
 	var subscription = db.Subscription{
@@ -240,7 +247,7 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 
 	err = db.SaveSubscription(dbConn, subscription)
 	if err != nil {
-		handlerLogger.Error("Ошибка при добавлении подписки: %v", err)
+		handlerLogger.Error("Ошибка при добавлении подписки", "error", err)
 		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ Не удалось добавить подписку на «%s».\n\nВозможные причины:\n• Подписка уже существует\n• Проблема с базой данных\n\nПопробуйте позже.", source.Name))
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -256,7 +263,7 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 func handleShowSources(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	sources, err := db.FindActiveSources(dbConn)
 	if err != nil {
-		handlerLogger.Error("Ошибка при получении списка источников: %v", err)
+		handlerLogger.Error("Ошибка при получении списка источников", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось получить список источников")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -304,7 +311,7 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 	// Проверяем, существует ли пользователь, если нет - регистрируем его
 	exists, err := db.UserExists(dbConn, chatId)
 	if err != nil {
-		handlerLogger.Error("Ошибка при проверке существования пользователя: %v", err)
+		handlerLogger.Error("Ошибка при проверке существования пользователя", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -319,13 +326,14 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 		}
 		_, err = db.SaveUser(dbConn, user)
 		if err != nil {
-			handlerLogger.Error("Ошибка при регистрации пользователя: %v", err)
+			handlerLogger.Error("Ошибка при регистрации пользователя", "error", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя")
 			msg.ReplyMarkup = createMainKeyboard()
 			bot.Send(msg)
 			return
 		}
-		handlerLogger.Info("Автоматически зарегистрирован пользователь с chatId %d", chatId)
+		handlerLogger.Info("Автоматически зарегистрирован пользователь",
+		"chat_id", chatId)
 	}
 
 	var subscription = db.Subscription{
@@ -335,7 +343,7 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 
 	err = db.SaveSubscription(dbConn, subscription)
 	if err != nil {
-		handlerLogger.Error("Ошибка при добавлении подписки: %v", err)
+		handlerLogger.Error("Ошибка при добавлении подписки", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось добавить подписку. Возможно, она уже существует")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -380,7 +388,7 @@ func handleDelSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 
 	err = db.DeleteSubscription(dbConn, subscription)
 	if err != nil {
-		handlerLogger.Error("Ошибка при удалении подписки: %v", err)
+		handlerLogger.Error("Ошибка при удалении подписки", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Не удалось удалить подписку. Возможно, она не существует")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -397,7 +405,7 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	// Получаем все активные источники
 	sources, err := db.FindActiveSources(dbConn)
 	if err != nil {
-		handlerLogger.Error("Ошибка при получении источников: %v", err)
+		handlerLogger.Error("Ошибка при получении источников", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении списка источников.\n\nПопробуйте позже или обратитесь к администратору, если проблема сохраняется.")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -414,7 +422,7 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	// Проверяем, существует ли пользователь, если нет - регистрируем его
 	exists, err := db.UserExists(dbConn, chatId)
 	if err != nil {
-		handlerLogger.Error("Ошибка при проверке существования пользователя: %v", err)
+		handlerLogger.Error("Ошибка при проверке существования пользователя", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя.\n\nПопробуйте позже или используйте команду /start.")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -429,13 +437,14 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 		}
 		_, err = db.SaveUser(dbConn, user)
 		if err != nil {
-			handlerLogger.Error("Ошибка при регистрации пользователя: %v", err)
+			handlerLogger.Error("Ошибка при регистрации пользователя", "error", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя.\n\nПожалуйста, используйте команду /start для регистрации.")
 			msg.ReplyMarkup = createMainKeyboard()
 			bot.Send(msg)
 			return
 		}
-		handlerLogger.Info("Автоматически зарегистрирован пользователь с chatId %d", chatId)
+		handlerLogger.Info("Автоматически зарегистрирован пользователь",
+		"chat_id", chatId)
 	}
 
 	// Подписываем на все источники
@@ -447,7 +456,9 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 		// Проверяем, не подписан ли уже
 		isSubscribed, err := db.IsUserSubscribed(dbConn, chatId, source.Id)
 		if err != nil {
-			handlerLogger.Error("Ошибка при проверке подписки на источник %d: %v", source.Id, err)
+			handlerLogger.Error("Ошибка при проверке подписки на источник",
+				"source_id", source.Id,
+				"error", err)
 			errorsCount++
 			continue
 		}
@@ -463,7 +474,9 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 		}
 		err = db.SaveSubscription(dbConn, subscription)
 		if err != nil {
-			handlerLogger.Error("Ошибка при добавлении подписки на источник %d: %v", source.Id, err)
+			handlerLogger.Error("Ошибка при добавлении подписки на источник",
+				"source_id", source.Id,
+				"error", err)
 			errorsCount++
 			continue
 		}
@@ -495,7 +508,7 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 func handleLatestNewsImproved(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, count int) {
 	news, err := db.GetLatestNewsByUser(dbConn, chatId, count)
 	if err != nil {
-		handlerLogger.Error("Ошибка при получении новостей: %v", err)
+		handlerLogger.Error("Ошибка при получении новостей", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении новостей. Попробуйте позже")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)
@@ -627,7 +640,7 @@ func handleAdminStats(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	// Получаем статистику
 	stats, err := db.GetAdminStats(dbConn)
 	if err != nil {
-		handlerLogger.Error("Ошибка при получении статистики: %v", err)
+		handlerLogger.Error("Ошибка при получении статистики", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении статистики.\n\nПопробуйте позже.")
 		msg.ReplyMarkup = createMainKeyboard()
 		bot.Send(msg)

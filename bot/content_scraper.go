@@ -95,7 +95,7 @@ func (cs *ContentScraper) scrapeBatch() {
 	// Получаем список новостей для парсинга
 	newsList, err := db.GetNewsForScraping(cs.db, cs.batchSize)
 	if err != nil {
-		contentScraperLogger.Error("Ошибка получения новостей для парсинга: %v", err)
+		contentScraperLogger.Error("Ошибка получения новостей для парсинга", "error", err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (cs *ContentScraper) scrapeBatch() {
 		return
 	}
 
-	contentScraperLogger.Info("Найдено %d новостей для парсинга", len(newsList))
+	contentScraperLogger.Info("Найдено новостей для парсинга", "news_count", len(newsList))
 
 	// Создаем канал для ограничения параллелизма
 	semaphore := make(chan struct{}, cs.concurrent)
@@ -152,7 +152,9 @@ func (cs *ContentScraper) scrapeBatch() {
 		}
 	}
 
-	contentScraperLogger.Info("Парсинг завершен: успешно=%d, ошибок=%d", successCount, failCount)
+	contentScraperLogger.Info("Парсинг завершен",
+		"success_count", successCount,
+		"error_count", failCount)
 }
 
 type scrapeResult struct {
@@ -161,13 +163,16 @@ type scrapeResult struct {
 
 // scrapeNews парсит одну новость
 func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scrapeResult) {
-	contentScraperLogger.Debug("Парсинг новости ID=%d: %s", news.ID, news.Link)
+	contentScraperLogger.Debug("Парсинг новости",
+		"news_id", news.ID,
+		"url", news.Link)
 
 	// Сначала проверяем Redis кэш
 	var content *scraper.NewsContent
 	if cs.cache != nil {
 		if cached, found := cs.cache.Get(news.Link); found {
-			contentScraperLogger.Debug("Контент новости ID=%d найден в Redis кэше", news.ID)
+			contentScraperLogger.Debug("Контент новости найден в Redis кэше",
+				"news_id", news.ID)
 			content = convertFromCachedNewsContent(cached)
 		}
 	}
@@ -177,10 +182,14 @@ func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scr
 		var err error
 		content, err = scraper.ScrapeNewsContent(news.Link)
 		if err != nil {
-			contentScraperLogger.Warn("Ошибка парсинга новости ID=%d: %v", news.ID, err)
+			contentScraperLogger.Warn("Ошибка парсинга новости",
+				"news_id", news.ID,
+				"error", err)
 			// Сохраняем ошибку
 			if saveErr := db.MarkNewsScrapeFailed(cs.db, news.ID, err.Error()); saveErr != nil {
-				contentScraperLogger.Error("Ошибка сохранения статуса ошибки для новости ID=%d: %v", news.ID, saveErr)
+				contentScraperLogger.Error("Ошибка сохранения статуса ошибки для новости",
+					"news_id", news.ID,
+					"error", saveErr)
 			}
 			results <- scrapeResult{success: false}
 			return
@@ -190,9 +199,12 @@ func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scr
 		if cs.cache != nil {
 			cachedContent := convertToCachedNewsContent(content)
 			if err := cs.cache.Set(news.Link, cachedContent, RedisCacheTTL); err != nil {
-				contentScraperLogger.Warn("Ошибка сохранения в Redis кэш для новости ID=%d: %v", news.ID, err)
+				contentScraperLogger.Warn("Ошибка сохранения в Redis кэш для новости",
+					"news_id", news.ID,
+					"error", err)
 			} else {
-				contentScraperLogger.Debug("Контент новости ID=%d сохранен в Redis кэш", news.ID)
+				contentScraperLogger.Debug("Контент новости сохранен в Redis кэш",
+					"news_id", news.ID)
 			}
 		}
 	}
@@ -219,9 +231,13 @@ func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scr
 	)
 
 	if err != nil {
-		contentScraperLogger.Error("Ошибка сохранения контента новости ID=%d: %v", news.ID, err)
+		contentScraperLogger.Error("Ошибка сохранения контента новости",
+			"news_id", news.ID,
+			"error", err)
 		if saveErr := db.MarkNewsScrapeFailed(cs.db, news.ID, err.Error()); saveErr != nil {
-			contentScraperLogger.Error("Ошибка сохранения статуса ошибки для новости ID=%d: %v", news.ID, saveErr)
+			contentScraperLogger.Error("Ошибка сохранения статуса ошибки для новости",
+				"news_id", news.ID,
+				"error", saveErr)
 		}
 		results <- scrapeResult{success: false}
 		return

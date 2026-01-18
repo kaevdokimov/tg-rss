@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"tg-rss/api"
 	"tg-rss/bot"
 	"tg-rss/config"
 	"tg-rss/db"
@@ -220,7 +221,8 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 		// В реальном приложении здесь можно прочитать файл
 		w.Write([]byte(`openapi: 3.0.3
 info:
-  title: TG-RSS Bot Monitoring API
+  title: TG-RSS Bot Management API
+  description: API для управления Telegram RSS ботом
   version: 1.0.0
 paths:
   /health:
@@ -235,6 +237,29 @@ paths:
       responses:
         200:
           description: Metrics in Prometheus format
+  /api/v1/users:
+    get:
+      summary: Get all users
+      responses:
+        200:
+          description: List of users
+  /api/v1/sources:
+    get:
+      summary: Get all sources
+      responses:
+        200:
+          description: List of sources
+    post:
+      summary: Create new source
+      responses:
+        201:
+          description: Source created
+  /api/v1/subscriptions:
+    get:
+      summary: Get user subscriptions
+      responses:
+        200:
+          description: User subscriptions
 `))
 	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(5*time.Second)))
 
@@ -367,6 +392,22 @@ paths:
 		fmt.Fprintf(w, "# TYPE db_connections_wait gauge\n")
 		fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
 	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(15*time.Second)))
+
+	// API для управления пользователями
+	mux.HandleFunc("/api/v1/users", api.GetUsersHandler(dbConn))
+	mux.HandleFunc("/api/v1/users/check", api.GetUserHandler(dbConn))
+
+	// API для управления источниками
+	mux.HandleFunc("/api/v1/sources", api.GetSourcesHandler(dbConn))
+	mux.HandleFunc("/api/v1/sources/info", api.GetSourceHandler(dbConn))
+	mux.HandleFunc("/api/v1/sources/create", api.CreateSourceHandler(dbConn))
+	mux.HandleFunc("/api/v1/sources/update", api.UpdateSourceHandler(dbConn))
+	mux.HandleFunc("/api/v1/sources/delete", api.DeleteSourceHandler(dbConn))
+
+	// API для управления подписками
+	mux.HandleFunc("/api/v1/subscriptions", api.GetSubscriptionsHandler(dbConn))
+	mux.HandleFunc("/api/v1/subscriptions/subscribe", api.SubscribeHandler(dbConn))
+	mux.HandleFunc("/api/v1/subscriptions/unsubscribe", api.UnsubscribeHandler(dbConn))
 
 	server := &http.Server{
 		Addr:    ":8080",
