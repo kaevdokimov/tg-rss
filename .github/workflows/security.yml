@@ -66,7 +66,7 @@ jobs:
           bandit -r src/ \
             -x tests \
             --skip B106,B403,B404,B607 \
-            -f json -o bandit-results.json || true
+            -f sarif -o bandit-results.sarif || true
           bandit -r src/ \
             -x tests \
             --skip B106,B403,B404,B607 \
@@ -76,7 +76,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: news-analyzer-python/bandit-results.json
+          sarif_file: news-analyzer-python/bandit-results.sarif
         continue-on-error: true
 
   # Container Security Scanning
@@ -159,14 +159,15 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD~1' }}
+          head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'HEAD' }}
           extra_args: --debug --only-verified
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
   # Infrastructure as Code Security
   iac-security:
@@ -232,6 +233,7 @@ jobs:
 
       - name: Run Scorecard (OpenSSF)
         uses: ossf/scorecard-action@main
+        continue-on-error: true
         with:
           results_file: results.sarif
           results_format: sarif

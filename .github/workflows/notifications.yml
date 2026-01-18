@@ -99,6 +99,9 @@ jobs:
 
       - name: Send Telegram notification
         if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
         run: |
           # Send message to Telegram bot
           # Create JSON payload with proper escaping
@@ -112,7 +115,7 @@ jobs:
           EOF
           )
 
-          curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "$JSON_PAYLOAD"
 
@@ -156,6 +159,9 @@ jobs:
 
       - name: Отправить ежедневный отчет в Telegram
         if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
         run: |
           # Создаем ежедневное сообщение отчета с правильным экранированием
           REPO_NAME="${{ github.repository }}"
@@ -204,10 +210,10 @@ jobs:
             "$REPORT_LINE21")
 
           # Send to Telegram
-          curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "{
-              \"chat_id\": \"${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}\",
+              \"chat_id\": \"$TELEGRAM_CHAT_ID\",
               \"text\": \"$REPORT_MESSAGE\",
               \"parse_mode\": \"MarkdownV2\",
               \"disable_web_page_preview\": true

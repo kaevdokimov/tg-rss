@@ -11,6 +11,17 @@ servers:
   - url: http://localhost:8080
     description: Local development server
 
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+security:
+  - ApiKeyAuth: []
+
 paths:
   /health:
     get:
