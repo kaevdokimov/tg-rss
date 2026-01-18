@@ -22,21 +22,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      # Установка Go
+      # Установка Go с кэшированием
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version: '1.25'
+          cache: true
+
+      # Кэширование Go build
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       # Установка зависимостей
       - name: Install dependencies
         run: go mod download
-      # Сборка приложения
+
+      # Параллельная сборка и тестирование
       - name: Build application
         run: go build -ldflags='-s -w -extldflags "-static"' -o ./tg-rss-app
-      # Запуск тестов
-      - name: Run tests
-        run: go test ./... -v
+
+      - name: Run tests with race detection and coverage
+        run: go test -race -coverprofile=coverage.out -v ./...
+
+      # Upload coverage report
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: ci-cd
+          name: codecov-ci-cd
+          fail_ci_if_error: false
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tg-rss-binary
+          path: ./tg-rss-app
+          retention-days: 7
 
   docker-build:
     name: Build and Push Docker Image
@@ -51,6 +81,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Кэширование Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      # Download build artifact
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tg-rss-binary
+
       # Логин в GitHub Container Registry
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -59,18 +104,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Сборка и пуш Docker-образа
+      # Сборка и пуш Docker-образа с оптимизациями
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          no-cache: false
           tags: |
             ghcr.io/${{ github.repository_owner }}/news-bot:latest
             ghcr.io/${{ github.repository_owner }}/news-bot:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/news-bot:latest
-          cache-to: type=inline
+          cache-from: |
+            type=local,src=/tmp/.buildx-cache
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/news-bot:latest
+          cache-to: |
+            type=local,dest=/tmp/.buildx-cache-new,mode=max
+            type=inline
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          # Multi-platform build preparation (can be enabled later)
+          # platforms: linux/amd64,linux/arm64
 
   docker-build-analyzer:
     name: Build and Push News Analyzer Image
@@ -85,6 +137,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Кэширование Docker layers для analyzer
+      - name: Cache Docker layers (analyzer)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-analyzer
+          key: ${{ runner.os }}-buildx-analyzer-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-analyzer-
+
       # Логин в GitHub Container Registry
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -93,19 +154,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Сборка и пуш образа news-analyzer
+      # Сборка и пуш образа news-analyzer с оптимизациями
       - name: Build and Push News Analyzer Image
         uses: docker/build-push-action@v6
         with:
           context: ./news-analyzer-python
           file: ./news-analyzer-python/Dockerfile
           push: true
-          no-cache: false
           tags: |
             ghcr.io/${{ github.repository_owner }}/news-analyzer:latest
             ghcr.io/${{ github.repository_owner }}/news-analyzer:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/news-analyzer:latest
-          cache-to: type=inline
+          cache-from: |
+            type=local,src=/tmp/.buildx-cache-analyzer
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/news-analyzer:latest
+          cache-to: |
+            type=local,dest=/tmp/.buildx-cache-analyzer-new,mode=max
+            type=inline
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
   server-setup:
     name: Server Infrastructure Setup (Production Environment)

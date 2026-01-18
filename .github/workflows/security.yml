@@ -1,0 +1,237 @@
+# Comprehensive Security Scanning Pipeline
+# SAST, Container Security, Secret Scanning, and Security Advisories
+
+name: "🛡️ Security Pipeline"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - '**.go'
+      - '**.py'
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'go.mod'
+      - 'go.sum'
+      - 'news-analyzer-python/requirements.txt'
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # Daily security scan at 6 AM UTC
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # Static Application Security Testing (SAST)
+  sast:
+    name: 'SAST Analysis'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run Gosec (Go Security Scanner)
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: './...'
+
+      - name: Run Bandit (Python Security Scanner)
+        run: |
+          pip install bandit[toml]
+          cd news-analyzer-python
+          bandit -r src/ -f json -o bandit-results.json || true
+          bandit -r src/ --format txt
+
+      - name: Upload Bandit results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: news-analyzer-python/bandit-results.json
+        continue-on-error: true
+
+  # Container Security Scanning
+  container-scan:
+    name: 'Container Security Scan'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Build Docker images for scanning
+        run: |
+          docker build -t tg-rss-app:latest .
+          docker build -t news-analyzer:latest -f news-analyzer-python/Dockerfile news-analyzer-python/
+
+      - name: Scan main application image
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          scan-ref: 'tg-rss-app:latest'
+          format: 'sarif'
+          output: 'trivy-main.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Scan analyzer image
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          scan-ref: 'news-analyzer:latest'
+          format: 'sarif'
+          output: 'trivy-analyzer.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-main.sarif,trivy-analyzer.sarif'
+
+      - name: Scan Dockerfiles
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'Dockerfile'
+          format: 'sarif'
+          output: 'trivy-dockerfile.sarif'
+
+      - name: Scan docker-compose
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'docker-compose.yml'
+          format: 'sarif'
+          output: 'trivy-compose.sarif'
+
+  # Secret Scanning
+  secret-scan:
+    name: 'Secret Detection'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog (Secret Scanner)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Infrastructure as Code Security
+  iac-security:
+    name: 'IaC Security Scan'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Scan Ansible playbooks
+        uses: bridgecrewio/yor-action@main
+        with:
+          directory: ansible/
+
+      - name: Scan Docker Compose
+        uses: bridgecrewio/yor-action@main
+        with:
+          directory: ./
+
+      - name: Run Checkov (Infrastructure Security)
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: all
+          output_format: sarif
+          output_file_path: checkov.sarif
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+
+  # Supply Chain Security
+  supply-chain:
+    name: 'Supply Chain Security'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run Scorecard (OpenSSF)
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload Scorecard results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+
+  # Security Summary
+  security-summary:
+    name: 'Security Summary'
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [sast, container-scan, secret-scan, iac-security, supply-chain]
+    steps:
+      - name: Generate Security Report
+        run: |
+          echo "## 🛡️ Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # SAST Results
+          echo "### 🔍 Static Analysis (SAST)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gosec (Go)**: ${{ needs.sast.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bandit (Python)**: ${{ needs.sast.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Container Security
+          echo "### 🐳 Container Security" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trivy Scan**: ${{ needs.container-scan.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Images Scanned**: tg-rss-app, news-analyzer" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Secret Detection
+          echo "### 🔐 Secret Detection" >> $GITHUB_STEP_SUMMARY
+          echo "- **TruffleHog**: ${{ needs.secret-scan.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gitleaks**: ${{ needs.secret-scan.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # IaC Security
+          echo "### 🏗️ Infrastructure Security" >> $GITHUB_STEP_SUMMARY
+          echo "- **Checkov**: ${{ needs.iac-security.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **YOR**: ${{ needs.iac-security.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Supply Chain
+          echo "### 🔗 Supply Chain Security" >> $GITHUB_STEP_SUMMARY
+          echo "- **OpenSSF Scorecard**: ${{ needs.supply-chain.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall Status
+          OVERALL_STATUS="✅ All Security Checks Passed"
+          if [[ "${{ needs.sast.result }}" != "success" || "${{ needs.container-scan.result }}" != "success" || "${{ needs.secret-scan.result }}" != "success" || "${{ needs.iac-security.result }}" != "success" || "${{ needs.supply-chain.result }}" != "success" ]]; then
+            OVERALL_STATUS="❌ Security Issues Found"
+          fi
+
+          echo "## 📊 Overall Status: $OVERALL_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 View Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Security Tab](${{ github.server_url }}/${{ github.repository }}/security)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Code Scanning](${{ github.server_url }}/${{ github.repository }}/security/code-scanning)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Dependabot](${{ github.server_url }}/${{ github.repository }}/security/dependabot)" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,179 @@
+# Notifications & Alerts System
+# Telegram Bot integration for CI/CD events, failures, and deployments
+
+name: "📢 Telegram Notifications"
+
+on:
+  workflow_run:
+    workflows:
+      - "CI/CD Pipeline"
+      - "Go Extended CI"
+      - "🔍 CodeQL Advanced Security"
+      - "🛡️ Security Pipeline"
+      - "🔒 Security Dependency Review"
+    types:
+      - completed
+      - requested  # For manual workflow runs
+  schedule:
+    # Daily status report at 8 AM UTC
+    - cron: '0 8 * * *'
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  notify:
+    name: 'Send Notifications'
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Generate notification message
+        id: notification
+        run: |
+          # Determine notification type and content
+          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+          CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+          REPO="${{ github.repository }}"
+          BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          ACTOR="${{ github.event.workflow_run.triggering_actor.login }}"
+          REPO_URL="https://github.com/$REPO"
+
+          # Set status emoji and text
+          case $CONCLUSION in
+            "success")
+              STATUS_EMOJI="✅"
+              STATUS_TEXT="SUCCESS"
+              ;;
+            "failure")
+              STATUS_EMOJI="❌"
+              STATUS_TEXT="FAILURE"
+              ;;
+            "cancelled")
+              STATUS_EMOJI="⚠️"
+              STATUS_TEXT="CANCELLED"
+              ;;
+            *)
+              STATUS_EMOJI="❓"
+              STATUS_TEXT="$CONCLUSION"
+              ;;
+          esac
+
+          # Create Telegram message with MarkdownV2 formatting
+          TELEGRAM_MESSAGE=$(cat <<EOF
+          $STATUS_EMOJI *CI/CD $STATUS_TEXT*
+
+          🏗️ *Workflow:* \`$WORKFLOW_NAME\`
+          📦 *Repository:* [$REPO]($REPO_URL)
+          🌿 *Branch:* \`$BRANCH\`
+          👤 *Triggered by:* \`$ACTOR\`
+          🔗 *Details:* [View Run](https://github.com/$REPO/actions/runs/$RUN_ID)
+
+          🕐 $(date '+%Y-%m-%d %H:%M:%S UTC')
+          EOF
+          )
+
+          # Escape special characters for Telegram MarkdownV2
+          TELEGRAM_MESSAGE=$(echo "$TELEGRAM_MESSAGE" | sed 's/[-.+?^${}()|[\]\\]/\\&/g')
+
+          echo "telegram_message=$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
+          echo "status=$STATUS_TEXT" >> $GITHUB_OUTPUT
+          echo "workflow=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
+
+      - name: Send Telegram notification
+        if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
+        run: |
+          # Send message to Telegram bot
+          curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "chat_id": "${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}",
+              "text": "${{ steps.notification.outputs.telegram_message }}",
+              "parse_mode": "MarkdownV2",
+              "disable_web_page_preview": true
+            }'
+
+      - name: Log failure details
+        if: github.event.workflow_run.conclusion == 'failure'
+        run: |
+          echo "Workflow failed: ${{ github.event.workflow_run.name }}"
+          echo "See: https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
+
+  # Daily status report
+  daily-report:
+    name: 'Daily Status Report'
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 8 * * *'
+    steps:
+      - name: Generate daily report
+        run: |
+          # Get workflow run statistics from the last 24 hours
+          echo "## 📊 Daily CI/CD Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # This is a simplified report - in production you'd query GitHub API
+          echo "### 🔄 Recent Workflow Runs" >> $GITHUB_STEP_SUMMARY
+          echo "- **Main Branch:** Check recent runs in Actions tab" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scans:** CodeQL, SAST, Container scans" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Updates:** Dependabot PRs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 📈 Health Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Success Rate:** Monitor via Actions" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Coverage:** Check codecov reports" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Issues:** Check Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 🎯 Recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- Review failed workflows" >> $GITHUB_STEP_SUMMARY
+          echo "- Check security advisories" >> $GITHUB_STEP_SUMMARY
+          echo "- Review Dependabot PRs" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send daily report to Telegram
+        if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
+        run: |
+          # Create daily report message
+          REPORT_MESSAGE=$(cat <<EOF
+          📊 *Daily CI/CD Status Report*
+          📅 $(date -u '+%Y-%m-%d')
+
+          *Repository:* ${{ github.repository }}
+
+          🔄 *Recent Workflow Runs:*
+          • Main Branch: Check Actions tab
+          • Security Scans: CodeQL, SAST, Container
+          • Dependency Updates: Dependabot PRs
+
+          📈 *Health Metrics:*
+          • Build Success Rate: Monitor via Actions
+          • Test Coverage: Check Codecov reports
+          • Security Issues: Check Security tab
+
+          🎯 *Recommendations:*
+          • Review failed workflows
+          • Check security advisories
+          • Review Dependabot PRs
+
+          🔗 [View Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )
+
+          # Escape special characters for Telegram MarkdownV2
+          REPORT_MESSAGE=$(echo "$REPORT_MESSAGE" | sed 's/[-.+?^${}()|[\]\\]/\\&/g')
+
+          # Send to Telegram
+          curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"chat_id\": \"${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}\",
+              \"text\": \"$REPORT_MESSAGE\",
+              \"parse_mode\": \"MarkdownV2\",
+              \"disable_web_page_preview\": true
+            }"

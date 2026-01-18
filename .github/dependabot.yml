@@ -5,27 +5,119 @@
 
 version: 2
 updates:
-  - package-ecosystem: "docker-compose"
+  # Go modules - main application
+  - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "kaevdokimov"
+    assignees:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
 
+  # Python dependencies - news analyzer
+  - package-ecosystem: "pip"
+    directory: "/news-analyzer-python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "kaevdokimov"
+    assignees:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+
+  # Docker images
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
 
+  # Docker Compose
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:30"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
 
-  - package-ecosystem: "composer"
+# Security updates - separate from regular updates for priority
+  - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    open-pull-requests-limit: 20
+    reviewers:
+      - "kaevdokimov"
+    assignees:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "security"
+      include: "scope"
+    # Only security updates
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      # Ignore non-security updates for this config
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
 
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/news-analyzer-python"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    open-pull-requests-limit: 20
+    reviewers:
+      - "kaevdokimov"
+    assignees:
+      - "kaevdokimov"
+    commit-message:
+      prefix: "security"
+      include: "scope"
+    # Only security updates
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      # Ignore non-security updates for this config
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]

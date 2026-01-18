@@ -136,6 +136,11 @@ RSS Sources → RSS Poller → Redis Pub/Sub (news-items) → News Processor →
    # Отдельный бот для отправки отчетов анализа новостей
    TELEGRAM_SIGNAL_API_KEY=your_signal_bot_token_here
 
+   # Telegram Bot для CI/CD уведомлений (опционально)
+   # Можно использовать тот же TELEGRAM_API_KEY или создать отдельный бот
+   # GH_NOTIFY_TELEGRAM_BOT_TOKEN=your_ci_cd_bot_token_here
+   # GH_NOTIFY_TELEGRAM_CHAT_ID=your_chat_id_here
+
    # Настройки базы данных
    POSTGRES_HOST=db
    POSTGRES_PORT=5432
@@ -191,6 +196,34 @@ RSS Sources → RSS Poller → Redis Pub/Sub (news-items) → News Processor →
    WORKER_POOL_SIZE=6          # количество воркеров для параллельного парсинга RSS (оптимизировано: 6)
    SOURCES_CACHE_TTL=30m      # TTL кэша источников (оптимизировано: 30m)
    SUBSCRIPTIONS_CACHE_TTL=10m # TTL кэша подписок (оптимизировано: 10m)
+   ```
+
+### Создание Telegram бота для уведомлений CI/CD
+
+Для получения уведомлений о статусе CI/CD в Telegram:
+
+1. **Создайте бота через [@BotFather](https://t.me/botfather)**:
+   ```
+   /newbot
+   Имя бота: CI/CD Notifier
+   Username: your_ci_cd_bot
+   ```
+
+2. **Получите токен бота** от BotFather и сохраните его.
+
+3. **Создайте приватный канал или группу** для уведомлений.
+
+4. **Добавьте бота в канал/группу** как администратора.
+
+5. **Получите Chat ID**:
+   - Отправьте сообщение в канал/группу
+   - Перейдите по ссылке: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Найдите `"chat":{"id":...}` - это и есть CHAT_ID
+
+6. **Добавьте секреты в GitHub** (Settings → Secrets and variables → Actions):
+   ```
+   GH_NOTIFY_TELEGRAM_BOT_TOKEN=your_bot_token_here
+   GH_NOTIFY_TELEGRAM_CHAT_ID=your_chat_id_here
    ```
 
 ### Запуск с Docker Compose

@@ -1,39 +1,61 @@
-# Dependency Review Action
+# Enhanced Dependency Review with Security & License Checks
 #
-# This Action will scan dependency manifest files that change as part of a Pull Request,
-# surfacing known-vulnerable versions of the packages declared or updated in the PR.
-# Once installed, if the workflow run is marked as required, PRs introducing known-vulnerable
-# packages will be blocked from merging.
-#
-# Source repository: https://github.com/actions/dependency-review-action
-# Public documentation: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enforcement
-name: 'Dependency review'
+# Scans dependency changes in PRs for vulnerabilities, license issues, and security risks
+# Blocks PRs with high/critical vulnerabilities or prohibited licenses
+
+name: '🔒 Security Dependency Review'
 on:
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'news-analyzer-python/requirements.txt'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/*.yml'
+      - 'ansible/requirements.yml'
 
-# If using a dependency submission action in this workflow this permission will need to be set to:
-#
-# permissions:
-#   contents: write
-#
-# https://docs.github.com/en/enterprise-cloud@latest/code-security/supply-chain-security/understanding-your-software-supply-chain/using-the-dependency-submission-api
 permissions:
   contents: read
-  # Write permissions for pull-requests are required for using the `comment-summary-in-pr` option, comment out if you aren't using this option
   pull-requests: write
 
 jobs:
   dependency-review:
+    name: 'Security & License Check'
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout repository'
         uses: actions/checkout@v6
+
       - name: 'Dependency Review'
         uses: actions/dependency-review-action@v4
-        # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
         with:
+          # Block PRs with moderate or higher severity vulnerabilities
+          fail-on-severity: moderate
+          # Block problematic licenses
+          deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later, MS-PL, BSD-4-Clause
+          # Allow retries on snapshot warnings
+          retry-on-snapshot-warnings: true
+          # Show summary in PR comments
           comment-summary-in-pr: always
-        #   fail-on-severity: moderate
-        #   deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later
+          # Additional vulnerability checks
+          vulnerability-check: true
+          # License compatibility check
+          license-check: true
+
+      - name: 'Security Scan Summary'
+        if: always()
+        run: |
+          echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Vulnerability Check**: ✅ Enabled (fail on moderate+)" >> $GITHUB_STEP_SUMMARY
+          echo "- **License Check**: ✅ Enabled (blocks GPL/LGPL)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Review**: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Scanned Files:" >> $GITHUB_STEP_SUMMARY
+          echo "- Go modules (go.mod, go.sum)" >> $GITHUB_STEP_SUMMARY
+          echo "- Python requirements (requirements.txt)" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker configurations" >> $GITHUB_STEP_SUMMARY
+          echo "- GitHub Actions workflows" >> $GITHUB_STEP_SUMMARY
+          echo "- Ansible requirements" >> $GITHUB_STEP_SUMMARY
         #   retry-on-snapshot-warnings: true

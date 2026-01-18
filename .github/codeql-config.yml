@@ -1,0 +1,28 @@
+disable-default-queries: false
+queries:
+  - uses: security-and-quality
+  - uses: security-experimental
+
+paths-ignore:
+  - vendor/
+  - node_modules/
+  - .git/
+  - test/
+  - tests/
+  - "**/*.test.go"
+  - "**/*_test.go"
+
+paths:
+  - "**/*.go"
+  - "**/*.py"
+  - ".github/workflows/"
+
+# Language-specific configurations
+go:
+  build-mode: autobuild
+
+python:
+  build-mode: none
+
+actions:
+  build-mode: none
