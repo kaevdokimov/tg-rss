@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
