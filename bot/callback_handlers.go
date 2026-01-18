@@ -124,7 +124,9 @@ func handleMySubscriptions(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "📝 *Ваши подписки:*\n\nНажмите на источник, чтобы отписаться от него")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMySubscriptionsKeyboard(subscriptions, sources)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки списка подписок: %v", err)
+	}
 }
 
 // handleSourceDetails показывает детали источника с возможностью подписки/отписки
@@ -174,7 +176,9 @@ func handleSourceDetails(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, dat
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.DisableWebPagePreview = true
 	msg.ReplyMarkup = createSubscriptionKeyboard(sourceId, isSubscribed)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки информации об источнике: %v", err)
+	}
 }
 
 // handleSubscribe подписывает пользователя на источник
@@ -274,7 +278,9 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	}
 
 	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы успешно подписались на источник «%s»!\n\nТеперь вы будете получать новости из этого источника автоматически.", source.Name))
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки подтверждения подписки: %v", err)
+	}
 }
 
 // handleUnsubscribe отписывает пользователя от источника
