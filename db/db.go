@@ -449,7 +449,6 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 		} else {
 			log.Printf("Ошибка проверки существования источника %s (%s): %v", update.name, update.newURL, err)
 		}
-		}
 	}
 
 	log.Println("Обновление RSS источников завершено")
