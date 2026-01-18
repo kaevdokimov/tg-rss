@@ -1,0 +1,27 @@
+# Конфигурация для production
+environment: production
+debug: false
+log_level: INFO
+
+performance:
+  max_features: 5000
+  use_lemmatization: true
+  async_processing: true
+
+limits:
+  max_news_limit: 1200
+  min_news_threshold: 10
+
+analysis:
+  time_window_hours: 24
+
+# Production-specific настройки
+monitoring:
+  enable_detailed_metrics: true
+  alert_on_quality_drop: true
+
+cache:
+  enable_redis: true
+  redis_ttl_vectors: 3600    # 1 час
+  redis_ttl_clusters: 1800   # 30 мин
+  redis_ttl_narratives: 1800 # 30 мин

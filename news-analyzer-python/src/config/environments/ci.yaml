@@ -1,0 +1,24 @@
+# Конфигурация для CI/CD
+environment: ci
+debug: false
+log_level: WARNING
+
+performance:
+  max_features: 1000
+  use_lemmatization: false
+  async_processing: true
+
+limits:
+  max_news_limit: 200
+  min_news_threshold: 5
+
+analysis:
+  time_window_hours: 1  # Минимальное окно для быстрого тестирования
+
+# CI-specific настройки
+testing:
+  enable_validation: true
+  skip_expensive_operations: true
+
+cache:
+  enable_redis: false  # Отключаем кэш в CI

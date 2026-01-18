@@ -37,7 +37,7 @@ if nltk_data_dir not in nltk.data.path:
 
 from datetime import datetime
 
-from src.config import load_settings
+from src.config import load_settings, print_config_validation_report
 from src.db import Database, User
 from src.fetcher import NewsFetcher
 from src.preprocessor import TextCleaner
@@ -65,6 +65,13 @@ async def async_main():
         logger.info("=" * 60)
         logger.info("Запуск АСИНХРОННОГО анализа новостей")
         logger.info("=" * 60)
+
+        # Проверяем конфигурацию перед запуском
+        logger.info("Валидация конфигурации...")
+        config_valid = print_config_validation_report()
+        if not config_valid:
+            logger.error("Конфигурация не валидна. Исправьте ошибки и перезапустите.")
+            return
 
         # Инициализируем метрики
         init_metrics("1.0.0")
@@ -324,6 +331,13 @@ def main():
         logger.info("=" * 60)
         logger.info("Запуск анализа новостей")
         logger.info("=" * 60)
+
+        # Проверяем конфигурацию перед запуском
+        logger.info("Валидация конфигурации...")
+        config_valid = print_config_validation_report()
+        if not config_valid:
+            logger.error("Конфигурация не валидна. Исправьте ошибки и перезапустите.")
+            return
 
         # Структурированное логирование начала анализа
         structured_logger.info("Analysis started",

@@ -1,0 +1,16 @@
+# Конфигурация для разработки
+environment: development
+debug: true
+log_level: DEBUG
+
+performance:
+  max_features: 1000
+  use_lemmatization: false
+  async_processing: false
+
+limits:
+  max_news_limit: 500
+  min_news_threshold: 5
+
+analysis:
+  time_window_hours: 6  # Меньше для быстрого тестирования

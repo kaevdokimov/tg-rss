@@ -1,10 +1,16 @@
 """Загрузка и управление конфигурацией из .env и config.yaml."""
 
 import os
+import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import yaml
 from dotenv import load_dotenv
+
+from .validator import load_and_validate_config, ConfigValidationError
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Settings:
@@ -73,36 +79,101 @@ class Settings:
         )
 
 
-def load_settings(config_path: str = "config.yaml") -> Settings:
+def load_settings(config_path: str = "config.yaml", validate: bool = True) -> Settings:
     """
-    Загружает конфигурацию из .env и config.yaml.
-    
+    Загружает и валидирует конфигурацию из .env и config.yaml.
+
     Args:
         config_path: Путь к файлу config.yaml
-        
+        validate: Выполнять ли валидацию конфигурации
+
     Returns:
         Settings: Объект с настройками
+
+    Raises:
+        ConfigValidationError: Если валидация не пройдена
     """
     # Загружаем переменные окружения из .env
     env_path = Path(".env")
     if env_path.exists():
         load_dotenv(env_path)
-    
-    # Загружаем config.yaml
+
+    # Загружаем и валидируем конфигурацию
     config_file = Path(config_path)
+    config_dict, is_valid, errors, warnings = load_and_validate_config(config_file)
+
     if not config_file.exists():
         raise FileNotFoundError(
             f"Файл конфигурации {config_path} не найден. "
             f"Скопируйте config.yaml.example в config.yaml и настройте его."
         )
-    
-    with open(config_file, "r", encoding="utf-8") as f:
-        config_dict = yaml.safe_load(f) or {}
-    
+
+    # Выводим отчет о валидации
+    if validate:
+        if warnings:
+            logger.warning("Предупреждения конфигурации:")
+            for warning in warnings:
+                logger.warning(f"  - {warning}")
+
+        if not is_valid:
+            error_msg = f"Конфигурация не валидна:\n" + "\n".join(f"  - {err}" for err in errors)
+            logger.error(error_msg)
+            raise ConfigValidationError(error_msg)
+
+        if is_valid and not warnings:
+            logger.info("✅ Конфигурация валидна")
+
     # Заменяем переменные окружения в значениях
     config_dict = _substitute_env_vars(config_dict)
-    
+
     return Settings(config_dict)
+
+
+def validate_config_file(config_path: str = "config.yaml") -> Tuple[bool, List[str], List[str]]:
+    """
+    Валидирует файл конфигурации без создания объекта Settings.
+
+    Args:
+        config_path: Путь к файлу config.yaml
+
+    Returns:
+        (is_valid, errors, warnings)
+    """
+    config_file = Path(config_path)
+    _, is_valid, errors, warnings = load_and_validate_config(config_file)
+    return is_valid, errors, warnings
+
+
+def print_config_validation_report(config_path: str = "config.yaml"):
+    """Выводит отчет о валидации конфигурации."""
+    from .validator import ConfigValidator
+
+    is_valid, errors, warnings = validate_config_file(config_path)
+
+    print("=" * 60)
+    print("Проверка конфигурации news-analyzer-python")
+    print("=" * 60)
+
+    if errors:
+        print(f"\n❌ Ошибки ({len(errors)}):")
+        for error in errors:
+            print(f"  - {error}")
+
+    if warnings:
+        print(f"\n⚠️  Предупреждения ({len(warnings)}):")
+        for warning in warnings:
+            print(f"  - {warning}")
+
+    if is_valid and not warnings:
+        print("\n✅ Конфигурация корректна, без предупреждений")
+        return True
+
+    if is_valid and warnings:
+        print(f"\n⚠️  Конфигурация валидна, но есть {len(warnings)} предупреждений")
+        return True
+
+    print(f"\n❌ Конфигурация не валидна ({len(errors)} ошибок)")
+    return False
 
 
 def _substitute_env_vars(obj: Any) -> Any:

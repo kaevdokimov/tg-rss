@@ -48,6 +48,17 @@ cp config.yaml.example config.yaml
 
 Отредактируйте `.env` и `config.yaml` согласно вашей конфигурации БД.
 
+5. Проверьте конфигурацию:
+```bash
+python validate_config.py
+```
+
+Этот скрипт проверит:
+- Корректность всех параметров
+- Совместимость настроек
+- Оптимизацию производительности
+- Наличие необходимых файлов и директорий
+
 **Важно:** Убедитесь, что параметры подключения к БД в `.env` совпадают с параметрами вашего Go-проекта:
 - `POSTGRES_HOST` - хост БД (обычно `db` для Docker или `localhost` для локальной разработки)
 - `POSTGRES_PORT` - порт (обычно `5432`)
@@ -169,10 +180,51 @@ news-analyzer-python/
 
 ## Конфигурация
 
+Проект поддерживает **environment-specific конфигурации** для разных окружений (development, production, ci).
+
+### Основные настройки
+
 Основные параметры настраиваются в `config.yaml`:
 - `time_window_hours`: окно анализа (по умолчанию 24 часа)
 - `min_cluster_size`: минимальный размер кластера
 - `top_narratives`: количество топ-тем в отчете
+
+### Environment-specific конфигурации
+
+Для каждого окружения можно создать отдельный файл в `src/config/environments/`:
+
+```yaml
+# development.yaml - для разработки
+environment: development
+debug: true
+performance:
+  max_features: 1000
+  use_lemmatization: false
+
+# production.yaml - для production
+environment: production
+debug: false
+performance:
+  max_features: 5000
+  use_lemmatization: true
+```
+
+Окружение определяется автоматически по:
+- Переменной `ENV`
+- Наличию `.git` (development)
+- Наличию `/app` (Docker - production)
+- Наличию `CI=true` (CI/CD)
+
+### Валидация конфигурации
+
+```bash
+# Проверка конфигурации
+python validate_config.py
+
+# Валидация в коде
+from src.config import validate_config_file
+is_valid, errors, warnings = validate_config_file()
+```
 
 Параметры подключения к БД настраиваются в `.env`.
 
