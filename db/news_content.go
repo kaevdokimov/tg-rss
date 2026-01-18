@@ -132,7 +132,7 @@ func GetNewsForScraping(db *sql.DB, limit int) ([]NewsForScraping, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения новостей для парсинга: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var newsList []NewsForScraping
 	for rows.Next() {

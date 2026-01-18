@@ -90,14 +90,14 @@ func TestLoggerFromEnv(t *testing.T) {
 	originalLevel := os.Getenv("LOG_LEVEL")
 	defer func() {
 		if originalLevel != "" {
-			os.Setenv("LOG_LEVEL", originalLevel)
+			_ = os.Setenv("LOG_LEVEL", originalLevel)
 		} else {
-			os.Unsetenv("LOG_LEVEL")
+			_ = os.Unsetenv("LOG_LEVEL")
 		}
 	}()
 
 	// Тест установки из переменной окружения
-	os.Setenv("LOG_LEVEL", "WARN")
+	_ = os.Setenv("LOG_LEVEL", "WARN")
 	// Переинициализируем (в реальности это делается в init)
 	SetLogLevelFromString(os.Getenv("LOG_LEVEL"))
 	if currentLevel != WARN {

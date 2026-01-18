@@ -81,10 +81,9 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 	for _, imgURL := range content.Images {
 		if cv.validateImageURL(imgURL) {
 			validImages = append(validImages, imgURL)
-		} else {
-			// Недействительный URL изображения - пропускаем без ошибок
-			// monitoring.IncrementContentValidationErrors("image_url") // раскомментировать при необходимости
+			// Валидный URL изображения - добавляем в список
 		}
+		// Недействительный URL изображения - пропускаем без ошибок
 	}
 	content.Images = validImages
 
@@ -94,10 +93,9 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 		sanitizedTag := cv.sanitizeText(tag)
 		if sanitizedTag != "" && len(sanitizedTag) <= 100 {
 			validTags = append(validTags, sanitizedTag)
-		} else {
-			// Недействительный тег (пустой или слишком длинный) - пропускаем
-			// monitoring.IncrementContentValidationErrors("tag") // раскомментировать при необходимости
+			// Валидный тег - добавляем в список
 		}
+		// Недействительный тег (пустой или слишком длинный) - пропускаем
 	}
 	content.Tags = validTags
 
@@ -107,10 +105,9 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 		for key, value := range content.MetaData {
 			if cv.validateMetaKey(key) && cv.validateMetaValue(value) {
 			validMetaData[key] = cv.sanitizeText(value)
-		} else {
-			// Недействительная мета-данная - пропускаем
-			// monitoring.IncrementContentValidationErrors("meta_data") // раскомментировать при необходимости
+			// Валидная мета-данная - добавляем в список
 		}
+		// Недействительная мета-данная - пропускаем
 		}
 		content.MetaData = validMetaData
 	}

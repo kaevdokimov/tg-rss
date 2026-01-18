@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -77,7 +78,9 @@ func sendErrorMessage(bot *tgbotapi.BotAPI, chatId int64, err error) {
 
 	msg := tgbotapi.NewMessage(chatId, errorMsg)
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения об ошибке: %v", err)
+	}
 }
 
 // isRateLimitError проверяет, является ли ошибка ошибкой rate limiting

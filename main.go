@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("Ошибка подключения к базе данных: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	logger.Info("Инициализация схемы базы данных...")
 	db.InitSchema(dbConn)
@@ -97,7 +97,7 @@ func main() {
 			redisAvailable = false
 		} else {
 			redisAvailable = true
-			defer redisProducer.Close()
+			defer func() { _ = redisProducer.Close() }()
 			logger.Info("Redis producer успешно инициализирован")
 			break
 		}
@@ -122,7 +122,7 @@ func main() {
 				logger.Warn("Redis consumer недоступен. Работаем в ограниченном режиме")
 				redisAvailable = false
 			} else {
-				defer redisConsumer.Close()
+				defer func() { _ = redisConsumer.Close() }()
 				logger.Info("Redis consumer успешно инициализирован")
 				break
 			}
@@ -206,12 +206,12 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 		// Проверяем подключение к БД
 		if err := dbConn.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "Database unhealthy: %v", err)
+			_, _ = fmt.Fprintf(w, "Database unhealthy: %v", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "OK")
+		_, _ = fmt.Fprintf(w, "OK")
 	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(10*time.Second)))
 
 	// OpenAPI спецификация
@@ -219,7 +219,7 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.WriteHeader(http.StatusOK)
 		// В реальном приложении здесь можно прочитать файл
-		w.Write([]byte(`openapi: 3.0.3
+		_, _ = w.Write([]byte(`openapi: 3.0.3
 info:
   title: TG-RSS Bot Management API
   description: API для управления Telegram RSS ботом
@@ -268,129 +268,129 @@ paths:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 		// Собираем метрики
-		fmt.Fprintf(w, "# TG-RSS Bot Metrics\n")
-		fmt.Fprintf(w, "# HELP rss_polls_total Total number of RSS polls\n")
-		fmt.Fprintf(w, "# TYPE rss_polls_total counter\n")
-		fmt.Fprintf(w, "rss_polls_total %d\n", monitoring.GetRSSPolls())
+		_, _ = fmt.Fprintf(w, "# TG-RSS Bot Metrics\n")
+		_, _ = fmt.Fprintf(w, "# HELP rss_polls_total Total number of RSS polls\n")
+		_, _ = fmt.Fprintf(w, "# TYPE rss_polls_total counter\n")
+		_, _ = fmt.Fprintf(w, "rss_polls_total %d\n", monitoring.GetRSSPolls())
 
-		fmt.Fprintf(w, "# HELP rss_polls_errors_total Total number of RSS poll errors\n")
-		fmt.Fprintf(w, "# TYPE rss_polls_errors_total counter\n")
-		fmt.Fprintf(w, "rss_polls_errors_total %d\n", monitoring.GetRSSPollsErrors())
+		_, _ = fmt.Fprintf(w, "# HELP rss_polls_errors_total Total number of RSS poll errors\n")
+		_, _ = fmt.Fprintf(w, "# TYPE rss_polls_errors_total counter\n")
+		_, _ = fmt.Fprintf(w, "rss_polls_errors_total %d\n", monitoring.GetRSSPollsErrors())
 
-		fmt.Fprintf(w, "# HELP rss_items_processed_total Total number of RSS items processed\n")
-		fmt.Fprintf(w, "# TYPE rss_items_processed_total counter\n")
-		fmt.Fprintf(w, "rss_items_processed_total %d\n", monitoring.GetRSSItemsProcessed())
+		_, _ = fmt.Fprintf(w, "# HELP rss_items_processed_total Total number of RSS items processed\n")
+		_, _ = fmt.Fprintf(w, "# TYPE rss_items_processed_total counter\n")
+		_, _ = fmt.Fprintf(w, "rss_items_processed_total %d\n", monitoring.GetRSSItemsProcessed())
 
-		fmt.Fprintf(w, "# HELP redis_messages_produced_total Total number of Redis messages produced\n")
-		fmt.Fprintf(w, "# TYPE redis_messages_produced_total counter\n")
-		fmt.Fprintf(w, "redis_messages_produced_total %d\n", monitoring.GetRedisMessagesProduced())
+		_, _ = fmt.Fprintf(w, "# HELP redis_messages_produced_total Total number of Redis messages produced\n")
+		_, _ = fmt.Fprintf(w, "# TYPE redis_messages_produced_total counter\n")
+		_, _ = fmt.Fprintf(w, "redis_messages_produced_total %d\n", monitoring.GetRedisMessagesProduced())
 
-		fmt.Fprintf(w, "# HELP redis_messages_consumed_total Total number of Redis messages consumed\n")
-		fmt.Fprintf(w, "# TYPE redis_messages_consumed_total counter\n")
-		fmt.Fprintf(w, "redis_messages_consumed_total %d\n", monitoring.GetRedisMessagesConsumed())
+		_, _ = fmt.Fprintf(w, "# HELP redis_messages_consumed_total Total number of Redis messages consumed\n")
+		_, _ = fmt.Fprintf(w, "# TYPE redis_messages_consumed_total counter\n")
+		_, _ = fmt.Fprintf(w, "redis_messages_consumed_total %d\n", monitoring.GetRedisMessagesConsumed())
 
-		fmt.Fprintf(w, "# HELP redis_errors_total Total number of Redis errors\n")
-		fmt.Fprintf(w, "# TYPE redis_errors_total counter\n")
-		fmt.Fprintf(w, "redis_errors_total %d\n", monitoring.GetRedisErrors())
+		_, _ = fmt.Fprintf(w, "# HELP redis_errors_total Total number of Redis errors\n")
+		_, _ = fmt.Fprintf(w, "# TYPE redis_errors_total counter\n")
+		_, _ = fmt.Fprintf(w, "redis_errors_total %d\n", monitoring.GetRedisErrors())
 
-		fmt.Fprintf(w, "# HELP telegram_messages_sent_total Total number of Telegram messages sent\n")
-		fmt.Fprintf(w, "# TYPE telegram_messages_sent_total counter\n")
-		fmt.Fprintf(w, "telegram_messages_sent_total %d\n", monitoring.GetTelegramMessagesSent())
+		_, _ = fmt.Fprintf(w, "# HELP telegram_messages_sent_total Total number of Telegram messages sent\n")
+		_, _ = fmt.Fprintf(w, "# TYPE telegram_messages_sent_total counter\n")
+		_, _ = fmt.Fprintf(w, "telegram_messages_sent_total %d\n", monitoring.GetTelegramMessagesSent())
 
-		fmt.Fprintf(w, "# HELP telegram_messages_errors_total Total number of Telegram message errors\n")
-		fmt.Fprintf(w, "# TYPE telegram_messages_errors_total counter\n")
-		fmt.Fprintf(w, "telegram_messages_errors_total %d\n", monitoring.GetTelegramMessagesErrors())
+		_, _ = fmt.Fprintf(w, "# HELP telegram_messages_errors_total Total number of Telegram message errors\n")
+		_, _ = fmt.Fprintf(w, "# TYPE telegram_messages_errors_total counter\n")
+		_, _ = fmt.Fprintf(w, "telegram_messages_errors_total %d\n", monitoring.GetTelegramMessagesErrors())
 
-		fmt.Fprintf(w, "# HELP telegram_commands_total Total number of Telegram commands received\n")
-		fmt.Fprintf(w, "# TYPE telegram_commands_total counter\n")
-		fmt.Fprintf(w, "telegram_commands_total %d\n", monitoring.GetTelegramCommands())
+		_, _ = fmt.Fprintf(w, "# HELP telegram_commands_total Total number of Telegram commands received\n")
+		_, _ = fmt.Fprintf(w, "# TYPE telegram_commands_total counter\n")
+		_, _ = fmt.Fprintf(w, "telegram_commands_total %d\n", monitoring.GetTelegramCommands())
 
-		fmt.Fprintf(w, "# HELP db_queries_total Total number of database queries\n")
-		fmt.Fprintf(w, "# TYPE db_queries_total counter\n")
-		fmt.Fprintf(w, "db_queries_total %d\n", monitoring.GetDBQueries())
+		_, _ = fmt.Fprintf(w, "# HELP db_queries_total Total number of database queries\n")
+		_, _ = fmt.Fprintf(w, "# TYPE db_queries_total counter\n")
+		_, _ = fmt.Fprintf(w, "db_queries_total %d\n", monitoring.GetDBQueries())
 
-		fmt.Fprintf(w, "# HELP db_queries_errors_total Total number of database query errors\n")
-		fmt.Fprintf(w, "# TYPE db_queries_errors_total counter\n")
-		fmt.Fprintf(w, "db_queries_errors_total %d\n", monitoring.GetDBQueriesErrors())
+		_, _ = fmt.Fprintf(w, "# HELP db_queries_errors_total Total number of database query errors\n")
+		_, _ = fmt.Fprintf(w, "# TYPE db_queries_errors_total counter\n")
+		_, _ = fmt.Fprintf(w, "db_queries_errors_total %d\n", monitoring.GetDBQueriesErrors())
 
 		// Добавляем uptime метрику
-		fmt.Fprintf(w, "# HELP app_uptime_seconds Application uptime in seconds\n")
-		fmt.Fprintf(w, "# TYPE app_uptime_seconds gauge\n")
-		fmt.Fprintf(w, "app_uptime_seconds %d\n", int(time.Since(startTime).Seconds()))
+		_, _ = fmt.Fprintf(w, "# HELP app_uptime_seconds Application uptime in seconds\n")
+		_, _ = fmt.Fprintf(w, "# TYPE app_uptime_seconds gauge\n")
+		_, _ = fmt.Fprintf(w, "app_uptime_seconds %d\n", int(time.Since(startTime).Seconds()))
 
 		// Добавляем информацию о Go
-		fmt.Fprintf(w, "# HELP go_goroutines Number of goroutines\n")
-		fmt.Fprintf(w, "# TYPE go_goroutines gauge\n")
-		fmt.Fprintf(w, "go_goroutines %d\n", runtime.NumGoroutine())
+		_, _ = fmt.Fprintf(w, "# HELP go_goroutines Number of goroutines\n")
+		_, _ = fmt.Fprintf(w, "# TYPE go_goroutines gauge\n")
+		_, _ = fmt.Fprintf(w, "go_goroutines %d\n", runtime.NumGoroutine())
 
-		fmt.Fprintf(w, "# HELP go_threads Number of OS threads\n")
-		fmt.Fprintf(w, "# TYPE go_threads gauge\n")
-		fmt.Fprintf(w, "go_threads %d\n", runtime.NumCPU())
+		_, _ = fmt.Fprintf(w, "# HELP go_threads Number of OS threads\n")
+		_, _ = fmt.Fprintf(w, "# TYPE go_threads gauge\n")
+		_, _ = fmt.Fprintf(w, "go_threads %d\n", runtime.NumCPU())
 
 		// Метрики Circuit Breaker
 		metrics := monitoring.GetMetrics()
 		for name, calls := range metrics.CircuitBreakerCalls {
-			fmt.Fprintf(w, "# HELP circuit_breaker_calls_total Total number of calls to circuit breaker %s\n", name)
-			fmt.Fprintf(w, "# TYPE circuit_breaker_calls_total counter\n")
-			fmt.Fprintf(w, "circuit_breaker_calls_total{name=\"%s\"} %d\n", name, calls)
+			_, _ = fmt.Fprintf(w, "# HELP circuit_breaker_calls_total Total number of calls to circuit breaker %s\n", name)
+			_, _ = fmt.Fprintf(w, "# TYPE circuit_breaker_calls_total counter\n")
+			_, _ = fmt.Fprintf(w, "circuit_breaker_calls_total{name=\"%s\"} %d\n", name, calls)
 		}
 
 		for name, failures := range metrics.CircuitBreakerFailures {
-			fmt.Fprintf(w, "# HELP circuit_breaker_failures_total Total number of failures in circuit breaker %s\n", name)
-			fmt.Fprintf(w, "# TYPE circuit_breaker_failures_total counter\n")
-			fmt.Fprintf(w, "circuit_breaker_failures_total{name=\"%s\"} %d\n", name, failures)
+			_, _ = fmt.Fprintf(w, "# HELP circuit_breaker_failures_total Total number of failures in circuit breaker %s\n", name)
+			_, _ = fmt.Fprintf(w, "# TYPE circuit_breaker_failures_total counter\n")
+			_, _ = fmt.Fprintf(w, "circuit_breaker_failures_total{name=\"%s\"} %d\n", name, failures)
 		}
 
 		for name, rejected := range metrics.CircuitBreakerRejected {
-			fmt.Fprintf(w, "# HELP circuit_breaker_rejected_total Total number of rejected requests in circuit breaker %s\n", name)
-			fmt.Fprintf(w, "# TYPE circuit_breaker_rejected_total counter\n")
-			fmt.Fprintf(w, "circuit_breaker_rejected_total{name=\"%s\"} %d\n", name, rejected)
+			_, _ = fmt.Fprintf(w, "# HELP circuit_breaker_rejected_total Total number of rejected requests in circuit breaker %s\n", name)
+			_, _ = fmt.Fprintf(w, "# TYPE circuit_breaker_rejected_total counter\n")
+			_, _ = fmt.Fprintf(w, "circuit_breaker_rejected_total{name=\"%s\"} %d\n", name, rejected)
 		}
 
 		// HTTP метрики
-		fmt.Fprintf(w, "# HELP http_requests_total Total number of HTTP requests\n")
-		fmt.Fprintf(w, "# TYPE http_requests_total counter\n")
-		fmt.Fprintf(w, "http_requests_total %d\n", metrics.HTTPRequestsTotal)
+		_, _ = fmt.Fprintf(w, "# HELP http_requests_total Total number of HTTP requests\n")
+		_, _ = fmt.Fprintf(w, "# TYPE http_requests_total counter\n")
+		_, _ = fmt.Fprintf(w, "http_requests_total %d\n", metrics.HTTPRequestsTotal)
 
-		fmt.Fprintf(w, "# HELP http_requests_active Current number of active HTTP requests\n")
-		fmt.Fprintf(w, "# TYPE http_requests_active gauge\n")
-		fmt.Fprintf(w, "http_requests_active %d\n", metrics.HTTPRequestsActive)
+		_, _ = fmt.Fprintf(w, "# HELP http_requests_active Current number of active HTTP requests\n")
+		_, _ = fmt.Fprintf(w, "# TYPE http_requests_active gauge\n")
+		_, _ = fmt.Fprintf(w, "http_requests_active %d\n", metrics.HTTPRequestsActive)
 
-		fmt.Fprintf(w, "# HELP http_requests_errors_total Total number of HTTP request errors\n")
-		fmt.Fprintf(w, "# TYPE http_requests_errors_total counter\n")
-		fmt.Fprintf(w, "http_requests_errors_total %d\n", metrics.HTTPRequestsErrors)
+		_, _ = fmt.Fprintf(w, "# HELP http_requests_errors_total Total number of HTTP request errors\n")
+		_, _ = fmt.Fprintf(w, "# TYPE http_requests_errors_total counter\n")
+		_, _ = fmt.Fprintf(w, "http_requests_errors_total %d\n", metrics.HTTPRequestsErrors)
 
-		fmt.Fprintf(w, "# HELP http_requests_timeout_total Total number of HTTP request timeouts\n")
-		fmt.Fprintf(w, "# TYPE http_requests_timeout_total counter\n")
-		fmt.Fprintf(w, "http_requests_timeout_total %d\n", metrics.HTTPRequestsTimeout)
+		_, _ = fmt.Fprintf(w, "# HELP http_requests_timeout_total Total number of HTTP request timeouts\n")
+		_, _ = fmt.Fprintf(w, "# TYPE http_requests_timeout_total counter\n")
+		_, _ = fmt.Fprintf(w, "http_requests_timeout_total %d\n", metrics.HTTPRequestsTimeout)
 
 		// Content validation метрики
-		fmt.Fprintf(w, "# HELP content_validations_total Total number of content validations\n")
-		fmt.Fprintf(w, "# TYPE content_validations_total counter\n")
-		fmt.Fprintf(w, "content_validations_total %d\n", metrics.ContentValidations)
+		_, _ = fmt.Fprintf(w, "# HELP content_validations_total Total number of content validations\n")
+		_, _ = fmt.Fprintf(w, "# TYPE content_validations_total counter\n")
+		_, _ = fmt.Fprintf(w, "content_validations_total %d\n", metrics.ContentValidations)
 
 		for field, errors := range metrics.ContentValidationErrors {
-			fmt.Fprintf(w, "# HELP content_validation_errors_total Total number of content validation errors for %s\n", field)
-			fmt.Fprintf(w, "# TYPE content_validation_errors_total counter\n")
-			fmt.Fprintf(w, "content_validation_errors_total{field=\"%s\"} %d\n", field, errors)
+			_, _ = fmt.Fprintf(w, "# HELP content_validation_errors_total Total number of content validation errors for %s\n", field)
+			_, _ = fmt.Fprintf(w, "# TYPE content_validation_errors_total counter\n")
+			_, _ = fmt.Fprintf(w, "content_validation_errors_total{field=\"%s\"} %d\n", field, errors)
 		}
 
 		// Database connection метрики
-		fmt.Fprintf(w, "# HELP db_connections_open Current number of open database connections\n")
-		fmt.Fprintf(w, "# TYPE db_connections_open gauge\n")
-		fmt.Fprintf(w, "db_connections_open %d\n", metrics.DBConnectionsOpen)
+		_, _ = fmt.Fprintf(w, "# HELP db_connections_open Current number of open database connections\n")
+		_, _ = fmt.Fprintf(w, "# TYPE db_connections_open gauge\n")
+		_, _ = fmt.Fprintf(w, "db_connections_open %d\n", metrics.DBConnectionsOpen)
 
-		fmt.Fprintf(w, "# HELP db_connections_idle Current number of idle database connections\n")
-		fmt.Fprintf(w, "# TYPE db_connections_idle gauge\n")
-		fmt.Fprintf(w, "db_connections_idle %d\n", metrics.DBConnectionsIdle)
+		_, _ = fmt.Fprintf(w, "# HELP db_connections_idle Current number of idle database connections\n")
+		_, _ = fmt.Fprintf(w, "# TYPE db_connections_idle gauge\n")
+		_, _ = fmt.Fprintf(w, "db_connections_idle %d\n", metrics.DBConnectionsIdle)
 
-		fmt.Fprintf(w, "# HELP db_connections_in_use Current number of in-use database connections\n")
-		fmt.Fprintf(w, "# TYPE db_connections_in_use gauge\n")
-		fmt.Fprintf(w, "db_connections_in_use %d\n", metrics.DBConnectionsInUse)
+		_, _ = fmt.Fprintf(w, "# HELP db_connections_in_use Current number of in-use database connections\n")
+		_, _ = fmt.Fprintf(w, "# TYPE db_connections_in_use gauge\n")
+		_, _ = fmt.Fprintf(w, "db_connections_in_use %d\n", metrics.DBConnectionsInUse)
 
-		fmt.Fprintf(w, "# HELP db_connections_wait Current number of connections waiting\n")
-		fmt.Fprintf(w, "# TYPE db_connections_wait gauge\n")
-		fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
+		_, _ = fmt.Fprintf(w, "# HELP db_connections_wait Current number of connections waiting\n")
+		_, _ = fmt.Fprintf(w, "# TYPE db_connections_wait gauge\n")
+		_, _ = fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
 	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(15*time.Second)))
 
 	// API для управления пользователями
@@ -445,7 +445,7 @@ func PerformanceTest() {
 		log.Printf("🔄 Продолжаем тестирование без Redis кэша")
 		cache = nil
 	} else {
-		defer cache.Close()
+		defer func() { _ = cache.Close() }()
 		fmt.Println("✅ Redis кэш подключен")
 	}
 

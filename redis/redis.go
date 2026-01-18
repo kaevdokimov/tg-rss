@@ -148,7 +148,7 @@ func NewConsumer(redisConfig *config.RedisConfig) (*Consumer, error) {
 // SubscribeNews подписывается на новости
 func (c *Consumer) SubscribeNews(handler func(NewsItem) error) error {
 	pubsub := c.client.Subscribe(context.Background(), c.newsChannel)
-	defer pubsub.Close()
+	defer func() { _ = pubsub.Close() }()
 
 	log.Printf("Redis consumer подписан на канал: %s", c.newsChannel)
 
@@ -175,7 +175,7 @@ func (c *Consumer) SubscribeNews(handler func(NewsItem) error) error {
 // SubscribeNotifications подписывается на уведомления
 func (c *Consumer) SubscribeNotifications(handler func(NewsNotification) error) error {
 	pubsub := c.client.Subscribe(context.Background(), c.notifyChannel)
-	defer pubsub.Close()
+	defer func() { _ = pubsub.Close() }()
 
 	log.Printf("Redis consumer подписан на канал уведомлений: %s", c.notifyChannel)
 
