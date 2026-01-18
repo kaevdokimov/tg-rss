@@ -55,7 +55,7 @@ func GetByteSlice() []byte {
 // PutByteSlice возвращает срез байтов в pool
 func PutByteSlice(slice []byte) {
 	if cap(slice) <= 65536 { // Не возвращаем очень большие срезы (макс 64KB)
-		byteSlicePool.Put(slice[:0]) // Очищаем срез перед возвратом
+		byteSlicePool.Put((*[]byte)(&slice)) // Передаем указатель на срез
 	}
 }
 

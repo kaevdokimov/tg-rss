@@ -105,7 +105,11 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRed
 		log.Printf("🔄 Продолжаем без кэширования контента")
 	} else {
 		log.Printf("✅ Redis кэш для контента инициализирован")
-		defer contentCache.Close()
+		defer func() {
+			if err := contentCache.Close(); err != nil {
+				log.Printf("⚠️  Ошибка при закрытии кэша контента: %v", err)
+			}
+		}()
 	}
 
 	// Запуск фонового парсера контента новостей

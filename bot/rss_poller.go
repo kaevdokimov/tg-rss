@@ -43,6 +43,7 @@ type newsCandidate struct {
 }
 
 // parseSource парсит один RSS источник
+// TODO: используется ли эта функция? проверить необходимость
 func parseSource(source db.Source, tz *time.Location) parseResult {
 	newsList, err := rss.ParseRSSWithClient(source.Url, tz, rssHttpClient)
 	return parseResult{

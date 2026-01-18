@@ -68,6 +68,7 @@ func handleTelegramError(err error) string {
 }
 
 // sendErrorMessage отправляет понятное сообщение об ошибке пользователю
+// TODO: использовать в обработчиках команд при возникновении ошибок
 func sendErrorMessage(bot *tgbotapi.BotAPI, chatId int64, err error) {
 	errorMsg := handleTelegramError(err)
 	if errorMsg == "" {

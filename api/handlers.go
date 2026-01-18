@@ -65,7 +65,7 @@ type UpdateSourceRequest struct {
 func sendJSON(w http.ResponseWriter, status int, response APIResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response) // Ignore error after headers sent
 }
 
 // GetUsersHandler возвращает список всех пользователей (упрощенная версия)

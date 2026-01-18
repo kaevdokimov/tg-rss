@@ -82,7 +82,8 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 		if cv.validateImageURL(imgURL) {
 			validImages = append(validImages, imgURL)
 		} else {
-			// monitoring.IncrementContentValidationErrors("image_url")
+			// Недействительный URL изображения - пропускаем без ошибок
+			// monitoring.IncrementContentValidationErrors("image_url") // раскомментировать при необходимости
 		}
 	}
 	content.Images = validImages
@@ -94,7 +95,8 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 		if sanitizedTag != "" && len(sanitizedTag) <= 100 {
 			validTags = append(validTags, sanitizedTag)
 		} else {
-			// monitoring.IncrementContentValidationErrors("tag")
+			// Недействительный тег (пустой или слишком длинный) - пропускаем
+			// monitoring.IncrementContentValidationErrors("tag") // раскомментировать при необходимости
 		}
 	}
 	content.Tags = validTags
@@ -106,7 +108,8 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 			if cv.validateMetaKey(key) && cv.validateMetaValue(value) {
 			validMetaData[key] = cv.sanitizeText(value)
 		} else {
-			// monitoring.IncrementContentValidationErrors("meta_data")
+			// Недействительная мета-данная - пропускаем
+			// monitoring.IncrementContentValidationErrors("meta_data") // раскомментировать при необходимости
 		}
 		}
 		content.MetaData = validMetaData

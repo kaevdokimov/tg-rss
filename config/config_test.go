@@ -16,19 +16,19 @@ func TestLoadDBConfig(t *testing.T) {
 	// Восстанавливаем после теста
 	defer func() {
 		if originalHost != "" {
-			os.Setenv("POSTGRES_HOST", originalHost)
+			_ = os.Setenv("POSTGRES_HOST", originalHost)
 		} else {
-			os.Unsetenv("POSTGRES_HOST")
+			_ = os.Unsetenv("POSTGRES_HOST")
 		}
 		if originalPort != "" {
-			os.Setenv("POSTGRES_PORT", originalPort)
+			_ = os.Setenv("POSTGRES_PORT", originalPort)
 		} else {
-			os.Unsetenv("POSTGRES_PORT")
+			_ = os.Unsetenv("POSTGRES_PORT")
 		}
 		if originalUser != "" {
-			os.Setenv("POSTGRES_USER", originalUser)
+			_ = os.Setenv("POSTGRES_USER", originalUser)
 		} else {
-			os.Unsetenv("POSTGRES_USER")
+			_ = os.Unsetenv("POSTGRES_USER")
 		}
 		if originalPass != "" {
 			os.Setenv("POSTGRES_PASSWORD", originalPass)

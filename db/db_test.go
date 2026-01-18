@@ -128,7 +128,7 @@ func TestConnect(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Закрываем соединение
-	db.Close()
+	_ = db.Close()
 }
 
 // TestSaveNews тестирует сохранение новости (интеграционный тест)

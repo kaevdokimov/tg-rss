@@ -198,11 +198,11 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 			return nil, fmt.Errorf("ошибка загрузки страницы после %d попыток: %w", maxRetries, err)
 		}
 		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("неверный статус код после %d попыток: %d", maxRetries, resp.StatusCode)
 		}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Читаем body с поддержкой сжатия и ограничением размера
 	var reader io.Reader = resp.Body
@@ -218,13 +218,13 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ошибка создания gzip reader: %w", err)
 		}
-		defer gzipReader.Close()
+		defer func() { _ = gzipReader.Close() }()
 		reader = gzipReader
 		scraperLogger.Debug("Распаковываем данные с использованием gzip")
 
 	case "deflate":
 		flateReader := flate.NewReader(resp.Body)
-		defer flateReader.Close()
+		defer func() { _ = flateReader.Close() }()
 		reader = flateReader
 		scraperLogger.Debug("Распаковываем данные с использованием deflate")
 
@@ -248,7 +248,7 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 			if peekReader.isGzip() {
 				gzipReader, err := gzip.NewReader(peekReader)
 				if err == nil {
-					defer gzipReader.Close()
+					defer func() { _ = gzipReader.Close() }()
 					reader = gzipReader
 					scraperLogger.Debug("Автоматически распаковали как gzip")
 				} else {
@@ -256,7 +256,7 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 				}
 			} else if peekReader.isDeflate() {
 				flateReader := flate.NewReader(peekReader)
-				defer flateReader.Close()
+				defer func() { _ = flateReader.Close() }()
 				reader = flateReader
 				scraperLogger.Debug("Автоматически распаковали как deflate")
 			} else if peekReader.isBrotli() {
@@ -406,7 +406,8 @@ func extractMetaData(doc *goquery.Document, content *NewsContent) {
 
 // extractFullText извлекает полный текст статьи, убирая лишнее
 // DEPRECATED: Используется go-readability, эта функция больше не вызывается
-// Оставлена для справки или как fallback
+// Оставлена для справки или как fallback на случай проблем с go-readability
+// TODO: удалить после окончательного перехода на go-readability
 func extractFullText(doc *goquery.Document, content *NewsContent) {
 	// Популярные селекторы для контента статьи (в порядке приоритета)
 	selectors := []string{
@@ -537,6 +538,7 @@ func extractFullText(doc *goquery.Document, content *NewsContent) {
 }
 
 // isNonContentText проверяет, является ли текст навигацией, рекламой или другим нерелевантным контентом
+// TODO: интегрировать в основную логику очистки текста
 func isNonContentText(text string) bool {
 	text = strings.ToLower(text)
 
@@ -629,6 +631,7 @@ func isNonContentText(text string) bool {
 }
 
 // cleanText очищает текст от лишних пробелов и переносов
+// TODO: использовать в основной логике обработки текста
 func cleanText(text string) string {
 	// Удаляем множественные пробелы
 	text = strings.ReplaceAll(text, "  ", " ")
@@ -787,9 +790,8 @@ func extractImages(doc *goquery.Document, content *NewsContent) {
 				// Преобразуем относительные URL в абсолютные
 				if strings.HasPrefix(src, "//") {
 					src = "https:" + src
-				} else if strings.HasPrefix(src, "/") {
-					// Нужен базовый URL, но для простоты оставляем как есть
 				}
+				// Относительные пути (/path) оставляем как есть - нужен базовый URL для полного разрешения
 				content.Images = append(content.Images, src)
 				seen[src] = true
 			}
@@ -844,6 +846,7 @@ func extractPublishedDate(doc *goquery.Document, content *NewsContent) {
 }
 
 // extractContentHTML сохраняет HTML контента для будущего анализа
+// TODO: интегрировать для сохранения оригинального HTML контента
 func extractContentHTML(doc *goquery.Document, content *NewsContent) {
 	// Используем те же селекторы, что и для извлечения текста
 	selectors := []string{

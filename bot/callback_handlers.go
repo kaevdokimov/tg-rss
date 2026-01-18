@@ -19,7 +19,9 @@ func handleCallback(bot *tgbotapi.BotAPI, dbConn *sql.DB, callback *tgbotapi.Cal
 
 	// Отвечаем на callback, чтобы убрать "часики" у кнопки
 	callbackResponse := tgbotapi.NewCallback(callback.ID, "")
-	bot.Send(callbackResponse)
+	if _, err := bot.Send(callbackResponse); err != nil {
+		log.Printf("⚠️  Ошибка отправки callback ответа: %v", err)
+	}
 
 	switch {
 	case data == "main_menu":
@@ -72,7 +74,9 @@ func handleMainMenu(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "🏠\n\nВыберите действие:")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки главного меню: %v", err)
+	}
 }
 
 // handleAddSourcePrompt показывает инструкцию для добавления источника
@@ -80,7 +84,9 @@ func handleAddSourcePrompt(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "➕ *Добавление источника*\n\nОтправьте URL RSS-ленты, которую хотите добавить.\n\nПримеры:\n• https://tass.ru/rss/v2.xml\n• https://rss.cnn.com/rss/edition.rss")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createAddSourceKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки инструкции добавления источника: %v", err)
+	}
 }
 
 // handleMySubscriptions показывает подписки пользователя
@@ -420,7 +426,9 @@ func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, da
 					ChatId:   chatId,
 					Username: "unknown",
 				}
-				db.SaveUser(dbConn, user)
+				if err := db.SaveUser(dbConn, user); err != nil {
+					log.Printf("⚠️  Ошибка сохранения пользователя %d: %v", chatId, err)
+				}
 			}
 
 			subscription := db.Subscription{
