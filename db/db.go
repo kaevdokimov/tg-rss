@@ -193,9 +193,15 @@ func Connect(config *config.DBConfig) (*sql.DB, error) {
 	}
 
 	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("ошибка соединения с БД: %v", err)
+		return nil, fmt.Errorf("ошибка соединения с БД: %w", err)
 	}
-	log.Println("Подключение к БД установлено")
+
+	// Настройка connection pooling для оптимизации производительности
+	db.SetMaxOpenConns(25)                 // Максимум 25 открытых соединений
+	db.SetMaxIdleConns(10)                 // Максимум 10 idle соединений
+	db.SetConnMaxLifetime(5 * time.Minute) // Максимальное время жизни соединения
+
+	log.Println("Подключение к БД установлено с connection pooling (max_open=25, max_idle=10, max_lifetime=5m)")
 	return db, nil
 }
 

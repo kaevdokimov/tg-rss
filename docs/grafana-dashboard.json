@@ -1,0 +1,177 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "TG-RSS Bot Monitoring",
+    "tags": ["tg-rss", "monitoring", "prometheus"],
+    "timezone": "Europe/Moscow",
+    "panels": [
+      {
+        "id": 1,
+        "title": "RSS Processing",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(rss_polls_total[5m])",
+            "legendFormat": "RSS polls per second"
+          },
+          {
+            "expr": "rate(rss_polls_errors_total[5m])",
+            "legendFormat": "RSS errors per second"
+          },
+          {
+            "expr": "rate(rss_items_processed_total[5m])",
+            "legendFormat": "Items processed per second"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Telegram Messages",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(telegram_messages_sent_total[5m])",
+            "legendFormat": "Messages sent per second"
+          },
+          {
+            "expr": "rate(telegram_messages_errors_total[5m])",
+            "legendFormat": "Message errors per second"
+          },
+          {
+            "expr": "rate(telegram_commands_total[5m])",
+            "legendFormat": "Commands per second"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Circuit Breaker Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "circuit_breaker_calls_total",
+            "legendFormat": "{{name}} calls"
+          },
+          {
+            "expr": "circuit_breaker_failures_total",
+            "legendFormat": "{{name}} failures"
+          },
+          {
+            "expr": "circuit_breaker_rejected_total",
+            "legendFormat": "{{name}} rejected"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "db_connections_open",
+            "legendFormat": "Open connections"
+          },
+          {
+            "expr": "db_connections_idle",
+            "legendFormat": "Idle connections"
+          },
+          {
+            "expr": "db_connections_in_use",
+            "legendFormat": "In use connections"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "HTTP Requests",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "Total requests per second"
+          },
+          {
+            "expr": "http_requests_active",
+            "legendFormat": "Active requests"
+          },
+          {
+            "expr": "rate(http_requests_errors_total[5m])",
+            "legendFormat": "Errors per second"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Application Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "Service status"
+          }
+        ],
+        "gridPos": {"h": 3, "w": 6, "x": 0, "y": 14}
+      },
+      {
+        "id": 7,
+        "title": "Uptime",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "app_uptime_seconds / 3600",
+            "legendFormat": "Hours running"
+          }
+        ],
+        "gridPos": {"h": 3, "w": 6, "x": 6, "y": 14}
+      },
+      {
+        "id": 8,
+        "title": "Goroutines",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "go_goroutines",
+            "legendFormat": "Active goroutines"
+          }
+        ],
+        "gridPos": {"h": 3, "w": 6, "x": 12, "y": 14}
+      },
+      {
+        "id": 9,
+        "title": "Content Validation",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(content_validations_total[5m])",
+            "legendFormat": "Validations per second"
+          },
+          {
+            "expr": "rate(content_validation_errors_total[5m])",
+            "legendFormat": "Validation errors per second"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 17}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": []
+  }
+}

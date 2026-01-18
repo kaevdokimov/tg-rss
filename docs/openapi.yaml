@@ -1,0 +1,84 @@
+openapi: 3.0.3
+info:
+  title: TG-RSS Bot Monitoring API
+  description: API для мониторинга и метрик Telegram RSS бота
+  version: 1.0.0
+  contact:
+    name: TG-RSS Bot
+    url: https://github.com/kaevdokimov/tg-rss
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Проверка здоровья сервиса
+      description: Возвращает статус здоровья приложения и подключения к БД
+      operationId: getHealth
+      responses:
+        "200":
+          description: Сервис здоров
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+        "503":
+          description: Сервис нездоров (проблемы с БД)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Database unhealthy: connection refused"
+
+  /metrics:
+    get:
+      summary: Получение метрик в формате Prometheus
+      description: Возвращает метрики производительности в формате, совместимом с Prometheus
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Метрики успешно получены
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # TG-RSS Bot Metrics
+                  # HELP rss_polls_total Total number of RSS polls
+                  # TYPE rss_polls_total counter
+                  rss_polls_total 150
+
+                  # HELP rss_polls_errors_total Total number of RSS poll errors
+                  # TYPE rss_polls_errors_total counter
+                  rss_polls_errors_total 3
+
+                  # HELP telegram_messages_sent_total Total number of Telegram messages sent
+                  # TYPE telegram_messages_sent_total counter
+                  telegram_messages_sent_total 1250
+
+                  # HELP circuit_breaker_calls_total Total number of calls to circuit breaker rss_sources
+                  # TYPE circuit_breaker_calls_total counter
+                  circuit_breaker_calls_total{name="rss_sources"} 450
+
+                  # HELP db_connections_open Current number of open database connections
+                  # TYPE db_connections_open gauge
+                  db_connections_open 5
+
+components:
+  schemas:
+    HealthResponse:
+      type: string
+      description: Статус здоровья сервиса
+      enum:
+        - "OK"
+        - "Database unhealthy: <error_details>"
+
+    MetricsResponse:
+      type: string
+      description: Метрики в формате Prometheus
+      format: prometheus_metrics
+
+security: []

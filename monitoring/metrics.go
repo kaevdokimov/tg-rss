@@ -43,6 +43,12 @@ type Metrics struct {
 	ContentValidations      int64
 	ContentValidationErrors map[string]int64
 
+	// Database connection метрики
+	DBConnectionsOpen     int64
+	DBConnectionsIdle     int64
+	DBConnectionsInUse    int64
+	DBConnectionsWait     int64
+
 	// Время последнего обновления
 	LastUpdate time.Time
 }
@@ -104,6 +110,10 @@ func GetMetrics() *Metrics {
 		HTTPRequestsTimeout:      globalMetrics.HTTPRequestsTimeout,
 		ContentValidations:       globalMetrics.ContentValidations,
 		ContentValidationErrors:  contentValidationErrors,
+		DBConnectionsOpen:        globalMetrics.DBConnectionsOpen,
+		DBConnectionsIdle:        globalMetrics.DBConnectionsIdle,
+		DBConnectionsInUse:       globalMetrics.DBConnectionsInUse,
+		DBConnectionsWait:        globalMetrics.DBConnectionsWait,
 		LastUpdate:               globalMetrics.LastUpdate,
 	}
 }
@@ -341,6 +351,17 @@ func IncrementContentValidationErrors(field string) {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
 	globalMetrics.ContentValidationErrors[field]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// UpdateDBConnectionMetrics обновляет метрики подключений к БД
+func UpdateDBConnectionMetrics(open, idle, inUse, wait int64) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.DBConnectionsOpen = open
+	globalMetrics.DBConnectionsIdle = idle
+	globalMetrics.DBConnectionsInUse = inUse
+	globalMetrics.DBConnectionsWait = wait
 	globalMetrics.LastUpdate = time.Now()
 }
 

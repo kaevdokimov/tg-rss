@@ -1,7 +1,6 @@
 package monitoring
 
 import (
-	"log"
 	"os"
 )
 
@@ -38,58 +37,49 @@ func SetLogLevelFromString(level string) {
 	}
 }
 
-// Logger предоставляет структурированное логирование
+// Logger предоставляет структурированное логирование (legacy wrapper)
 type Logger struct {
-	prefix string
+	structuredLogger *StructuredLogger
 }
 
-// NewLogger создает новый логгер с префиксом
+// NewLogger создает новый логгер с префиксом (legacy wrapper для совместимости)
 func NewLogger(prefix string) *Logger {
-	return &Logger{prefix: prefix}
-}
-
-func (l *Logger) log(level LogLevel, levelStr string, format string, args ...interface{}) {
-	if level < currentLevel {
-		return
-	}
-
-	prefix := ""
-	if l.prefix != "" {
-		prefix = "[" + l.prefix + "] "
-	}
-
-	message := prefix + "[" + levelStr + "] " + format
-	if len(args) > 0 {
-		log.Printf(message, args...)
-	} else {
-		log.Print(message)
+	return &Logger{
+		structuredLogger: NewStructuredLogger(prefix),
 	}
 }
 
 // Debug логирует сообщение уровня DEBUG
 func (l *Logger) Debug(format string, args ...interface{}) {
-	l.log(DEBUG, "DEBUG", format, args...)
+	if DEBUG >= currentLevel {
+		l.structuredLogger.Debug(format, args...)
+	}
 }
 
 // Info логирует сообщение уровня INFO
 func (l *Logger) Info(format string, args ...interface{}) {
-	l.log(INFO, "INFO", format, args...)
+	if INFO >= currentLevel {
+		l.structuredLogger.Info(format, args...)
+	}
 }
 
 // Warn логирует сообщение уровня WARN
 func (l *Logger) Warn(format string, args ...interface{}) {
-	l.log(WARN, "WARN", format, args...)
+	if WARN >= currentLevel {
+		l.structuredLogger.Warn(format, args...)
+	}
 }
 
 // Error логирует сообщение уровня ERROR
 func (l *Logger) Error(format string, args ...interface{}) {
-	l.log(ERROR, "ERROR", format, args...)
+	if ERROR >= currentLevel {
+		l.structuredLogger.Error(format, args...)
+	}
 }
 
 // Fatal логирует сообщение уровня ERROR и завершает программу
 func (l *Logger) Fatal(format string, args ...interface{}) {
-	l.log(ERROR, "FATAL", format, args...)
-	os.Exit(1)
+	l.structuredLogger.Fatal(format, args...)
 }
 
 // Инициализация логирования при импорте пакета

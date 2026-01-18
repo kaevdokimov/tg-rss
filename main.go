@@ -27,9 +27,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Обработка сигналов завершения
+	// Обработка сигналов завершения и перезапуска
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
 	// Инициализация структурированного логирования
 	logLevel := getEnv("LOG_LEVEL", "INFO")
@@ -131,6 +131,10 @@ func main() {
 	logger.Info("Запуск health check сервера на порту 8080...")
 	go startHealthServer(ctx, dbConn)
 
+	// Запуск обновления метрик
+	logger.Info("Запуск обновления метрик каждые 30 секунд...")
+	go startMetricsUpdater(ctx, dbConn)
+
 	// Запуск бота с Redis или в режиме graceful degradation
 	logger.Info("Запуск компонентов бота...")
 	if redisAvailable {
@@ -140,16 +144,55 @@ func main() {
 		bot.StartBotWithoutRedis(ctx, cfgTgBot, dbConn)
 	}
 
-	// Ожидание сигнала завершения
+	// Ожидание сигнала завершения или перезапуска
 	select {
 	case sig := <-sigChan:
-		logger.Info("Получен сигнал %v, начинаем graceful shutdown...", sig)
-		cancel()                    // отменяем контекст
-		time.Sleep(5 * time.Second) // даем время на завершение
+		switch sig {
+		case syscall.SIGHUP:
+			logger.Info("Получен сигнал SIGHUP, начинаем graceful restart...")
+			// Для graceful restart просто логируем и позволяем systemd/docker перезапустить
+			logger.Info("Graceful restart завершен, ожидаем перезапуска от orchestrator'а")
+			cancel()
+		default:
+			logger.Info("Получен сигнал %v, начинаем graceful shutdown...", sig)
+			cancel()                    // отменяем контекст
+			time.Sleep(5 * time.Second) // даем время на завершение
+		}
 	case <-ctx.Done():
 		logger.Info("Завершение по контексту")
 	}
 	logger.Info("Приложение завершено")
+}
+
+// startMetricsUpdater запускает периодическое обновление метрик
+func startMetricsUpdater(ctx context.Context, dbConn *sql.DB) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	updateDBMetrics := func() {
+		if dbConn != nil {
+			stats := dbConn.Stats()
+			monitoring.UpdateDBConnectionMetrics(
+				int64(stats.OpenConnections),
+				int64(stats.Idle),
+				int64(stats.InUse),
+				int64(stats.WaitCount),
+			)
+		}
+	}
+
+	// Первое обновление
+	updateDBMetrics()
+
+	// Периодические обновления
+	for {
+		select {
+		case <-ticker.C:
+			updateDBMetrics()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // startHealthServer запускает HTTP сервер для health checks и метрик
@@ -167,6 +210,31 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK")
+	})
+
+	// OpenAPI спецификация
+	mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		w.WriteHeader(http.StatusOK)
+		// В реальном приложении здесь можно прочитать файл
+		w.Write([]byte(`openapi: 3.0.3
+info:
+  title: TG-RSS Bot Monitoring API
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        200:
+          description: OK
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        200:
+          description: Metrics in Prometheus format
+`))
 	})
 
 	// Metrics endpoint для Prometheus-style метрик
@@ -280,6 +348,23 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 			fmt.Fprintf(w, "# TYPE content_validation_errors_total counter\n")
 			fmt.Fprintf(w, "content_validation_errors_total{field=\"%s\"} %d\n", field, errors)
 		}
+
+		// Database connection метрики
+		fmt.Fprintf(w, "# HELP db_connections_open Current number of open database connections\n")
+		fmt.Fprintf(w, "# TYPE db_connections_open gauge\n")
+		fmt.Fprintf(w, "db_connections_open %d\n", metrics.DBConnectionsOpen)
+
+		fmt.Fprintf(w, "# HELP db_connections_idle Current number of idle database connections\n")
+		fmt.Fprintf(w, "# TYPE db_connections_idle gauge\n")
+		fmt.Fprintf(w, "db_connections_idle %d\n", metrics.DBConnectionsIdle)
+
+		fmt.Fprintf(w, "# HELP db_connections_in_use Current number of in-use database connections\n")
+		fmt.Fprintf(w, "# TYPE db_connections_in_use gauge\n")
+		fmt.Fprintf(w, "db_connections_in_use %d\n", metrics.DBConnectionsInUse)
+
+		fmt.Fprintf(w, "# HELP db_connections_wait Current number of connections waiting\n")
+		fmt.Fprintf(w, "# TYPE db_connections_wait gauge\n")
+		fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
 	})
 
 	server := &http.Server{
