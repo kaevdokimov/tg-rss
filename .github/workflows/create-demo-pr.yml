@@ -1,0 +1,72 @@
+# Demo PR Creation Workflow
+# Creates a sample PR to demonstrate code review process
+
+name: "📝 Create Demo PR"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_title:
+        description: 'Title for the demo PR'
+        required: false
+        default: 'docs: demonstrate code review process'
+      pr_body:
+        description: 'Body for the demo PR'
+        required: false
+        default: |
+          This PR demonstrates the code review process for the repository.
+
+          ## Changes
+          - Minor documentation update to show PR workflow
+          - Demonstrates branch protection and code review requirements
+
+          ## Testing
+          - Documentation changes only
+          - No functional code changes
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-demo-pr:
+    name: 'Create Demo PR'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Create demo change
+        run: |
+          # Create a small demo change
+          echo "# Demo change for PR process" >> demo-change.txt
+          echo "This file demonstrates the code review process." >> demo-change.txt
+
+      - name: Create demo branch and PR
+        run: |
+          BRANCH_NAME="demo-pr-$(date +%s)"
+
+          # Create and checkout new branch
+          git checkout -b "$BRANCH_NAME"
+
+          # Add the demo file
+          git add demo-change.txt
+          git commit -m "docs: продемонстрировать процесс code review
+
+          - добавить демо-файл для демонстрации процесса PR
+          - показать работу защиты веток и обязательных reviews"
+
+          # Push the branch
+          git push origin "$BRANCH_NAME"
+
+          # Create PR using GitHub CLI if available, otherwise just note it
+          if command -v gh >/dev/null 2>&1; then
+            gh pr create \
+              --title "${{ github.event.inputs.pr_title }}" \
+              --body "${{ github.event.inputs.pr_body }}" \
+              --base main \
+              --head "$BRANCH_NAME"
+          else
+            echo "GitHub CLI not available. Please create PR manually from branch: $BRANCH_NAME"
+            echo "PR Title: ${{ github.event.inputs.pr_title }}"
+          fi
