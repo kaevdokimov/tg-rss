@@ -1,5 +1,7 @@
 /.env.local
 /.docker
 /.context
+/.cursor
 tg-rss-bot
 tg-rss-analyzer
+
