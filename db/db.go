@@ -85,7 +85,7 @@ func SaveNews(db *sql.DB, sourceID int64, title, description, link string, publi
 	`, sourceID, title, description, link, publishedAt).Scan(&id)
 
 	if err != nil {
-		return 0, fmt.Errorf("ошибка при сохранении новости: %v", err)
+		return 0, fmt.Errorf("ошибка при сохранении новости: %w", err)
 	}
 
 	return id, nil
@@ -100,7 +100,7 @@ func SaveMessage(tx *sql.Tx, chatID, newsID int64) error {
 	`, chatID, newsID)
 
 	if err != nil {
-		return fmt.Errorf("ошибка при сохранении сообщения: %v", err)
+		return fmt.Errorf("ошибка при сохранении сообщения: %w", err)
 	}
 
 	return nil
@@ -110,7 +110,7 @@ func SaveMessage(tx *sql.Tx, chatID, newsID int64) error {
 func SendNewsToSubscribers(db *sql.DB, chatIDs []int64, sourceID int64, title, description, link string, publishedAt time.Time) ([]int64, error) {
 	tx, err := db.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("не удалось начать транзакцию: %v", err)
+		return nil, fmt.Errorf("не удалось начать транзакцию: %w", err)
 	}
 	defer tx.Rollback()
 

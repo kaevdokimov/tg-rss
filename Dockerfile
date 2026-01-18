@@ -33,7 +33,7 @@ RUN go test -v ./...
 FROM alpine:3.23
 
 # Устанавливаем необходимые runtime зависимости
-RUN apk add --no-cache ca-certificates tzdata && \
+RUN apk add --no-cache ca-certificates tzdata wget && \
     addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
@@ -46,10 +46,9 @@ COPY --from=builder --chown=appuser:appgroup /app/tg-rss-app .
 # Переключаемся на непривилегированного пользователя
 USER appuser
 
-# Добавляем health check (проверяем наличие процесса)
-# Примечание: pgrep может отсутствовать в Alpine, поэтому используем ps
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD ps aux | grep -v grep | grep tg-rss-app || exit 1
+# Добавляем health check через HTTP endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Запускаем приложение
 CMD ["./tg-rss-app"]

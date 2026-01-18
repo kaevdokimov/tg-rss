@@ -180,7 +180,7 @@ func (np *NewsProcessor) isNewsAlreadySentGlobally(newsID int64) (bool, error) {
 	`, newsID).Scan(&count)
 
 	if err != nil {
-		return false, fmt.Errorf("ошибка при проверке глобальной отправки новости: %v", err)
+		return false, fmt.Errorf("ошибка при проверке глобальной отправки новости: %w", err)
 	}
 
 	return count > 0, nil

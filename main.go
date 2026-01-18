@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"tg-rss/bot"
 	"tg-rss/config"
@@ -18,6 +19,8 @@ import (
 
 	_ "github.com/lib/pq" // PostgreSQL драйвер
 )
+
+var startTime = time.Now()
 
 func main() {
 	// Создаем контекст для graceful shutdown
@@ -68,52 +71,74 @@ func main() {
 		logger.Warn("Не удалось обновить названия источников: %v", err)
 	}
 
-	// Инициализация Redis producer с retry
-	logger.Info("Инициализация Redis producer...")
+	// Инициализация Redis с graceful degradation
 	var redisProducer *redis.Producer
-	maxRetries := 10
+	var redisConsumer *redis.Consumer
+	var redisAvailable bool
+
+	logger.Info("Инициализация Redis producer...")
+	maxRetries := 3 // Уменьшаем количество попыток для graceful degradation
 	for i := 0; i < maxRetries; i++ {
 		redisProducer, err = redis.NewProducer(cfgRedis)
 		if err != nil {
 			logger.Warn("Ошибка создания Redis producer (попытка %d/%d): %v", i+1, maxRetries, err)
 			if i < maxRetries-1 {
-				logger.Info("Повторная попытка через 5 секунд...")
-				time.Sleep(5 * time.Second)
-				continue
+				logger.Info("Повторная попытка через 2 секунды...")
+				select {
+				case <-time.After(2 * time.Second):
+					continue
+				case <-ctx.Done():
+					logger.Fatal("Контекст отменен во время инициализации Redis")
+				}
 			}
-			logger.Fatal("Не удалось создать Redis producer после %d попыток", maxRetries)
+			logger.Warn("Redis недоступен. Переходим в режим graceful degradation (синхронная обработка)")
+			redisAvailable = false
+		} else {
+			redisAvailable = true
+			defer redisProducer.Close()
+			logger.Info("Redis producer успешно инициализирован")
+			break
 		}
-		break
 	}
-	defer redisProducer.Close()
-	logger.Info("Redis producer успешно инициализирован")
 
-	// Инициализация Redis consumer с retry
-	logger.Info("Инициализация Redis consumer...")
-	var redisConsumer *redis.Consumer
-	for i := 0; i < maxRetries; i++ {
-		redisConsumer, err = redis.NewConsumer(cfgRedis)
-		if err != nil {
-			logger.Warn("Ошибка создания Redis consumer (попытка %d/%d): %v", i+1, maxRetries, err)
-			if i < maxRetries-1 {
-				logger.Info("Повторная попытка через 5 секунд...")
-				time.Sleep(5 * time.Second)
-				continue
+	if redisAvailable {
+		// Инициализация Redis consumer
+		logger.Info("Инициализация Redis consumer...")
+		for i := 0; i < maxRetries; i++ {
+			redisConsumer, err = redis.NewConsumer(cfgRedis)
+			if err != nil {
+				logger.Warn("Ошибка создания Redis consumer (попытка %d/%d): %v", i+1, maxRetries, err)
+				if i < maxRetries-1 {
+					logger.Info("Повторная попытка через 2 секунды...")
+					select {
+					case <-time.After(2 * time.Second):
+						continue
+					case <-ctx.Done():
+						logger.Fatal("Контекст отменен во время инициализации Redis")
+					}
+				}
+				logger.Warn("Redis consumer недоступен. Работаем в ограниченном режиме")
+				redisAvailable = false
+			} else {
+				defer redisConsumer.Close()
+				logger.Info("Redis consumer успешно инициализирован")
+				break
 			}
-			logger.Fatal("Не удалось создать Redis consumer после %d попыток", maxRetries)
 		}
-		break
 	}
-	defer redisConsumer.Close()
-	logger.Info("Redis consumer успешно инициализирован")
 
 	// Запуск health check сервера
 	logger.Info("Запуск health check сервера на порту 8080...")
 	go startHealthServer(ctx, dbConn)
 
-	// Запуск бота с Redis
+	// Запуск бота с Redis или в режиме graceful degradation
 	logger.Info("Запуск компонентов бота...")
-	bot.StartBotWithRedis(ctx, cfgTgBot, cfgRedis, dbConn, redisProducer, redisConsumer)
+	if redisAvailable {
+		bot.StartBotWithRedis(ctx, cfgTgBot, cfgRedis, dbConn, redisProducer, redisConsumer)
+	} else {
+		logger.Info("Запуск в режиме graceful degradation (без Redis)")
+		bot.StartBotWithoutRedis(ctx, cfgTgBot, dbConn)
+	}
 
 	// Ожидание сигнала завершения
 	select {
@@ -150,15 +175,63 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 
 		// Собираем метрики
 		fmt.Fprintf(w, "# TG-RSS Bot Metrics\n")
+		fmt.Fprintf(w, "# HELP rss_polls_total Total number of RSS polls\n")
+		fmt.Fprintf(w, "# TYPE rss_polls_total counter\n")
 		fmt.Fprintf(w, "rss_polls_total %d\n", monitoring.GetRSSPolls())
+
+		fmt.Fprintf(w, "# HELP rss_polls_errors_total Total number of RSS poll errors\n")
+		fmt.Fprintf(w, "# TYPE rss_polls_errors_total counter\n")
 		fmt.Fprintf(w, "rss_polls_errors_total %d\n", monitoring.GetRSSPollsErrors())
+
+		fmt.Fprintf(w, "# HELP rss_items_processed_total Total number of RSS items processed\n")
+		fmt.Fprintf(w, "# TYPE rss_items_processed_total counter\n")
 		fmt.Fprintf(w, "rss_items_processed_total %d\n", monitoring.GetRSSItemsProcessed())
+
+		fmt.Fprintf(w, "# HELP redis_messages_produced_total Total number of Redis messages produced\n")
+		fmt.Fprintf(w, "# TYPE redis_messages_produced_total counter\n")
 		fmt.Fprintf(w, "redis_messages_produced_total %d\n", monitoring.GetRedisMessagesProduced())
+
+		fmt.Fprintf(w, "# HELP redis_messages_consumed_total Total number of Redis messages consumed\n")
+		fmt.Fprintf(w, "# TYPE redis_messages_consumed_total counter\n")
+		fmt.Fprintf(w, "redis_messages_consumed_total %d\n", monitoring.GetRedisMessagesConsumed())
+
+		fmt.Fprintf(w, "# HELP redis_errors_total Total number of Redis errors\n")
+		fmt.Fprintf(w, "# TYPE redis_errors_total counter\n")
 		fmt.Fprintf(w, "redis_errors_total %d\n", monitoring.GetRedisErrors())
+
+		fmt.Fprintf(w, "# HELP telegram_messages_sent_total Total number of Telegram messages sent\n")
+		fmt.Fprintf(w, "# TYPE telegram_messages_sent_total counter\n")
 		fmt.Fprintf(w, "telegram_messages_sent_total %d\n", monitoring.GetTelegramMessagesSent())
+
+		fmt.Fprintf(w, "# HELP telegram_messages_errors_total Total number of Telegram message errors\n")
+		fmt.Fprintf(w, "# TYPE telegram_messages_errors_total counter\n")
 		fmt.Fprintf(w, "telegram_messages_errors_total %d\n", monitoring.GetTelegramMessagesErrors())
+
+		fmt.Fprintf(w, "# HELP telegram_commands_total Total number of Telegram commands received\n")
+		fmt.Fprintf(w, "# TYPE telegram_commands_total counter\n")
+		fmt.Fprintf(w, "telegram_commands_total %d\n", monitoring.GetTelegramCommands())
+
+		fmt.Fprintf(w, "# HELP db_queries_total Total number of database queries\n")
+		fmt.Fprintf(w, "# TYPE db_queries_total counter\n")
 		fmt.Fprintf(w, "db_queries_total %d\n", monitoring.GetDBQueries())
+
+		fmt.Fprintf(w, "# HELP db_queries_errors_total Total number of database query errors\n")
+		fmt.Fprintf(w, "# TYPE db_queries_errors_total counter\n")
 		fmt.Fprintf(w, "db_queries_errors_total %d\n", monitoring.GetDBQueriesErrors())
+
+		// Добавляем uptime метрику
+		fmt.Fprintf(w, "# HELP app_uptime_seconds Application uptime in seconds\n")
+		fmt.Fprintf(w, "# TYPE app_uptime_seconds gauge\n")
+		fmt.Fprintf(w, "app_uptime_seconds %d\n", int(time.Since(startTime).Seconds()))
+
+		// Добавляем информацию о Go
+		fmt.Fprintf(w, "# HELP go_goroutines Number of goroutines\n")
+		fmt.Fprintf(w, "# TYPE go_goroutines gauge\n")
+		fmt.Fprintf(w, "go_goroutines %d\n", runtime.NumGoroutine())
+
+		fmt.Fprintf(w, "# HELP go_threads Number of OS threads\n")
+		fmt.Fprintf(w, "# TYPE go_threads gauge\n")
+		fmt.Fprintf(w, "go_threads %d\n", runtime.NumCPU())
 	})
 
 	server := &http.Server{

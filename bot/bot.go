@@ -11,6 +11,54 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+// StartBotWithoutRedis запускает бота в режиме graceful degradation (без Redis)
+func StartBotWithoutRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, dbConn *sql.DB) {
+	interval := time.Duration(cfgTgBot.Timeout) * time.Second
+
+	// Инициализация Telegram-бота
+	var bot *tgbotapi.BotAPI
+	log.Printf("🔍 Проверяем TELEGRAM_API_KEY: значение задано (длина %d символов)", len(cfgTgBot.ApiKey))
+
+	if cfgTgBot.ApiKey == "" || cfgTgBot.ApiKey == "YOUR_TELEGRAM_BOT_TOKEN_HERE" {
+		log.Printf("⚠️  TELEGRAM_API_KEY не задан или содержит placeholder - бот будет работать без Telegram функционала")
+		// Создаем заглушку для бота
+		bot = &tgbotapi.BotAPI{}
+		bot.Self = tgbotapi.User{UserName: "MockBot"}
+	} else {
+		var err error
+		bot, err = tgbotapi.NewBotAPI(cfgTgBot.ApiKey)
+		if err != nil {
+			log.Printf("⚠️  Ошибка инициализации Telegram бота: %v", err)
+			log.Printf("🔄 Продолжаем работу без Telegram функционала")
+			// Создаем заглушку для бота
+			bot = &tgbotapi.BotAPI{}
+			bot.Self = tgbotapi.User{UserName: "MockBot"}
+		} else {
+			log.Printf("Бот авторизован как %s", bot.Self.UserName)
+		}
+	}
+
+	// Создание обработчиков
+	newsProcessor := NewNewsProcessor(dbConn, bot)
+
+	// Запуск обработки команд
+	go StartCommandHandler(bot, dbConn, cfgTgBot.Timeout)
+
+	// Запуск синхронного опроса RSS-источников (без Redis)
+	log.Printf("Запуск RSS парсера в синхронном режиме с интервалом %v", interval)
+	go StartRSSPollingSync(dbConn, interval, time.Local, newsProcessor)
+
+	// Запуск фонового парсера контента новостей (без Redis кэша)
+	scraperInterval := time.Duration(cfgTgBot.ContentScraperInterval) * time.Minute
+	contentScraper := NewContentScraper(dbConn, scraperInterval, cfgTgBot.ContentScraperBatch, cfgTgBot.ContentScraperConcurrent, nil)
+	go contentScraper.Start()
+	log.Printf("Запуск фонового парсера контента: интервал=%v, батч=%d, параллельно=%d (без кэша)", scraperInterval, cfgTgBot.ContentScraperBatch, cfgTgBot.ContentScraperConcurrent)
+
+	// Ожидание завершения контекста
+	<-ctx.Done()
+	log.Println("Бот завершает работу...")
+}
+
 // StartBotWithRedis запускает бота с использованием Redis для очередей сообщений
 func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRedis *config.RedisConfig, dbConn *sql.DB, redisProducer *redis.Producer, redisConsumer *redis.Consumer) {
 	interval := time.Duration(cfgTgBot.Timeout) * time.Second

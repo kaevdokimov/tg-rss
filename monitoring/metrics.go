@@ -195,6 +195,12 @@ func GetTelegramMessagesErrors() int64 {
 	return globalMetrics.TelegramMessagesErrors
 }
 
+func GetTelegramCommands() int64 {
+	globalMetrics.mu.RLock()
+	defer globalMetrics.mu.RUnlock()
+	return globalMetrics.TelegramCommandsTotal
+}
+
 func GetDBQueries() int64 {
 	globalMetrics.mu.RLock()
 	defer globalMetrics.mu.RUnlock()

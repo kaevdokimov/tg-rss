@@ -74,13 +74,12 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 	// Запускаем первый цикл сразу, без ожидания
 	firstRun := true
 
-	// Защита от паники - если произойдет ошибка, парсер продолжит работу
+	// Защита от паники - логируем ошибку, но не перезапускаем рекурсивно
 	defer func() {
 		if r := recover(); r != nil {
-			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере: %v. Перезапуск через %v", r, interval)
-			time.Sleep(interval)
-			// Рекурсивно перезапускаем парсер
-			go StartRSSPolling(dbConn, interval, tz, redisProducer)
+			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере: %v. RSS парсинг остановлен", r)
+			// Не перезапускаем автоматически, чтобы избежать утечки горутин
+			// Перезапуск должен происходить на уровне оркестратора (systemd, docker, etc.)
 		}
 	}()
 
