@@ -157,34 +157,34 @@ func TestLoadTgBotConfig(t *testing.T) {
 	// Восстанавливаем после теста
 	defer func() {
 		if originalApiKey != "" {
-			os.Setenv("TELEGRAM_API_KEY", originalApiKey)
+			_ = os.Setenv("TELEGRAM_API_KEY", originalApiKey)
 		} else {
-			os.Unsetenv("TELEGRAM_API_KEY")
+			_ = os.Unsetenv("TELEGRAM_API_KEY")
 		}
 		if originalTZ != "" {
-			os.Setenv("TZ", originalTZ)
+			_ = os.Setenv("TZ", originalTZ)
 		} else {
-			os.Unsetenv("TZ")
+			_ = os.Unsetenv("TZ")
 		}
 		if originalTimeout != "" {
-			os.Setenv("TIMEOUT", originalTimeout)
+			_ = os.Setenv("TIMEOUT", originalTimeout)
 		} else {
-			os.Unsetenv("TIMEOUT")
+			_ = os.Unsetenv("TIMEOUT")
 		}
 		if originalInterval != "" {
-			os.Setenv("CONTENT_SCRAPER_INTERVAL", originalInterval)
+			_ = os.Setenv("CONTENT_SCRAPER_INTERVAL", originalInterval)
 		} else {
-			os.Unsetenv("CONTENT_SCRAPER_INTERVAL")
+			_ = os.Unsetenv("CONTENT_SCRAPER_INTERVAL")
 		}
 		if originalBatch != "" {
-			os.Setenv("CONTENT_SCRAPER_BATCH", originalBatch)
+			_ = os.Setenv("CONTENT_SCRAPER_BATCH", originalBatch)
 		} else {
-			os.Unsetenv("CONTENT_SCRAPER_BATCH")
+			_ = os.Unsetenv("CONTENT_SCRAPER_BATCH")
 		}
 		if originalConcurrent != "" {
-			os.Setenv("CONTENT_SCRAPER_CONCURRENT", originalConcurrent)
+			_ = os.Setenv("CONTENT_SCRAPER_CONCURRENT", originalConcurrent)
 		} else {
-			os.Unsetenv("CONTENT_SCRAPER_CONCURRENT")
+			_ = os.Unsetenv("CONTENT_SCRAPER_CONCURRENT")
 		}
 	}()
 

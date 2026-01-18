@@ -343,15 +343,19 @@ func handleUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data 
 		return
 	}
 
-	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы отписались от источника «%s».\n\nВы больше не будете получать новости из этого источника.", source.Name))
-	bot.Send(msg)
+	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы отписались от источника «%s».\n\nВы больше не будете получать новости из этого источента.", source.Name))
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки подтверждения отписки: %v", err)
+	}
 }
 
 // handleUnknownCallback обрабатывает неизвестные callback-запросы
 func handleUnknownCallback(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "❓ Неизвестная команда")
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения о неизвестной команде: %v", err)
+	}
 }
 
 // handleCopyLink обрабатывает запрос на копирование ссылки
@@ -367,7 +371,9 @@ func handleCopyLink(bot *tgbotapi.BotAPI, chatId int64, data string) {
 
 	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("🔗 *Ссылка скопирована:*\n\n`%s`", link))
 	msg.ParseMode = tgbotapi.ModeMarkdown
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки ссылки: %v", err)
+	}
 }
 
 // handleNewsPage обрабатывает пагинацию новостей
