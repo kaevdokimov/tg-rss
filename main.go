@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("Ошибка подключения к базе данных: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	logger.Info("Инициализация схемы базы данных...")
 	db.InitSchema(dbConn)
@@ -206,12 +206,12 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 		// Проверяем подключение к БД
 		if err := dbConn.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "Database unhealthy: %v", err)
+			_, _ = fmt.Fprintf(w, "Database unhealthy: %v", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "OK")
+		_, _ = fmt.Fprintf(w, "OK")
 	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(10*time.Second)))
 
 	// OpenAPI спецификация
@@ -219,7 +219,7 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.WriteHeader(http.StatusOK)
 		// В реальном приложении здесь можно прочитать файл
-		w.Write([]byte(`openapi: 3.0.3
+		_, _ = w.Write([]byte(`openapi: 3.0.3
 info:
   title: TG-RSS Bot Management API
   description: API для управления Telegram RSS ботом
@@ -268,7 +268,7 @@ paths:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 		// Собираем метрики
-		fmt.Fprintf(w, "# TG-RSS Bot Metrics\n")
+		_, _ = fmt.Fprintf(w, "# TG-RSS Bot Metrics\n")
 		fmt.Fprintf(w, "# HELP rss_polls_total Total number of RSS polls\n")
 		fmt.Fprintf(w, "# TYPE rss_polls_total counter\n")
 		fmt.Fprintf(w, "rss_polls_total %d\n", monitoring.GetRSSPolls())
@@ -445,7 +445,7 @@ func PerformanceTest() {
 		log.Printf("🔄 Продолжаем тестирование без Redis кэша")
 		cache = nil
 	} else {
-		defer cache.Close()
+		defer func() { _ = cache.Close() }()
 		fmt.Println("✅ Redis кэш подключен")
 	}
 

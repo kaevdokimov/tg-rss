@@ -296,7 +296,7 @@ func processCandidatesBatch(dbConn *sql.DB, redisProducer *redis.Producer, candi
 		// Fallback: обрабатываем по одной новости
 		return processCandidatesSequential(dbConn, redisProducer, candidates)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Собираем существующие новости
 	existingNews := make(map[string]bool)
@@ -400,7 +400,7 @@ func fetchSources(dbConn *sql.DB) ([]db.Source, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sources []db.Source
 	for rows.Next() {

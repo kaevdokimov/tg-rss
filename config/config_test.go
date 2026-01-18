@@ -31,23 +31,23 @@ func TestLoadDBConfig(t *testing.T) {
 			_ = os.Unsetenv("POSTGRES_USER")
 		}
 		if originalPass != "" {
-			os.Setenv("POSTGRES_PASSWORD", originalPass)
+			_ = os.Setenv("POSTGRES_PASSWORD", originalPass)
 		} else {
-			os.Unsetenv("POSTGRES_PASSWORD")
+			_ = os.Unsetenv("POSTGRES_PASSWORD")
 		}
 		if originalDB != "" {
-			os.Setenv("POSTGRES_DB", originalDB)
+			_ = os.Setenv("POSTGRES_DB", originalDB)
 		} else {
-			os.Unsetenv("POSTGRES_DB")
+			_ = os.Unsetenv("POSTGRES_DB")
 		}
 	}()
 
 	// Тест с дефолтными значениями
-	os.Unsetenv("POSTGRES_HOST")
-	os.Unsetenv("POSTGRES_PORT")
-	os.Unsetenv("POSTGRES_USER")
-	os.Unsetenv("POSTGRES_PASSWORD")
-	os.Unsetenv("POSTGRES_DB")
+	_ = os.Unsetenv("POSTGRES_HOST")
+	_ = os.Unsetenv("POSTGRES_PORT")
+	_ = os.Unsetenv("POSTGRES_USER")
+	_ = os.Unsetenv("POSTGRES_PASSWORD")
+	_ = os.Unsetenv("POSTGRES_DB")
 
 	cfg := LoadDBConfig()
 	if cfg.DBHost != "db" {
@@ -64,10 +64,10 @@ func TestLoadDBConfig(t *testing.T) {
 	}
 
 	// Тест с кастомными значениями
-	os.Setenv("POSTGRES_HOST", "test-host")
-	os.Setenv("POSTGRES_PORT", "3306")
-	os.Setenv("POSTGRES_USER", "test-user")
-	os.Setenv("POSTGRES_PASSWORD", "test-pass")
+	_ = os.Setenv("POSTGRES_HOST", "test-host")
+	_ = os.Setenv("POSTGRES_PORT", "3306")
+	_ = os.Setenv("POSTGRES_USER", "test-user")
+	_ = os.Setenv("POSTGRES_PASSWORD", "test-pass")
 	os.Setenv("POSTGRES_DB", "test-db")
 
 	cfg = LoadDBConfig()

@@ -21,7 +21,7 @@ func TestContentCache_BasicOperations(t *testing.T) {
 	if err != nil {
 		t.Skipf("Redis недоступен: %v", err)
 	}
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Создаем тестовый контент
 	now := time.Now().UTC()
@@ -92,7 +92,7 @@ func BenchmarkContentCache_PutGet(b *testing.B) {
 	if err != nil {
 		b.Skipf("Redis недоступен: %v", err)
 	}
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Создаем тестовый контент
 	testContent := &CachedNewsContent{

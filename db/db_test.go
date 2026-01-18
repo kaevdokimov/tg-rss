@@ -144,7 +144,7 @@ func TestSaveNews(t *testing.T) {
 	cfg := config.LoadDBConfig()
 	db, err := Connect(cfg)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Сначала создадим тестовый источник
 	sourceID := int64(999999) // Используем большой ID для тестов
@@ -187,7 +187,7 @@ func TestUserExists(t *testing.T) {
 	cfg := config.LoadDBConfig()
 	db, err := Connect(cfg)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Создаем тестового пользователя
 	testChatID := int64(999999999) // Большой ID для тестов
@@ -224,7 +224,7 @@ func TestFindActiveSources(t *testing.T) {
 	cfg := config.LoadDBConfig()
 	db, err := Connect(cfg)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Получаем текущие активные источники
 	sources, err := FindActiveSources(db)

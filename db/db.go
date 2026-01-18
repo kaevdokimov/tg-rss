@@ -420,7 +420,8 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 		var existingID int
 		err := db.QueryRow("SELECT id FROM sources WHERE url = $1", update.newURL).Scan(&existingID)
 
-		if err == nil {
+		switch err {
+		case nil:
 			// Новый URL уже существует, удаляем старый источник
 			_, err = db.Exec("DELETE FROM sources WHERE url = $1", update.oldURL)
 			if err != nil {
@@ -428,7 +429,7 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 			} else {
 				log.Printf("✅ Удален старый источник %s (%s), новый URL уже существует", update.name, update.oldURL)
 			}
-		} else if err == sql.ErrNoRows {
+		case sql.ErrNoRows:
 			// Новый URL не существует, обновляем старый
 			result, err := db.Exec(`
 				UPDATE sources
@@ -446,7 +447,7 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 					log.Printf("ℹ️  Источник %s (%s) не найден для обновления", update.name, update.oldURL)
 				}
 			}
-		} else {
+		default:
 			log.Printf("Ошибка проверки существования источника %s (%s): %v", update.name, update.newURL, err)
 		}
 	}
