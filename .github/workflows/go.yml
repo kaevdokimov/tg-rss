@@ -24,7 +24,7 @@ on:
       - '.github/workflows/go.yml'
 
 env:
-  GO_VERSION: '1.25.5'
+  GO_VERSION: '1.25.5'  # Required by go.mod
 
 jobs:
   # Fast feedback job - basic checks
@@ -103,10 +103,8 @@ jobs:
         cache: true
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: latest
-        args: --timeout=5m
+      run: |
+        docker run --rm -v $(pwd):/app -w /app golangci/golangci-lint:v2.8.0 golangci-lint run --timeout=5m
 
     - name: Run go vet
       run: go vet ./...
