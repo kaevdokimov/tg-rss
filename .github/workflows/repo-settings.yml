@@ -11,12 +11,18 @@ on:
       - '.github/workflows/repo-settings.yml'
   workflow_dispatch:
 
-# IMPORTANT: This workflow requires admin permissions
-# To enable branch protection, you need to:
-# 1. Go to repository Settings > Actions > General
+# BRANCH PROTECTION ACTIVATION INSTRUCTIONS
+#
+# To enable automatic branch protection, follow these steps:
+#
+# 1. Go to: https://github.com/[YOUR-USERNAME]/tg-rss/settings/actions
 # 2. Under "Workflow permissions", select "Read and write permissions"
-# 3. Save the changes
-# Or manually set branch protection in: Settings > Branches > Branch protection rules
+# 3. Click "Save"
+#
+# Then run this workflow manually to apply branch protection rules.
+#
+# ALTERNATIVE: Manual setup via web interface:
+# Settings > Branches > Add rule > Branch name pattern: main
 
 jobs:
   branch-protection:

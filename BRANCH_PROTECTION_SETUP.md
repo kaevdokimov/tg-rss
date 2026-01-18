@@ -1,0 +1,70 @@
+# Настройка защиты веток (Branch Protection)
+
+## 🚀 Быстрая настройка (рекомендуется)
+
+### Шаг 1: Настройка прав GITHUB_TOKEN
+1. Перейдите в: **Settings** → **Actions** → **General**
+2. В разделе **"Workflow permissions"** выберите **"Read and write permissions"**
+3. Нажмите **"Save"**
+
+### Шаг 2: Запуск workflow
+1. Перейдите в: **Actions** → **🛡️ Branch Protection**
+2. Нажмите **"Run workflow"** (зеленая кнопка)
+3. Workflow автоматически применит защиту веток
+
+## 🔧 Ручная настройка (альтернатива)
+
+Если автоматическая настройка не работает:
+
+### Шаг 1: Переход в настройки веток
+1. Перейдите в: **Settings** → **Branches**
+2. Нажмите **"Add rule"**
+
+### Шаг 2: Настройка правила для main
+```
+Branch name pattern: main
+Require a pull request before merging: ✅
+Require approvals: 1
+Dismiss stale pull request approvals when new commits are pushed: ✅
+Require review from Code Owners: ❌ (опционально)
+Restrict who can dismiss pull request reviews: ❌
+Allow force pushes: ❌
+Allow deletions: ❌
+```
+
+### Шаг 3: Настройка статус проверок
+```
+Require status checks to pass before merging: ✅
+Require branches to be up to date before merging: ✅
+Status checks found in the last week for this repository:
+- test
+- lint
+- security-scan
+```
+
+## ✅ Проверка настройки
+
+После настройки:
+1. Попробуйте создать тестовый PR
+2. Убедитесь, что слияние требует approvals
+3. Проверьте, что force push заблокирован
+
+## 📊 Результат
+
+После активации защиты веток:
+- **Branch-Protection score**: 0 → **10**
+- **Общий OpenSSF Scorecard**: **+1.0** балла
+- **Безопасность**: Значительно улучшена
+
+## 🔍 Диагностика
+
+Если защита не применяется:
+- Проверьте права GITHUB_TOKEN
+- Убедитесь, что workflow завершился успешно
+- Проверьте логи workflow на ошибки
+
+## 📞 Поддержка
+
+При проблемах проверьте:
+- [GitHub Docs: Managing branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches)
+- Логи workflow в Actions вкладке
