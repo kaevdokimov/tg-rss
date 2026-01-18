@@ -1,0 +1,116 @@
+---
+- name: Быстрое развертывание TG-RSS с оптимизациями производительности
+  hosts: tg_rss_servers
+  become: yes
+  gather_facts: smart
+  strategy: free  # Allow parallel execution across hosts
+
+  vars:
+    # Performance optimizations
+    ansible_ssh_pipelining: true
+    ansible_ssh_common_args: '-o ControlMaster=auto -o ControlPersist=300s -o StrictHostKeyChecking=no'
+
+  pre_tasks:
+    - name: Настройка производительности Ansible
+      set_fact:
+        ansible_ssh_retries: 3
+        ansible_ssh_timeout: 30
+      when: ansible_connection == "ssh"
+
+  tasks:
+    - name: Параллельное обновление системных пакетов
+      apt:
+        update_cache: yes
+        upgrade: safe
+        autoremove: yes
+        autoclean: yes
+      async: 900  # 15 minutes timeout
+      poll: 0
+      register: apt_upgrade
+      when: ansible_os_family == "Debian"
+
+    - name: Ожидание завершения обновления пакетов
+      async_status:
+        jid: "{{ apt_upgrade.ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 30
+      delay: 30
+
+    - name: Применение системных оптимизаций
+      include_role:
+        name: system_optimization
+        apply:
+          tags: ['optimization']
+      when: job_result.finished
+
+    - name: Параллельная настройка Docker
+      include_role:
+        name: docker_setup
+      async: 600
+      poll: 0
+      register: docker_setup_job
+
+    - name: Параллельная настройка безопасности
+      include_role:
+        name: security_hardening
+      async: 600
+      poll: 0
+      register: security_job
+
+    - name: Ожидание завершения Docker настройки
+      async_status:
+        jid: "{{ docker_setup_job.ansible_job_id }}"
+      register: docker_result
+      until: docker_result.finished
+      retries: 30
+      delay: 20
+
+    - name: Ожидание завершения настройки безопасности
+      async_status:
+        jid: "{{ security_job.ansible_job_id }}"
+      register: security_result
+      until: security_result.finished
+      retries: 30
+      delay: 20
+
+    - name: Настройка мониторинга и бэкапов
+      include_role:
+        name: monitoring_setup
+      when: docker_result.finished and security_result.finished
+
+    - name: Настройка системы бэкапов
+      include_role:
+        name: backup_system
+      when: docker_result.finished
+
+    - name: Финальная проверка развертывания
+      block:
+        - name: Проверка работы сервисов
+          service:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - docker
+            - prometheus
+            - grafana-server
+          ignore_errors: true
+          register: service_check
+
+        - name: Отчет о развертывании
+          debug:
+            msg: |
+              🚀 Быстрое развертывание завершено!
+
+              Время выполнения: {{ ansible_date_time.iso8601 }}
+              Сервер: {{ inventory_hostname }}
+
+              Статус сервисов:
+              {% for result in service_check.results %}
+              {{ result.item }}: {% if result.changed %}✅{% else %}❌{% endif %}
+              {% endfor %}
+
+              Следующие шаги:
+              - Проверьте логи: journalctl -u tg-rss-backup.timer --since "1 hour ago"
+              - Запустите первый бэкап: systemctl start tg-rss-backup.service
+              - Проверьте мониторинг: http://localhost:9090

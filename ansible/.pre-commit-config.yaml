@@ -1,0 +1,157 @@
+---
+# Pre-commit hooks for Ansible project
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run: pre-commit run --all-files
+
+repos:
+  # YAML formatting and validation
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        files: \.(yml|yaml)$
+      - id: end-of-file-fixer
+        files: \.(yml|yaml)$
+      - id: check-yaml
+        files: \.(yml|yaml)$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: detect-private-key
+        exclude: ^inventory/.*\.pub$
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: \.(yml|yaml)$
+        types: [file]
+        exclude: ^\.github/  # GitHub Actions workflows have different rules
+
+  # Ansible linting
+  - repo: https://github.com/ansible-community/ansible-lint.git
+    rev: v24.7.0
+    hooks:
+      - id: ansible-lint
+        files: \.(yml|yaml)$
+        exclude: ^\.github/|^molecule/.*\.yml$
+        additional_dependencies:
+          - ansible>=9.0.0
+
+  # JSON validation for inventory files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-json
+        files: \.json$
+
+  # Shell script validation
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        files: \.sh$
+        args: [-e, SC1090, -e, SC1091]  # Ignore source file not found warnings
+
+  # Python validation (for scripts)
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        files: \.py$
+        language_version: python3
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        files: \.py$
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        files: \.py$
+
+  # Custom hooks for Ansible
+  - repo: local
+    hooks:
+      - id: check-ansible-vault
+        name: Check Ansible Vault files are encrypted
+        entry: sh -c 'find . -name "*.yml" -exec grep -l "ANSIBLE_VAULT" {} \; | head -1 || echo "No vault files found"'
+        language: system
+        files: \.(yml|yaml)$
+        pass_filenames: false
+
+      - id: validate-ansible-syntax
+        name: Validate Ansible playbook syntax
+        entry: sh -c '
+          if command -v ansible-playbook >/dev/null 2>&1; then
+            find playbooks -name "*.yml" -exec ansible-playbook --syntax-check {} \; 2>/dev/null || true
+          else
+            echo "ansible-playbook not found, skipping syntax check"
+          fi
+        '
+        language: system
+        files: ^playbooks/
+        pass_filenames: false
+
+      - id: check-inventory-syntax
+        name: Check inventory file syntax
+        entry: sh -c '
+          if command -v ansible-inventory >/dev/null 2>&1; then
+            find inventory -name "*.ini" -exec ansible-inventory --list -i {} \; >/dev/null 2>&1 || echo "Inventory syntax check failed for $1"
+          else
+            echo "ansible-inventory not found, skipping inventory check"
+          fi
+        '
+        language: system
+        files: ^inventory/
+        pass_filenames: false
+
+# Custom yamllint configuration
+yamllint:
+  extends: default
+  rules:
+    line-length:
+      max: 120
+      level: warning
+    truthy:
+      allowed-values: ['true', 'false']
+      check-keys: false
+    comments-indentation: disable
+    comments: disable
+    empty-lines:
+      max-start: 2
+      max-end: 1
+      max: 3
+    indentation:
+      spaces: 2
+      indent-sequences: true
+      check-multi-line-strings: false
+
+# Ansible-lint configuration
+ansible-lint:
+  exclude_paths:
+    - .github/
+    - molecule/
+  rules:
+    # Allow specific rules to be disabled
+    yaml[line-length]:
+      max: 120
+    yaml[truthy]:
+      allowed-values: ['true', 'false']
+    var-naming:
+      patterns:
+        - name: "Allow environment variables"
+          pattern: "^[A-Z][A-Z0-9_]*$"
+    name[template]:
+      level: warning
+    yaml[comments]:
+      level: warning

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run TG-RSS Backup {{ backup_schedule }}
+Requires={{ backup_service_name }}.service
+
+[Timer]
+OnCalendar={{ backup_schedule }}
+Persistent=true
+Unit={{ backup_service_name }}.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,118 @@
+---
+# Enhanced backup system with integrity verification and rotation
+
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Create backup directories with proper permissions
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+    owner: root
+    group: root
+  loop:
+    - "{{ backup_base_dir }}"
+    - "{{ backup_scripts_dir }}"
+    - "{{ backup_logs_dir }}"
+    - "{{ backup_temp_dir }}"
+
+- name: Install backup dependencies
+  package:
+    name: "{{ backup_dependencies }}"
+    state: present
+    update_cache: yes
+  register: backup_deps_install
+  retries: 3
+  delay: 5
+  until: backup_deps_install is succeeded
+
+- name: Create backup configuration
+  template:
+    src: backup-config.yml.j2
+    dest: "{{ backup_config_file }}"
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Create main backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ backup_main_script }}"
+    mode: '0750'
+    owner: root
+    group: root
+
+- name: Create backup verification script
+  template:
+    src: verify-backup.sh.j2
+    dest: "{{ backup_verify_script }}"
+    mode: '0750'
+    owner: root
+    group: root
+
+- name: Create backup rotation script
+  template:
+    src: rotate-backups.sh.j2
+    dest: "{{ backup_rotate_script }}"
+    mode: '0750'
+    owner: root
+    group: root
+
+- name: Create backup service unit
+  template:
+    src: backup.service.j2
+    dest: /etc/systemd/system/{{ backup_service_name }}.service
+    mode: '0644'
+  notify: reload systemd
+
+- name: Create backup timer unit
+  template:
+    src: backup.timer.j2
+    dest: /etc/systemd/system/{{ backup_service_name }}.timer
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable and start backup timer
+  systemd:
+    name: "{{ backup_service_name }}.timer"
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Create backup status monitoring script
+  template:
+    src: backup-status.sh.j2
+    dest: "{{ backup_status_script }}"
+    mode: '0750'
+    owner: root
+    group: root
+
+- name: Setup logrotate for backup logs
+  template:
+    src: logrotate.conf.j2
+    dest: /etc/logrotate.d/{{ backup_service_name }}
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Run initial backup verification
+  command: "{{ backup_verify_script }}"
+  register: initial_backup_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Report backup system status
+  debug:
+    msg: |
+      🔄 Backup system configured successfully!
+      📁 Base directory: {{ backup_base_dir }}
+      ⏰ Schedule: {{ backup_schedule }}
+      📊 Retention: {{ backup_retention_days }} days
+      🔍 Verification: {{ '✅ Enabled' if backup_verify_integrity | bool else '❌ Disabled' }}
+      🚨 Alerting: {{ '✅ Enabled' if backup_alert_on_failure | bool else '❌ Disabled' }}
+
+      Next backup: {{ lookup('pipe', 'systemctl show ' + backup_service_name + '.timer -p NextElapseUSecRealtime --value | head -1 | xargs -I {} date -d @{}') }}
+
+      Run manual backup: {{ backup_main_script }}
+      Check status: {{ backup_status_script }}

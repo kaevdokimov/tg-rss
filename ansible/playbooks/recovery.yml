@@ -1,0 +1,195 @@
+---
+- name: Восстановление системы после сбоев
+  hosts: tg_rss_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    recovery_type: "{{ recovery_type | default('full') }}"  # full, services, docker, monitoring
+
+  pre_tasks:
+    - name: Валидация параметров восстановления
+      assert:
+        that:
+          - recovery_type in ['full', 'services', 'docker', 'monitoring']
+        fail_msg: "recovery_type должен быть одним из: full, services, docker, monitoring"
+
+    - name: Диагностика состояния системы
+      block:
+        - name: Проверка основных сервисов
+          service:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - ssh
+            - systemd-journald
+          register: service_status
+          ignore_errors: true
+
+        - name: Проверка дискового пространства
+          shell: df -h / | tail -1
+          register: disk_space
+          ignore_errors: true
+
+        - name: Проверка памяти
+          shell: free -h
+          register: memory_info
+          ignore_errors: true
+
+        - name: Отчет о состоянии системы
+          debug:
+            msg: |
+              📊 Диагностика системы:
+              Сервисы: {{ service_status.results | selectattr('changed', 'equalto', false) | list | length }}/{{ service_status.results | length }} запущены
+              Диск: {{ disk_space.stdout | default('N/A') }}
+              Память: {{ memory_info.stdout | default('N/A') }}
+
+  tasks:
+    - name: Восстановление Docker
+      block:
+        - name: Проверка состояния Docker
+          shell: docker info >/dev/null 2>&1
+          register: docker_check
+          ignore_errors: true
+
+        - name: Перезапуск Docker daemon если необходимо
+          service:
+            name: docker
+            state: restarted
+          when: docker_check.rc != 0
+
+        - name: Очистка поврежденных контейнеров
+          shell: |
+            # Останавливаем все контейнеры
+            docker stop $$(docker ps -aq) || true
+            # Удаляем остановленные контейнеры
+            docker rm $$(docker ps -aq) || true
+            # Очищаем неиспользуемые образы
+            docker image prune -f || true
+          ignore_errors: true
+          when: docker_check.rc == 0
+
+        - name: Проверка восстановления Docker
+          shell: docker run --rm hello-world
+          register: docker_test
+          retries: 3
+          delay: 5
+          until: docker_test.rc == 0
+          when: recovery_type in ['full', 'docker']
+
+      rescue:
+        - name: Переустановка Docker при критической ошибке
+          debug:
+            msg: "🔄 Docker требует переустановки. Запустите полное развертывание."
+      when: recovery_type in ['full', 'docker']
+      tags: ['recovery', 'docker']
+
+    - name: Восстановление системных сервисов
+      block:
+        - name: Перезапуск критических сервисов
+          service:
+            name: "{{ item }}"
+            state: restarted
+            enabled: true
+          loop:
+            - systemd-journald
+            - systemd-timesyncd
+            - ssh
+          ignore_errors: true
+          register: service_restart
+
+        - name: Проверка сетевых интерфейсов
+          shell: systemctl restart systemd-networkd || systemctl restart NetworkManager
+          ignore_errors: true
+
+        - name: Восстановление systemd
+          shell: systemctl daemon-reload
+          ignore_errors: true
+
+      when: recovery_type in ['full', 'services']
+      tags: ['recovery', 'services']
+
+    - name: Восстановление мониторинга
+      block:
+        - name: Проверка Prometheus
+          uri:
+            url: http://localhost:9090/-/healthy
+            method: GET
+            status_code: 200
+          register: prometheus_health
+          ignore_errors: true
+
+        - name: Перезапуск Prometheus если необходимо
+          service:
+            name: prometheus
+            state: restarted
+          when: prometheus_health.status != 200
+
+        - name: Проверка Node Exporter
+          uri:
+            url: http://localhost:9100/metrics
+            method: GET
+            status_code: 200
+          register: node_exporter_health
+          ignore_errors: true
+
+        - name: Перезапуск Node Exporter если необходимо
+          service:
+            name: node-exporter
+            state: restarted
+          when: node_exporter_health.status != 200
+
+        - name: Проверка Grafana
+          uri:
+            url: http://localhost:3000/api/health
+            method: GET
+            status_code: 200
+          register: grafana_health
+          ignore_errors: true
+
+        - name: Перезапуск Grafana если необходимо
+          service:
+            name: grafana-server
+            state: restarted
+          when: grafana_health.status != 200
+
+      rescue:
+        - name: Переустановка мониторинга при критической ошибке
+          debug:
+            msg: "🔄 Мониторинг требует переустановки. Запустите: make deploy -- --tags monitoring"
+      when: recovery_type in ['full', 'monitoring']
+      tags: ['recovery', 'monitoring']
+
+    - name: Финальная проверка и очистка
+      block:
+        - name: Очистка системных логов
+          shell: |
+            journalctl --vacuum-time=7d
+            find /var/log -name "*.log" -type f -exec truncate -s 0 {} \;
+          ignore_errors: true
+
+        - name: Перезагрузка системы при необходимости
+          reboot:
+            msg: "Система перезагружается для завершения восстановления"
+            connect_timeout: 5
+            reboot_timeout: 300
+            pre_reboot_delay: 0
+            post_reboot_delay: 30
+          when: ansible_uptime_seconds > 3600  # Только если система работает > 1 часа
+
+      tags: ['recovery', 'cleanup']
+
+  post_tasks:
+    - name: Финальный отчет о восстановлении
+      debug:
+        msg: |
+          🔄 Восстановление системы завершено!
+
+          Тип восстановления: {{ recovery_type }}
+          Время выполнения: {{ ansible_date_time.iso8601 }}
+          Сервер: {{ inventory_hostname }}
+
+          Рекомендации:
+          - Проверьте логи приложений на ошибки
+          - Выполните функциональное тестирование
+          - При необходимости выполните полное развертывание

@@ -1,0 +1,40 @@
+---
+# Development Environment Variables
+# Less restrictive, more verbose logging, smaller resources
+
+# Environment
+environment: development
+debug_mode: true
+
+# System optimization (lighter settings for dev)
+swap_file_size: "512M"
+sysctl_params:
+  vm.swappiness: 10
+  vm.vfs_cache_pressure: 50
+  net.core.somaxconn: 512
+
+# Docker settings (development)
+docker_daemon_config:
+  storage-driver: "overlay2"
+  log-driver: "json-file"
+  log-opts:
+    max-size: "50m"
+    max-file: "2"
+  debug: true
+
+# Monitoring (minimal for dev)
+monitoring_enabled: true
+prometheus_retention_days: 7
+alertmanager_enabled: false
+
+# Security (relaxed for dev)
+fail2ban_enabled: false
+firewall_strict_mode: false
+
+# Backup settings
+backup_enabled: false
+backup_retention_days: 3
+
+# Application settings
+app_debug: true
+app_log_level: DEBUG

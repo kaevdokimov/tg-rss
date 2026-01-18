@@ -79,55 +79,124 @@
         echo "✅ Apt locks очищены"
       args:
         executable: /bin/bash
-      ignore_errors: true
+      register: apt_lock_result
+      failed_when: apt_lock_result.rc != 0 and "killall" not in apt_lock_result.stderr
       when: ansible_os_family == "Debian"
+      rescue:
+        - name: Критическая ошибка с apt locks
+          fail:
+            msg: "Не удалось освободить apt locks после 5 минут ожидания. Сервер может быть в нестабильном состоянии."
 
     - name: Полная очистка Docker перед настройкой сервера
-      shell: |
-        set -e
-        echo "🗑️ Полная очистка Docker..."
+      block:
+        - name: Остановка и отключение Docker сервисов
+          service:
+            name: "{{ item }}"
+            state: stopped
+            enabled: false
+          loop:
+            - docker
+            - docker.socket
+            - containerd
+          ignore_errors: true
+          register: docker_stop_result
 
-        # Останавливаем и удаляем все Docker сервисы
-        systemctl stop docker docker.socket containerd || true
-        systemctl disable docker docker.socket containerd || true
+        - name: Удаление Docker пакетов
+          apt:
+            name:
+              - docker
+              - docker-engine
+              - docker.io
+              - containerd
+              - runc
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: absent
+            purge: true
+          ignore_errors: true
+          register: docker_purge_result
 
-        # Удаляем все Docker пакеты
-        apt-get remove --purge -y docker docker-engine docker.io containerd runc \
-          docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || true
+        - name: Очистка Docker файлов и конфигурации
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/apt/sources.list.d/docker*.list
+            - /usr/share/keyrings/docker*.gpg
+            - /etc/apt/trusted.gpg.d/docker*.gpg
+            - /var/lib/docker
+            - /etc/docker
+          ignore_errors: true
 
-        # Удаляем все Docker repository файлы
-        rm -f /etc/apt/sources.list.d/docker*.list
-        rm -f /usr/share/keyrings/docker*.gpg
-        rm -f /etc/apt/trusted.gpg.d/docker*.gpg
+        - name: Очистка apt cache для Docker
+          shell: |
+            apt-get clean
+            apt-get autoclean
+            rm -rf /var/lib/apt/lists/*docker*
+          args:
+            executable: /bin/bash
+          ignore_errors: true
 
-        # Очищаем apt cache
-        apt-get clean
-        apt-get autoclean
-        rm -rf /var/lib/apt/lists/*docker*
-        rm -rf /var/lib/docker
-        rm -rf /etc/docker
+        - name: Финальная проверка очистки Docker
+          shell: |
+            if command -v docker >/dev/null 2>&1; then
+              echo "⚠️ Docker все еще установлен"
+              exit 1
+            else
+              echo "✅ Docker полностью очищен"
+            fi
+          args:
+            executable: /bin/bash
+          register: docker_check_result
+          failed_when: docker_check_result.rc != 0
 
-        echo "✅ Docker полностью очищен"
-      args:
-        executable: /bin/bash
-      ignore_errors: true
+      rescue:
+        - name: Предупреждение о проблемах с очисткой Docker
+          debug:
+            msg: "⚠️ Не удалось полностью очистить Docker. Это может вызвать проблемы при установке."
       when: ansible_os_family == "Debian"
 
     - name: Проверка и перезапуск SSH сервиса
-      service:
-        name: ssh
-        state: restarted
-      ignore_errors: true
+      block:
+        - name: Проверка статуса SSH сервиса
+          service:
+            name: ssh
+            state: started
+            enabled: true
+          register: ssh_service_result
+
+        - name: Перезапуск SSH если необходимо
+          service:
+            name: ssh
+            state: restarted
+          when: ssh_service_result.changed
+      rescue:
+        - name: Предупреждение о проблемах с SSH
+          debug:
+            msg: "⚠️ Не удалось проверить SSH сервис. Убедитесь что SSH работает."
       when: ansible_os_family == "Debian"
 
     - name: Обновление списка пакетов
       apt:
         update_cache: yes
         cache_valid_time: 3600
+      register: apt_update_result
+      retries: 3
+      delay: 10
+      until: apt_update_result is succeeded
       when: ansible_os_family == "Debian"
 
   roles:
-    - system_optimization
-    - docker_setup
-    - monitoring_setup
-    - security_hardening
+    - role: system_optimization
+      tags: ['system', 'optimization', 'always']
+    - role: docker_setup
+      tags: ['docker', 'containers', 'always']
+    - role: monitoring_setup
+      tags: ['monitoring', 'prometheus', 'grafana', 'alerting']
+    - role: security_hardening
+      tags: ['security', 'hardening', 'firewall', 'ssh']
+    - role: backup_system
+      tags: ['backup', 'monitoring']

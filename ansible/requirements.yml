@@ -1,0 +1,65 @@
+---
+# Ansible Galaxy Requirements
+# Install with: ansible-galaxy install -r requirements.yml
+
+collections:
+  # Docker management
+  - name: community.docker
+    version: ">=3.4.0"
+    source: https://galaxy.ansible.com
+
+  # General utilities
+  - name: community.general
+    version: ">=8.0.0"
+    source: https://galaxy.ansible.com
+
+  # PostgreSQL management
+  - name: community.postgresql
+    version: ">=3.0.0"
+    source: https://galaxy.ansible.com
+
+  # System management
+  - name: ansible.posix
+    version: ">=1.5.0"
+    source: https://galaxy.ansible.com
+
+  # Monitoring and alerting
+  - name: prometheus.prometheus
+    version: ">=0.8.0"
+    source: https://galaxy.ansible.com
+
+roles:
+  # Docker setup and management
+  - name: geerlingguy.docker
+    version: "7.0.0"
+    source: https://galaxy.ansible.com
+
+  # Security hardening
+  - name: devsec.hardening
+    version: "9.0.0"
+    source: https://galaxy.ansible.com
+
+  # System monitoring
+  - name: geerlingguy.node_exporter
+    version: "2.0.0"
+    source: https://galaxy.ansible.com
+
+  # Prometheus monitoring
+  - name: geerlingguy.prometheus
+    version: "2.1.0"
+    source: https://galaxy.ansible.com
+
+  # Grafana dashboards
+  - name: geerlingguy.grafana
+    version: "6.0.0"
+    source: https://galaxy.ansible.com
+
+  # Fail2ban security
+  - name: geerlingguy.fail2ban
+    version: "2.1.0"
+    source: https://galaxy.ansible.com
+
+  # Firewall management
+  - name: geerlingguy.firewall
+    version: "2.0.0"
+    source: https://galaxy.ansible.com

@@ -1,0 +1,87 @@
+---
+# Ansible-lint configuration
+# https://ansible-lint.readthedocs.io/en/latest/configuring/
+
+exclude_paths:
+  - .github/
+  - molecule/
+  - .tox/
+  - .venv/
+  - venv/
+
+# Profile to use (min, basic, moderate, safety, shared, production)
+profile: moderate
+
+# Rules configuration
+rules:
+  # Allow environment variable naming
+  var-naming:
+    patterns:
+      - name: "Allow environment variables"
+        pattern: "^[A-Z][A-Z0-9_]*$"
+      - name: "Allow Ansible facts"
+        pattern: "^ansible_.*$"
+
+  # Allow template in names (common in Ansible)
+  name[template]:
+    level: warning
+
+  # YAML comment rules
+  yaml[comments]:
+    level: warning
+
+  # YAML line length
+  yaml[line-length]:
+    max: 120
+    level: warning
+
+  # YAML truthy values
+  yaml[truthy]:
+    allowed-values: ['true', 'false']
+    level: warning
+
+  # Allow risky shell commands (we handle this manually)
+  command-instead-of-shell:
+    level: warning
+
+  # Allow risky file operations (we handle this manually)
+  risky-file-permissions:
+    level: warning
+
+  # Allow shell without pipefail (we handle this manually)
+  shell-without-pipefail:
+    level: warning
+
+  # Allow jinja2 template delimiters in names
+  jinja[invalid]:
+    level: warning
+
+  # Allow missing file permissions
+  risky-file-permissions:
+    level: warning
+
+# Mock modules for testing
+mock_modules:
+  - namespaced.module
+  - namespaced.bar
+
+# Mock roles for testing
+mock_roles:
+  - my_company.my_role
+
+# Skip list for rules
+skip_list:
+  - yaml[line-length]
+  - yaml[comments]
+  - yaml[truthy]
+  - name[template]
+  - command-instead-of-shell
+  - risky-file-permissions
+  - shell-without-pipefail
+
+# Enable specific rules
+enable_list:
+  - yaml
+  - syntax-check
+  - var-naming
+  - name

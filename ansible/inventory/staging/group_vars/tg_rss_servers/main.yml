@@ -1,0 +1,44 @@
+---
+# Staging Environment Variables
+# Pre-production testing, balanced settings
+
+# Environment
+environment: staging
+debug_mode: false
+
+# System optimization (balanced)
+swap_file_size: "1G"
+sysctl_params:
+  vm.swappiness: 30
+  vm.vfs_cache_pressure: 50
+  net.core.somaxconn: 1024
+  net.ipv4.tcp_tw_reuse: 1
+
+# Docker settings (production-like)
+docker_daemon_config:
+  storage-driver: "overlay2"
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+  iptables: false
+  bridge: "none"
+  ip-masq: false
+  userland-proxy: false
+
+# Monitoring (full monitoring)
+monitoring_enabled: true
+prometheus_retention_days: 30
+alertmanager_enabled: true
+
+# Security (moderate)
+fail2ban_enabled: true
+firewall_strict_mode: true
+
+# Backup settings
+backup_enabled: true
+backup_retention_days: 14
+
+# Application settings
+app_debug: false
+app_log_level: INFO

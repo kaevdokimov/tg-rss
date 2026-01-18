@@ -1,0 +1,18 @@
+[Unit]
+Description=TG-RSS Backup Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User={{ backup_service_user }}
+Group={{ backup_service_group }}
+ExecStart={{ backup_main_script }}
+ExecStopPost={{ backup_verify_script }}
+TimeoutSec={{ backup_timeout_seconds }}
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tg-rss-backup
+
+[Install]
+WantedBy=multi-user.target

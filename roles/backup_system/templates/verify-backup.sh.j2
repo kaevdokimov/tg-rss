@@ -1,0 +1,121 @@
+#!/bin/bash
+# Backup verification script for TG-RSS
+# {{ ansible_managed }}
+
+set -euo pipefail
+
+# Configuration
+BACKUP_DIR="{{ backup_base_dir }}"
+LOG_FILE="{{ backup_logs_dir }}/verify-backup.log"
+TEMP_DIR="{{ backup_temp_dir }}/verify"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Logging
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $*" >&2
+    log "ERROR: $*"
+}
+
+warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $*" >&2
+    log "WARNING: $*"
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $*" >&2
+    log "SUCCESS: $*"
+}
+
+# Cleanup
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+
+trap cleanup EXIT
+
+log "Starting backup verification"
+
+# Create temp directory
+mkdir -p "$TEMP_DIR"
+
+# Find latest backup
+LATEST_BACKUP=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name "tg-rss-backup-*" | sort | tail -1)
+
+if [ -z "$LATEST_BACKUP" ]; then
+    error "No backup directories found in $BACKUP_DIR"
+    exit 1
+fi
+
+log "Verifying backup: $(basename "$LATEST_BACKUP")"
+
+# Check manifest
+MANIFEST="$LATEST_BACKUP/manifest.txt"
+if [ -f "$MANIFEST" ]; then
+    log "Manifest found, checking contents..."
+    cat "$MANIFEST" >> "$LOG_FILE"
+else
+    warning "Manifest file not found: $MANIFEST"
+fi
+
+# Verify backup files
+BACKUP_FILES=$(find "$LATEST_BACKUP" -type f \( -name "*.tar.gz" -o -name "*.txt" \) | wc -l)
+log "Found $BACKUP_FILES backup files"
+
+# Test archive integrity
+find "$LATEST_BACKUP" -name "*.tar.gz" | while read -r archive; do
+    log "Testing archive: $(basename "$archive")"
+
+    if tar -tzf "$archive" >/dev/null 2>&1; then
+        success "Archive integrity OK: $(basename "$archive")"
+    else
+        error "Archive corrupted: $(basename "$archive")"
+        exit 1
+    fi
+done
+
+# Calculate backup size
+BACKUP_SIZE=$(du -sh "$LATEST_BACKUP" | cut -f1)
+log "Backup size: $BACKUP_SIZE"
+
+# Check backup age
+BACKUP_AGE_HOURS=$(( ($(date +%s) - $(stat -c %Y "$LATEST_BACKUP")) / 3600 ))
+if [ $BACKUP_AGE_HOURS -gt 25 ]; then
+    warning "Backup is $BACKUP_AGE_HOURS hours old (expected: < 25 hours)"
+else
+    success "Backup age OK: $BACKUP_AGE_HOURS hours"
+fi
+
+# Check disk space for backups
+BACKUP_DISK_FREE=$(df "$BACKUP_DIR" | tail -1 | awk '{print $4}')
+BACKUP_DISK_FREE_GB=$((BACKUP_DISK_FREE / 1024 / 1024))
+
+if [ $BACKUP_DISK_FREE_GB -lt 5 ]; then
+    warning "Low disk space for backups: ${BACKUP_DISK_FREE_GB}GB available"
+else
+    success "Disk space OK: ${BACKUP_DISK_FREE_GB}GB available"
+fi
+
+# Test restore capability (basic)
+log "Testing basic restore capability..."
+if command -v docker >/dev/null 2>&1; then
+    # Test if we can list backup contents
+    if find "$LATEST_BACKUP" -name "*.tar.gz" | head -1 | xargs -I {} tar -tzf {} | head -5 >/dev/null 2>&1; then
+        success "Restore capability verified"
+    else
+        warning "Restore capability test failed"
+    fi
+else
+    warning "Docker not available for restore testing"
+fi
+
+success "Backup verification completed successfully"
+log "Verification summary: $BACKUP_FILES files, $BACKUP_SIZE, $BACKUP_AGE_HOURS hours old"

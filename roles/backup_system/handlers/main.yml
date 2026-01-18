@@ -1,0 +1,20 @@
+---
+# Handlers for backup system
+
+- name: reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: restart backup timer
+  systemd:
+    name: "{{ backup_service_name }}.timer"
+    state: restarted
+
+- name: restart backup service
+  systemd:
+    name: "{{ backup_service_name }}.service"
+    state: restarted
+
+- name: backup systemd logs
+  command: journalctl -u {{ backup_service_name }} --since "1 hour ago" > {{ backup_logs_dir }}/systemd-backup.log
+  ignore_errors: true

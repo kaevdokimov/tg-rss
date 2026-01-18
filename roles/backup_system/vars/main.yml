@@ -1,0 +1,71 @@
+---
+# Backup system default variables
+
+# Base directories
+backup_base_dir: "/opt/tg-rss/backups"
+backup_scripts_dir: "/opt/tg-rss/backup-scripts"
+backup_logs_dir: "/opt/tg-rss/logs"
+backup_temp_dir: "/tmp/tg-rss-backup"
+
+# Configuration files
+backup_config_file: "/etc/tg-rss/backup-config.yml"
+backup_main_script: "{{ backup_scripts_dir }}/backup.sh"
+backup_verify_script: "{{ backup_scripts_dir }}/verify-backup.sh"
+backup_rotate_script: "{{ backup_scripts_dir }}/rotate-backups.sh"
+backup_status_script: "{{ backup_scripts_dir }}/backup-status.sh"
+
+# Service configuration
+backup_service_name: "tg-rss-backup"
+backup_service_user: "root"
+backup_service_group: "root"
+
+# Backup schedule and retention
+backup_schedule: "*-*-* 02:00:00"  # Daily at 2 AM
+backup_retention_days: "{{ backup_retention_days | default(30) }}"
+backup_compression_level: 6
+backup_verify_integrity: true
+backup_alert_on_failure: true
+
+# Backup sources
+backup_sources:
+  - name: "postgresql_data"
+    type: "docker_volume"
+    volume_name: "tg-rss_db_data"
+    destination: "postgresql"
+    compress: true
+    verify: true
+
+  - name: "redis_data"
+    type: "docker_volume"
+    volume_name: "tg-rss_redis_data"
+    destination: "redis"
+    compress: true
+    verify: true
+
+  - name: "application_config"
+    type: "directory"
+    source_path: "/opt/tg-rss/.env"
+    destination: "config"
+    compress: false
+    verify: true
+
+  - name: "ssl_certificates"
+    type: "directory"
+    source_path: "/opt/tg-rss/ssl"
+    destination: "ssl"
+    compress: true
+    verify: true
+    optional: true
+
+# Encryption settings
+backup_encryption_enabled: false
+backup_encryption_key_file: "/etc/tg-rss/backup-key.gpg"
+
+# Notification settings
+backup_notification_email: ""
+backup_notification_webhook: ""
+
+# Performance settings
+backup_parallel_jobs: 2
+backup_timeout_seconds: 3600
+backup_max_file_size_mb: 1024

@@ -1,0 +1,114 @@
+---
+- name: Частичное обновление системы
+  hosts: tg_rss_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    update_type: "{{ update_type | default('all') }}"  # all, security, packages
+
+  pre_tasks:
+    - name: Валидация параметров обновления
+      assert:
+        that:
+          - update_type in ['all', 'security', 'packages']
+        fail_msg: "update_type должен быть одним из: all, security, packages"
+
+  tasks:
+    - name: Обновление пакетов безопасности
+      block:
+        - name: Обновление списка пакетов
+          apt:
+            update_cache: yes
+            cache_valid_time: 600
+
+        - name: Установка обновлений безопасности
+          apt:
+            upgrade: dist
+            update_cache: yes
+          register: security_update_result
+
+        - name: Перезагрузка если необходимо
+          reboot:
+            msg: "Сервер перезагружается после обновлений безопасности"
+            connect_timeout: 5
+            reboot_timeout: 600
+            pre_reboot_delay: 0
+            post_reboot_delay: 30
+          when: security_update_result.changed and ansible_uptime_seconds > 300
+
+        - name: Сообщение об обновлениях безопасности
+          debug:
+            msg: "✅ Обновления безопасности установлены"
+      when: update_type in ['all', 'security']
+      tags: ['security', 'updates']
+
+    - name: Обновление всех пакетов
+      block:
+        - name: Полное обновление системы
+          apt:
+            upgrade: full
+            update_cache: yes
+            autoremove: yes
+            autoclean: yes
+          register: full_update_result
+
+        - name: Перезагрузка после полного обновления
+          reboot:
+            msg: "Сервер перезагружается после полного обновления"
+            connect_timeout: 5
+            reboot_timeout: 600
+            pre_reboot_delay: 0
+            post_reboot_delay: 30
+          when: full_update_result.changed and ansible_uptime_seconds > 300
+
+        - name: Сообщение о полном обновлении
+          debug:
+            msg: "✅ Полное обновление системы завершено"
+      when: update_type == 'packages'
+      tags: ['packages', 'updates']
+
+    - name: Финальная проверка после обновлений
+      block:
+        - name: Проверка работы основных сервисов
+          service:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - ssh
+            - docker
+          ignore_errors: true
+          register: service_check_result
+
+        - name: Отчет о статусе сервисов
+          debug:
+            msg: |
+              📊 Статус сервисов после обновления:
+              SSH: {{ '✅' if service_check_result.results[0].changed else '❌' }}
+              Docker: {{ '✅' if service_check_result.results[1].changed else '❌' }}
+
+        - name: Проверка свободного места на диске
+          shell: df -h / | tail -1 | awk '{print $5}' | sed 's/%//'
+          register: disk_usage
+          failed_when: disk_usage.stdout | int > 90
+
+        - name: Предупреждение о низком месте на диске
+          debug:
+            msg: "⚠️ Низкое место на диске: {{ disk_usage.stdout }}%"
+          when: disk_usage.stdout | int > 80
+      tags: ['check', 'validation']
+
+  post_tasks:
+    - name: Финальный отчет об обновлении
+      debug:
+        msg: |
+          🎉 Обновление системы завершено!
+
+          Тип обновления: {{ update_type }}
+          Время выполнения: {{ ansible_date_time.iso8601 }}
+          Сервер: {{ inventory_hostname }}
+
+          Следующие шаги:
+          - Проверьте логи приложений
+          - Выполните тестирование функциональности
+          - При необходимости перезапустите сервисы приложений

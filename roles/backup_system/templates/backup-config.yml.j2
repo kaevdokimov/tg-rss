@@ -1,0 +1,28 @@
+# TG-RSS Backup Configuration
+# {{ ansible_managed }}
+
+backup_base_dir: "{{ backup_base_dir }}"
+backup_retention_days: {{ backup_retention_days }}
+backup_verify_integrity: {{ backup_verify_integrity | bool }}
+backup_compression_level: {{ backup_compression_level }}
+backup_timeout_seconds: {{ backup_timeout_seconds }}
+backup_max_file_size_mb: {{ backup_max_file_size_mb }}
+
+backup_sources:
+{{ backup_sources | to_yaml | indent(2) }}
+
+# Notification settings
+notifications:
+  enabled: {{ backup_alert_on_failure | bool }}
+  email: "{{ backup_notification_email }}"
+  webhook: "{{ backup_notification_webhook }}"
+
+# Performance settings
+performance:
+  parallel_jobs: {{ backup_parallel_jobs }}
+  timeout_seconds: {{ backup_timeout_seconds }}
+
+# Encryption (future feature)
+encryption:
+  enabled: {{ backup_encryption_enabled | bool }}
+  key_file: "{{ backup_encryption_key_file }}"

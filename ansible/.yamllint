@@ -1,0 +1,80 @@
+---
+extends: default
+
+rules:
+  # Line length
+  line-length:
+    max: 120
+    level: warning
+
+  # Allow truthy values
+  truthy:
+    allowed-values: ['true', 'false']
+    check-keys: false
+
+  # Indentation
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Empty lines
+  empty-lines:
+    max-start: 2
+    max-end: 1
+    max: 3
+
+  # Comments (allow inline comments)
+  comments-indentation: disable
+  comments: disable
+
+  # Document start (not required for Ansible)
+  document-start: disable
+
+  # Braces spacing
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # Brackets spacing
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # Colons
+  colons:
+    max-spaces-after: 1
+    max-spaces-before: 0
+
+  # Commas
+  commas:
+    max-spaces-after: 1
+    max-spaces-before: 0
+    min-spaces-after: 1
+
+  # Allow empty values in mappings
+  empty-values: disable
+
+  # Allow octal values (common in Ansible)
+  octal-values: disable
+
+  # Allow float values
+  float-values: disable
+
+  # Key duplicates (Ansible may have legitimate duplicates)
+  key-duplicates: enable
+
+  # Key ordering (not enforced)
+  key-ordering: disable
+
+  # Allow new line at end of file
+  new-line-at-end-of-file: enable
+
+  # Allow new lines
+  new-lines: enable
+
+  # Trailing spaces
+  trailing-spaces: enable
+
+  # Allow specific Ansible patterns
+  anchors: enable
