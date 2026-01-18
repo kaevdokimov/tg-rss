@@ -95,14 +95,18 @@ func handleMySubscriptions(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	if err != nil {
 		log.Printf("Ошибка при получении подписок: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении подписок")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения об ошибке подписок: %v", err)
+		}
 		return
 	}
 
 	if len(subscriptions) == 0 {
 		msg := tgbotapi.NewMessage(chatId, "📝 У вас пока нет подписок на источники.\n\nДобавьте источники через меню «Мои источники»")
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения о пустых подписках: %v", err)
+		}
 		return
 	}
 
@@ -111,14 +115,18 @@ func handleMySubscriptions(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	if err != nil {
 		log.Printf("Ошибка при получении источников: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении списка источников.\n\nПопробуйте позже или обратитесь к администратору, если проблема сохраняется.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения об ошибке источников: %v", err)
+		}
 		return
 	}
 
 	msg := tgbotapi.NewMessage(chatId, "📝 *Ваши подписки:*\n\nНажмите на источник, чтобы отписаться от него")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMySubscriptionsKeyboard(subscriptions, sources)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки списка подписок: %v", err)
+	}
 }
 
 // handleSourceDetails показывает детали источника с возможностью подписки/отписки
@@ -139,7 +147,9 @@ func handleSourceDetails(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, dat
 	if err != nil {
 		log.Printf("Ошибка при поиске источника: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Источник не найден")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -148,7 +158,9 @@ func handleSourceDetails(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, dat
 	if err != nil {
 		log.Printf("Ошибка при проверке подписки: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке статуса подписки.\n\nПопробуйте позже.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -164,7 +176,9 @@ func handleSourceDetails(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, dat
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.DisableWebPagePreview = true
 	msg.ReplyMarkup = createSubscriptionKeyboard(sourceId, isSubscribed)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки информации об источнике: %v", err)
+	}
 }
 
 // handleSubscribe подписывает пользователя на источник
@@ -186,7 +200,9 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	if err != nil {
 		log.Printf("Ошибка при поиске источника: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Источник не найден.\n\nВозможно, он был удален или деактивирован.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -195,13 +211,17 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	if err != nil {
 		log.Printf("Ошибка при проверке подписки: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке подписки.\n\nПопробуйте позже.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
 	if isSubscribed {
 		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ℹ️ Вы уже подписаны на источник «%s».\n\nИспользуйте меню «📝 Мои подписки» для управления подписками.", source.Name))
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -210,7 +230,9 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 	if err != nil {
 		log.Printf("Ошибка при проверке существования пользователя: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке пользователя.\n\nПопробуйте позже или используйте команду /start.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -224,7 +246,9 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 		if err != nil {
 			log.Printf("Ошибка при регистрации пользователя: %v", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя.\n\nПожалуйста, используйте команду /start для регистрации.")
-			bot.Send(msg)
+			if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 			return
 		}
 		log.Printf("Автоматически зарегистрирован пользователь с chatId %d", chatId)
@@ -247,12 +271,16 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 		} else {
 			msg = tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ Не удалось добавить подписку на «%s».\n\nПопробуйте позже.", source.Name))
 		}
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
 	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы успешно подписались на источник «%s»!\n\nТеперь вы будете получать новости из этого источника автоматически.", source.Name))
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки подтверждения подписки: %v", err)
+	}
 }
 
 // handleUnsubscribe отписывает пользователя от источника
@@ -274,7 +302,9 @@ func handleUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data 
 	if err != nil {
 		log.Printf("Ошибка при поиске источника: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Источник не найден")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -283,13 +313,17 @@ func handleUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data 
 	if err != nil {
 		log.Printf("Ошибка при проверке подписки: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при проверке подписки.\n\nПопробуйте позже.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
 	if !isSubscribed {
 		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("ℹ️ Вы не подписаны на источник «%s».\n\nИспользуйте меню «📋 Мои источники» чтобы подписаться.", source.Name))
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -303,19 +337,25 @@ func handleUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data 
 	if err != nil {
 		log.Printf("Ошибка при удалении подписки: %v", err)
 		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("❌ Не удалось отписаться от источника «%s».\n\nПопробуйте позже.", source.Name))
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
-	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы отписались от источника «%s».\n\nВы больше не будете получать новости из этого источника.", source.Name))
-	bot.Send(msg)
+	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы отписались от источника «%s».\n\nВы больше не будете получать новости из этого источента.", source.Name))
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки подтверждения отписки: %v", err)
+	}
 }
 
 // handleUnknownCallback обрабатывает неизвестные callback-запросы
 func handleUnknownCallback(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "❓ Неизвестная команда")
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения о неизвестной команде: %v", err)
+	}
 }
 
 // handleCopyLink обрабатывает запрос на копирование ссылки
@@ -331,7 +371,9 @@ func handleCopyLink(bot *tgbotapi.BotAPI, chatId int64, data string) {
 
 	msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("🔗 *Ссылка скопирована:*\n\n`%s`", link))
 	msg.ParseMode = tgbotapi.ModeMarkdown
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки ссылки: %v", err)
+	}
 }
 
 // handleNewsPage обрабатывает пагинацию новостей
@@ -361,14 +403,18 @@ func handleQuickStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 		log.Printf("Ошибка при получении источников: %v", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении источников")
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
 	if len(sources) == 0 {
 		msg := tgbotapi.NewMessage(chatId, "📋 Источников пока нет.\n\nДобавьте первый источник через кнопку «Добавить источник»")
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -390,7 +436,9 @@ func handleQuickStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, msgText)
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createQuickStartKeyboard(sources, subscribedIds)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки быстрого меню подписок: %v", err)
+	}
 }
 
 // handleQuickSubscribe обрабатывает подписку через быстрый старт
@@ -407,7 +455,9 @@ func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, da
 		if err != nil {
 			log.Printf("Ошибка при получении источников: %v", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении источников")
-			bot.Send(msg)
+			if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 			return
 		}
 
@@ -442,7 +492,9 @@ func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, da
 
 		msg := tgbotapi.NewMessage(chatId, fmt.Sprintf("✅ Вы успешно подписались на %d источников!", subscribedCount))
 		msg.ReplyMarkup = createMainKeyboard()
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+		}
 		return
 	}
 
@@ -502,7 +554,9 @@ func handleTutorialStep(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data
 func handleTutorialSkip(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "✅ Туториал пропущен.\n\nИспользуйте кнопки меню для навигации. Если нужна помощь, нажмите /help")
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения о пропуске туториала: %v", err)
+	}
 }
 
 // handleTutorialComplete завершает туториал
@@ -510,5 +564,7 @@ func handleTutorialComplete(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "🎉 *Туториал завершен!*\n\nТеперь вы готовы использовать бота. Нажмите «🚀 Быстрый старт» чтобы подписаться на популярные источники, или используйте меню для других действий.")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения о завершении туториала: %v", err)
+	}
 }

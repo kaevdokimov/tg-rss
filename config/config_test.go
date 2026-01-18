@@ -31,23 +31,23 @@ func TestLoadDBConfig(t *testing.T) {
 			_ = os.Unsetenv("POSTGRES_USER")
 		}
 		if originalPass != "" {
-			os.Setenv("POSTGRES_PASSWORD", originalPass)
+			_ = os.Setenv("POSTGRES_PASSWORD", originalPass)
 		} else {
-			os.Unsetenv("POSTGRES_PASSWORD")
+			_ = os.Unsetenv("POSTGRES_PASSWORD")
 		}
 		if originalDB != "" {
-			os.Setenv("POSTGRES_DB", originalDB)
+			_ = os.Setenv("POSTGRES_DB", originalDB)
 		} else {
-			os.Unsetenv("POSTGRES_DB")
+			_ = os.Unsetenv("POSTGRES_DB")
 		}
 	}()
 
 	// Тест с дефолтными значениями
-	os.Unsetenv("POSTGRES_HOST")
-	os.Unsetenv("POSTGRES_PORT")
-	os.Unsetenv("POSTGRES_USER")
-	os.Unsetenv("POSTGRES_PASSWORD")
-	os.Unsetenv("POSTGRES_DB")
+	_ = os.Unsetenv("POSTGRES_HOST")
+	_ = os.Unsetenv("POSTGRES_PORT")
+	_ = os.Unsetenv("POSTGRES_USER")
+	_ = os.Unsetenv("POSTGRES_PASSWORD")
+	_ = os.Unsetenv("POSTGRES_DB")
 
 	cfg := LoadDBConfig()
 	if cfg.DBHost != "db" {
@@ -64,11 +64,11 @@ func TestLoadDBConfig(t *testing.T) {
 	}
 
 	// Тест с кастомными значениями
-	os.Setenv("POSTGRES_HOST", "test-host")
-	os.Setenv("POSTGRES_PORT", "3306")
-	os.Setenv("POSTGRES_USER", "test-user")
-	os.Setenv("POSTGRES_PASSWORD", "test-pass")
-	os.Setenv("POSTGRES_DB", "test-db")
+	_ = os.Setenv("POSTGRES_HOST", "test-host")
+	_ = os.Setenv("POSTGRES_PORT", "3306")
+	_ = os.Setenv("POSTGRES_USER", "test-user")
+	_ = os.Setenv("POSTGRES_PASSWORD", "test-pass")
+	_ = os.Setenv("POSTGRES_DB", "test-db")
 
 	cfg = LoadDBConfig()
 	if cfg.DBHost != "test-host" {
@@ -97,38 +97,38 @@ func TestLoadRedisConfig(t *testing.T) {
 
 	defer func() {
 		if originalAddr != "" {
-			os.Setenv("REDIS_ADDR", originalAddr)
+			_ = os.Setenv("REDIS_ADDR", originalAddr)
 		} else {
-			os.Unsetenv("REDIS_ADDR")
+			_ = os.Unsetenv("REDIS_ADDR")
 		}
 		if originalPassword != "" {
-			os.Setenv("REDIS_PASSWORD", originalPassword)
+			_ = os.Setenv("REDIS_PASSWORD", originalPassword)
 		} else {
-			os.Unsetenv("REDIS_PASSWORD")
+			_ = os.Unsetenv("REDIS_PASSWORD")
 		}
 		if originalDB != "" {
-			os.Setenv("REDIS_DB", originalDB)
+			_ = os.Setenv("REDIS_DB", originalDB)
 		} else {
-			os.Unsetenv("REDIS_DB")
+			_ = os.Unsetenv("REDIS_DB")
 		}
 		if originalNewsChannel != "" {
-			os.Setenv("REDIS_NEWS_CHANNEL", originalNewsChannel)
+			_ = os.Setenv("REDIS_NEWS_CHANNEL", originalNewsChannel)
 		} else {
-			os.Unsetenv("REDIS_NEWS_CHANNEL")
+			_ = os.Unsetenv("REDIS_NEWS_CHANNEL")
 		}
 		if originalNotifyChannel != "" {
-			os.Setenv("REDIS_NOTIFY_CHANNEL", originalNotifyChannel)
+			_ = os.Setenv("REDIS_NOTIFY_CHANNEL", originalNotifyChannel)
 		} else {
-			os.Unsetenv("REDIS_NOTIFY_CHANNEL")
+			_ = os.Unsetenv("REDIS_NOTIFY_CHANNEL")
 		}
 	}()
 
 	// Тест с дефолтными значениями
-	os.Unsetenv("REDIS_ADDR")
-	os.Unsetenv("REDIS_PASSWORD")
-	os.Unsetenv("REDIS_DB")
-	os.Unsetenv("REDIS_NEWS_CHANNEL")
-	os.Unsetenv("REDIS_NOTIFY_CHANNEL")
+	_ = os.Unsetenv("REDIS_ADDR")
+	_ = os.Unsetenv("REDIS_PASSWORD")
+	_ = os.Unsetenv("REDIS_DB")
+	_ = os.Unsetenv("REDIS_NEWS_CHANNEL")
+	_ = os.Unsetenv("REDIS_NOTIFY_CHANNEL")
 
 	cfg := LoadRedisConfig()
 	if cfg.Addr != "redis:6379" {
@@ -157,44 +157,44 @@ func TestLoadTgBotConfig(t *testing.T) {
 	// Восстанавливаем после теста
 	defer func() {
 		if originalApiKey != "" {
-			os.Setenv("TELEGRAM_API_KEY", originalApiKey)
+			_ = os.Setenv("TELEGRAM_API_KEY", originalApiKey)
 		} else {
-			os.Unsetenv("TELEGRAM_API_KEY")
+			_ = os.Unsetenv("TELEGRAM_API_KEY")
 		}
 		if originalTZ != "" {
-			os.Setenv("TZ", originalTZ)
+			_ = os.Setenv("TZ", originalTZ)
 		} else {
-			os.Unsetenv("TZ")
+			_ = os.Unsetenv("TZ")
 		}
 		if originalTimeout != "" {
-			os.Setenv("TIMEOUT", originalTimeout)
+			_ = os.Setenv("TIMEOUT", originalTimeout)
 		} else {
-			os.Unsetenv("TIMEOUT")
+			_ = os.Unsetenv("TIMEOUT")
 		}
 		if originalInterval != "" {
-			os.Setenv("CONTENT_SCRAPER_INTERVAL", originalInterval)
+			_ = os.Setenv("CONTENT_SCRAPER_INTERVAL", originalInterval)
 		} else {
-			os.Unsetenv("CONTENT_SCRAPER_INTERVAL")
+			_ = os.Unsetenv("CONTENT_SCRAPER_INTERVAL")
 		}
 		if originalBatch != "" {
-			os.Setenv("CONTENT_SCRAPER_BATCH", originalBatch)
+			_ = os.Setenv("CONTENT_SCRAPER_BATCH", originalBatch)
 		} else {
-			os.Unsetenv("CONTENT_SCRAPER_BATCH")
+			_ = os.Unsetenv("CONTENT_SCRAPER_BATCH")
 		}
 		if originalConcurrent != "" {
-			os.Setenv("CONTENT_SCRAPER_CONCURRENT", originalConcurrent)
+			_ = os.Setenv("CONTENT_SCRAPER_CONCURRENT", originalConcurrent)
 		} else {
-			os.Unsetenv("CONTENT_SCRAPER_CONCURRENT")
+			_ = os.Unsetenv("CONTENT_SCRAPER_CONCURRENT")
 		}
 	}()
 
 	// Тест с дефолтными значениями (кроме ApiKey, который обязателен)
-	os.Setenv("TELEGRAM_API_KEY", "test-api-key")
-	os.Unsetenv("TZ")
-	os.Unsetenv("TIMEOUT")
-	os.Unsetenv("CONTENT_SCRAPER_INTERVAL")
-	os.Unsetenv("CONTENT_SCRAPER_BATCH")
-	os.Unsetenv("CONTENT_SCRAPER_CONCURRENT")
+	_ = os.Setenv("TELEGRAM_API_KEY", "test-api-key")
+	_ = os.Unsetenv("TZ")
+	_ = os.Unsetenv("TIMEOUT")
+	_ = os.Unsetenv("CONTENT_SCRAPER_INTERVAL")
+	_ = os.Unsetenv("CONTENT_SCRAPER_BATCH")
+	_ = os.Unsetenv("CONTENT_SCRAPER_CONCURRENT")
 
 	cfg := LoadTgBotConfig()
 	if cfg.ApiKey != "test-api-key" {
@@ -217,12 +217,12 @@ func TestLoadTgBotConfig(t *testing.T) {
 	}
 
 	// Тест с кастомными значениями
-	os.Setenv("TELEGRAM_API_KEY", "custom-api-key")
-	os.Setenv("TZ", "UTC")
-	os.Setenv("TIMEOUT", "120")
-	os.Setenv("CONTENT_SCRAPER_INTERVAL", "5")
-	os.Setenv("CONTENT_SCRAPER_BATCH", "30")
-	os.Setenv("CONTENT_SCRAPER_CONCURRENT", "10")
+	_ = os.Setenv("TELEGRAM_API_KEY", "custom-api-key")
+	_ = os.Setenv("TZ", "UTC")
+	_ = os.Setenv("TIMEOUT", "120")
+	_ = os.Setenv("CONTENT_SCRAPER_INTERVAL", "5")
+	_ = os.Setenv("CONTENT_SCRAPER_BATCH", "30")
+	_ = os.Setenv("CONTENT_SCRAPER_CONCURRENT", "10")
 
 	cfg = LoadTgBotConfig()
 	if cfg.ApiKey != "custom-api-key" {

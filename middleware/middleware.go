@@ -48,7 +48,7 @@ func Recovery(next http.HandlerFunc) http.HandlerFunc {
 				)
 
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Internal Server Error"))
+				_, _ = w.Write([]byte("Internal Server Error"))
 			}
 		}()
 
@@ -85,7 +85,7 @@ func Timeout(timeout time.Duration) Middleware {
 
 				if w.Header().Get("Content-Type") == "" {
 					w.WriteHeader(http.StatusGatewayTimeout)
-					w.Write([]byte("Request timeout"))
+					_, _ = w.Write([]byte("Request timeout"))
 				}
 			}
 		}

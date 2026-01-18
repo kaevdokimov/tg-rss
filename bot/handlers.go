@@ -95,7 +95,9 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 	if err != nil {
 		handlerLogger.Error("Ошибка добавления пользователя", "error", err)
 		msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при подключении к боту.\n\nПожалуйста, попробуйте позже или обратитесь к администратору, если проблема сохраняется.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			handlerLogger.Error("Ошибка отправки сообщения об ошибке подключения", "error", err)
+		}
 		return
 	}
 
@@ -132,7 +134,9 @@ func handleStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, username string, chatId i
 	msg := tgbotapi.NewMessage(chatId, welcomeText)
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createWelcomeKeyboard(hasSubscriptions)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		handlerLogger.Error("Ошибка отправки приветственного сообщения", "error", err)
+	}
 }
 
 // handleAddSource обрабатывает команду /add для добавления нового источника
