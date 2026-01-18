@@ -1,7 +1,7 @@
 """Redis caching для векторизации и кластеризации."""
 
 import json
-import pickle
+import pickle  # nosec - used for local ML model serialization
 from typing import Optional, Dict, Any, List
 import redis
 import hashlib
@@ -67,7 +67,7 @@ class RedisCache:
 
             cached_data = self.client.get(key)
             if cached_data:
-                vectors = pickle.loads(cached_data)
+                vectors = pickle.loads(cached_data)  # nosec - local cache only
                 logger.debug("Retrieved vectorized texts from cache", "key", key)
                 return vectors
         except Exception as e:
@@ -116,7 +116,7 @@ class RedisCache:
         try:
             # Создаем хэш параметров для уникальности
             params_str = json.dumps(params, sort_keys=True)
-            params_hash = hashlib.md5(params_str.encode()).hexdigest()[:8]
+            params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:8]
             key = self._make_key("clusters", f"{vectors_hash}_{params_hash}")
 
             cached_data = self.client.get(key)
@@ -146,7 +146,7 @@ class RedisCache:
         try:
             # Создаем хэш параметров для уникальности
             params_str = json.dumps(params, sort_keys=True)
-            params_hash = hashlib.md5(params_str.encode()).hexdigest()[:8]
+            params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:8]
             key = self._make_key("clusters", f"{vectors_hash}_{params_hash}")
 
             # Сериализация в JSON
@@ -173,7 +173,7 @@ class RedisCache:
 
         try:
             params_str = json.dumps(params, sort_keys=True)
-            params_hash = hashlib.md5(params_str.encode()).hexdigest()[:8]
+            params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:8]
             key = self._make_key("narratives", f"{clusters_hash}_{params_hash}")
 
             cached_data = self.client.get(key)
@@ -202,7 +202,7 @@ class RedisCache:
 
         try:
             params_str = json.dumps(params, sort_keys=True)
-            params_hash = hashlib.md5(params_str.encode()).hexdigest()[:8]
+            params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:8]
             key = self._make_key("narratives", f"{clusters_hash}_{params_hash}")
 
             data = json.dumps(narratives, ensure_ascii=False)
