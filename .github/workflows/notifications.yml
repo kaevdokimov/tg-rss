@@ -35,7 +35,7 @@ jobs:
       - name: Generate notification message
         id: notification
         run: |
-          # Determine notification type and content
+          # Определяем тип уведомления и содержимое
           WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
           CONCLUSION="${{ github.event.workflow_run.conclusion }}"
           REPO="${{ github.repository }}"
@@ -44,19 +44,19 @@ jobs:
           ACTOR="${{ github.event.workflow_run.triggering_actor.login }}"
           REPO_URL="https://github.com/$REPO"
 
-          # Set status emoji and text
+          # Устанавливаем эмодзи и текст статуса
           case $CONCLUSION in
             "success")
               STATUS_EMOJI="✅"
-              STATUS_TEXT="SUCCESS"
+              STATUS_TEXT="УСПЕХ"
               ;;
             "failure")
               STATUS_EMOJI="❌"
-              STATUS_TEXT="FAILURE"
+              STATUS_TEXT="НЕУДАЧА"
               ;;
             "cancelled")
               STATUS_EMOJI="⚠️"
-              STATUS_TEXT="CANCELLED"
+              STATUS_TEXT="ОТМЕНЕНО"
               ;;
             *)
               STATUS_EMOJI="❓"
@@ -64,32 +64,31 @@ jobs:
               ;;
           esac
 
-          # Create Telegram message with MarkdownV2 formatting
-          # First escape the variables that contain special characters
+          # Создаем сообщение Telegram с форматированием MarkdownV2
+          # Сначала экранируем переменные, содержащие специальные символы
           ESCAPED_WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_REPO=$(echo "$REPO" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_BRANCH=$(echo "$BRANCH" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_ACTOR=$(echo "$ACTOR" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create message parts separately to avoid YAML issues
+          # Создаем части сообщения отдельно для избежания проблем с YAML
           LINE1="$STATUS_EMOJI *CI/CD $STATUS_TEXT*"
-          LINE2="🏗️ *Workflow:* \`$ESCAPED_WORKFLOW_NAME\`"
-          LINE3="📦 *Repository:* [$ESCAPED_REPO](https://github.com/$REPO)"
-          LINE4="🌿 *Branch:* \`$ESCAPED_BRANCH\`"
-          LINE5="👤 *Triggered by:* \`$ESCAPED_ACTOR\`"
-          LINE6="🔗 *Details:* [View Run](https://github.com/$REPO/actions/runs/$RUN_ID)"
+          LINE2="🏗️ *Рабочий процесс:* \`$ESCAPED_WORKFLOW_NAME\`"
+          LINE3="📦 *Репозиторий:* [$ESCAPED_REPO](https://github.com/$REPO)"
+          LINE4="🌿 *Ветка:* \`$ESCAPED_BRANCH\`"
+          LINE5="👤 *Запущено:* \`$ESCAPED_ACTOR\`"
+          LINE6="🔗 *Подробности:* [Посмотреть запуск](https://github.com/$REPO/actions/runs/$RUN_ID)"
           LINE7="🕐 $(date '+%Y-%m-%d %H:%M:%S UTC')"
 
-          # Combine into final message
-          TELEGRAM_MESSAGE="$LINE1
-
-$LINE2
-$LINE3
-$LINE4
-$LINE5
-$LINE6
-
-$LINE7"
+          # Combine into final message using printf
+          TELEGRAM_MESSAGE=$(printf '%s\n\n%s\n%s\n%s\n%s\n%s\n\n%s' \
+            "$LINE1" \
+            "$LINE2" \
+            "$LINE3" \
+            "$LINE4" \
+            "$LINE5" \
+            "$LINE6" \
+            "$LINE7")
 
           echo "telegram_message<<EOF" >> $GITHUB_OUTPUT
           echo "$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
@@ -130,82 +129,78 @@ $LINE7"
     steps:
       - name: Generate daily report
         run: |
-          # Get workflow run statistics from the last 24 hours
-          echo "## 📊 Daily CI/CD Status Report" >> $GITHUB_STEP_SUMMARY
-          echo "**Date:** $(date -u '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
-          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          # Получаем статистику запусков рабочих процессов за последние 24 часа
+          echo "## 📊 Ежедневный отчет статуса CI/CD" >> $GITHUB_STEP_SUMMARY
+          echo "**Дата:** $(date -u '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "**Репозиторий:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # This is a simplified report - in production you'd query GitHub API
-          echo "### 🔄 Recent Workflow Runs" >> $GITHUB_STEP_SUMMARY
-          echo "- **Main Branch:** Check recent runs in Actions tab" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Scans:** CodeQL, SAST, Container scans" >> $GITHUB_STEP_SUMMARY
-          echo "- **Dependency Updates:** Dependabot PRs" >> $GITHUB_STEP_SUMMARY
+          # Это упрощенный отчет - в production вы бы запрашивали GitHub API
+          echo "### 🔄 Недавние запуски рабочих процессов" >> $GITHUB_STEP_SUMMARY
+          echo "- **Основная ветка:** проверить недавние запуски во вкладке Actions" >> $GITHUB_STEP_SUMMARY
+          echo "- **Сканирование безопасности:** CodeQL, SAST, сканирование контейнеров" >> $GITHUB_STEP_SUMMARY
+          echo "- **Обновления зависимостей:** Dependabot PRs" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "### 📈 Health Metrics" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Success Rate:** Monitor via Actions" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Coverage:** Check codecov reports" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Issues:** Check Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "### 📈 Метрики здоровья" >> $GITHUB_STEP_SUMMARY
+          echo "- **Успешность сборки:** мониторить через Actions" >> $GITHUB_STEP_SUMMARY
+          echo "- **Покрытие тестами:** проверить отчеты codecov" >> $GITHUB_STEP_SUMMARY
+          echo "- **Проблемы безопасности:** проверить вкладку Security" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "### 🎯 Recommendations" >> $GITHUB_STEP_SUMMARY
-          echo "- Review failed workflows" >> $GITHUB_STEP_SUMMARY
-          echo "- Check security advisories" >> $GITHUB_STEP_SUMMARY
-          echo "- Review Dependabot PRs" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Рекомендации" >> $GITHUB_STEP_SUMMARY
+          echo "- Проверить неудачные рабочие процессы" >> $GITHUB_STEP_SUMMARY
+          echo "- Проверить предупреждения безопасности" >> $GITHUB_STEP_SUMMARY
+          echo "- Проверить PRs от Dependabot" >> $GITHUB_STEP_SUMMARY
 
-      - name: Send daily report to Telegram
+      - name: Отправить ежедневный отчет в Telegram
         if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
         run: |
-          # Create daily report message with proper escaping
+          # Создаем ежедневное сообщение отчета с правильным экранированием
           REPO_NAME="${{ github.repository }}"
           ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create report message parts separately
-          REPORT_LINE1="📊 *Daily CI/CD Status Report*"
+          # Создаем части сообщения отчета отдельно
+          REPORT_LINE1="📊 *Ежедневный отчет CI/CD*"
           REPORT_LINE2="📅 $(date -u '+%Y-%m-%d')"
           REPORT_LINE3=""
-          REPORT_LINE4="*Repository:* $ESCAPED_REPO"
+          REPORT_LINE4="*Репозиторий:* $ESCAPED_REPO"
           REPORT_LINE5=""
-          REPORT_LINE6="🔄 *Recent Workflow Runs:*"
-          REPORT_LINE7="• Main Branch: Check Actions tab"
-          REPORT_LINE8="• Security Scans: CodeQL, SAST, Container"
-          REPORT_LINE9="• Dependency Updates: Dependabot PRs"
+          REPORT_LINE6="🔄 *Недавние запуски рабочих процессов:*"
+          REPORT_LINE7="• Основная ветка: проверить вкладку Actions"
+          REPORT_LINE8="• Сканирование безопасности: CodeQL, SAST, Container"
+          REPORT_LINE9="• Обновления зависимостей: Dependabot PRs"
           REPORT_LINE10=""
-          REPORT_LINE11="📈 *Health Metrics:*"
-          REPORT_LINE12="• Build Success Rate: Monitor via Actions"
-          REPORT_LINE13="• Test Coverage: Check Codecov reports"
-          REPORT_LINE14="• Security Issues: Check Security tab"
+          REPORT_LINE11="📈 *Метрики здоровья:*"
+          REPORT_LINE12="• Успешность сборки: мониторить через Actions"
+          REPORT_LINE13="• Покрытие тестами: проверить отчеты Codecov"
+          REPORT_LINE14="• Проблемы безопасности: проверить вкладку Security"
           REPORT_LINE15=""
-          REPORT_LINE16="🎯 *Recommendations:*"
-          REPORT_LINE17="• Review failed workflows"
-          REPORT_LINE18="• Check security advisories"
-          REPORT_LINE19="• Review Dependabot PRs"
+          REPORT_LINE16="🎯 *Рекомендации:*"
+          REPORT_LINE17="• Проверить неудачные рабочие процессы"
+          REPORT_LINE18="• Проверить предупреждения безопасности"
+          REPORT_LINE19="• Проверить PRs от Dependabot"
           REPORT_LINE20=""
-          REPORT_LINE21="🔗 [View Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          REPORT_LINE21="🔗 [Посмотреть отчет](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
 
-          # Combine into final report message
-          REPORT_MESSAGE="$REPORT_LINE1
-$REPORT_LINE2
-
-$REPORT_LINE4
-
-$REPORT_LINE6
-$REPORT_LINE7
-$REPORT_LINE8
-$REPORT_LINE9
-
-$REPORT_LINE11
-$REPORT_LINE12
-$REPORT_LINE13
-$REPORT_LINE14
-
-$REPORT_LINE16
-$REPORT_LINE17
-$REPORT_LINE18
-$REPORT_LINE19
-
-$REPORT_LINE21"
+          # Combine into final report message using printf
+          REPORT_MESSAGE=$(printf '%s\n%s\n\n%s\n\n%s\n%s\n%s\n%s\n\n%s\n%s\n%s\n%s\n\n%s\n%s\n%s\n%s\n\n%s' \
+            "$REPORT_LINE1" \
+            "$REPORT_LINE2" \
+            "$REPORT_LINE4" \
+            "$REPORT_LINE6" \
+            "$REPORT_LINE7" \
+            "$REPORT_LINE8" \
+            "$REPORT_LINE9" \
+            "$REPORT_LINE11" \
+            "$REPORT_LINE12" \
+            "$REPORT_LINE13" \
+            "$REPORT_LINE14" \
+            "$REPORT_LINE16" \
+            "$REPORT_LINE17" \
+            "$REPORT_LINE18" \
+            "$REPORT_LINE19" \
+            "$REPORT_LINE21")
 
           # Send to Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
