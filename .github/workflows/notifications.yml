@@ -71,9 +71,8 @@ jobs:
           ESCAPED_BRANCH=$(echo "$BRANCH" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_ACTOR=$(echo "$ACTOR" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create message using cat and sed to avoid YAML parsing issues
-          TELEGRAM_MESSAGE=$(cat << EOF | sed "s|{{STATUS_EMOJI}}|$STATUS_EMOJI|g; s|{{STATUS_TEXT}}|$STATUS_TEXT|g; s|{{WORKFLOW}}|$ESCAPED_WORKFLOW_NAME|g; s|{{REPO}}|$ESCAPED_REPO|g; s|{{REPO_RAW}}|$REPO|g; s|{{BRANCH}}|$ESCAPED_BRANCH|g; s|{{ACTOR}}|$ESCAPED_ACTOR|g; s|{{RUN_ID}}|$RUN_ID|g; s|{{DATE}}|$(date '+%Y-%m-%d %H:%M:%S UTC')|g"
-{{STATUS_EMOJI}} *CI/CD {{STATUS_TEXT}}*
+          # Create message template
+          TEMPLATE="{{STATUS_EMOJI}} *CI/CD {{STATUS_TEXT}}*
 
 🏗️ *Workflow:* \`{{WORKFLOW}}\`
 📦 *Repository:* [{{REPO}}](https://github.com/{{REPO_RAW}})
@@ -81,9 +80,19 @@ jobs:
 👤 *Triggered by:* \`{{ACTOR}}\`
 🔗 *Details:* [View Run](https://github.com/{{REPO_RAW}}/actions/runs/{{RUN_ID}})
 
-🕐 {{DATE}}
-EOF
-)
+🕐 {{DATE}}"
+
+          # Replace placeholders with actual values
+          TELEGRAM_MESSAGE="${TEMPLATE}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{STATUS_EMOJI\}\}/$STATUS_EMOJI}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{STATUS_TEXT\}\}/$STATUS_TEXT}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{WORKFLOW\}\}/$ESCAPED_WORKFLOW_NAME}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{REPO\}\}/$ESCAPED_REPO}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{REPO_RAW\}\}/$REPO}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{BRANCH\}\}/$ESCAPED_BRANCH}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{ACTOR\}\}/$ESCAPED_ACTOR}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{RUN_ID\}\}/$RUN_ID}"
+          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{DATE\}\}/$(date '+%Y-%m-%d %H:%M:%S UTC')}"
 
           echo "telegram_message<<EOF" >> $GITHUB_OUTPUT
           echo "$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
@@ -155,9 +164,8 @@ EOF
           REPO_NAME="${{ github.repository }}"
           ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create report message using cat and sed to avoid YAML issues
-          REPORT_MESSAGE=$(cat << EOF | sed "s|{{DATE}}|$(date -u '+%Y-%m-%d')|g; s|{{REPO}}|$ESCAPED_REPO|g; s|{{SERVER_URL}}|${{ github.server_url }}|g; s|{{REPOSITORY}}|${{ github.repository }}|g; s|{{RUN_ID}}|${{ github.run_id }}|g"
-📊 *Daily CI/CD Status Report*
+          # Create report message template
+          REPORT_TEMPLATE="📊 *Daily CI/CD Status Report*
 📅 {{DATE}}
 
 *Repository:* {{REPO}}
@@ -177,9 +185,15 @@ EOF
 • Check security advisories
 • Review Dependabot PRs
 
-🔗 [View Report]({{SERVER_URL}}/{{REPOSITORY}}/actions/runs/{{RUN_ID}})
-EOF
-)
+🔗 [View Report]({{SERVER_URL}}/{{REPOSITORY}}/actions/runs/{{RUN_ID}})"
+
+          # Replace placeholders with actual values
+          REPORT_MESSAGE="${REPORT_TEMPLATE}"
+          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{DATE\}\}/$(date -u '+%Y-%m-%d')}"
+          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{REPO\}\}/$ESCAPED_REPO}"
+          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{SERVER_URL\}\}/${{ github.server_url }}}"
+          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{REPOSITORY\}\}/${{ github.repository }}}"
+          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{RUN_ID\}\}/${{ github.run_id }}}"
 
           # Send to Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
