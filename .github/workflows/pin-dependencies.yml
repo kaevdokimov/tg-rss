@@ -1,0 +1,46 @@
+# Pin Dependencies Workflow
+# Automatically pins GitHub Actions and Docker images to specific SHAs
+
+name: "🔒 Pin Dependencies"
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_path:
+        description: 'Path to workflow file to pin'
+        required: true
+        default: '.github/workflows/ci-cd.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pin-dependencies:
+    name: 'Pin Dependencies'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pin dependencies
+        uses: step-security/pin-workflows-action@v1
+        with:
+          workflow_path: ${{ github.event.inputs.workflow_path }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: "🔒 Pin dependencies for ${{ github.event.inputs.workflow_path }}"
+          body: |
+            This PR pins dependencies to specific SHAs for security.
+
+            Pinned by: ${{ github.actor }}
+            Workflow: ${{ github.event.inputs.workflow_path }}
+
+            ## Changes
+            - Pinned GitHub Actions to commit SHAs
+            - Pinned Docker images to specific versions
+            - Improved supply chain security
+          branch: pin-dependencies-${{ github.run_id }}
+          delete-branch: true
