@@ -3,6 +3,10 @@
 
 name: Reusable Docker Build
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   workflow_call:
     inputs:

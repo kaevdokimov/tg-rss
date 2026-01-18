@@ -22,14 +22,15 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  pull-requests: write
 
 jobs:
   # Static Application Security Testing (SAST)
   sast:
     name: 'SAST Analysis'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -82,6 +83,9 @@ jobs:
   container-scan:
     name: 'Container Security Scan'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -168,6 +172,9 @@ jobs:
   iac-security:
     name: 'IaC Security Scan'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -216,6 +223,9 @@ jobs:
   supply-chain:
     name: 'Supply Chain Security'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

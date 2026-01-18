@@ -1,0 +1,53 @@
+# GitHub Repository Settings
+# This file configures repository settings using repo-sync/github-sync
+
+repository:
+  name: tg-rss
+  description: Telegram RSS Bot with News Analysis
+  topics: telegram, rss, bot, news, analysis, golang, python
+  private: false
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_downloads: false
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: true
+  delete_branch_on_merge: true
+
+# Branch protection rules
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - test
+          - lint
+          - security-scan
+      enforce_admins: true
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+        dismissal_restrictions: {}
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
+
+  - name: develop
+    protection:
+      required_status_checks:
+        strict: false
+        contexts:
+          - test
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+        dismissal_restrictions: {}
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
