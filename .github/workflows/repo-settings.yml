@@ -11,9 +11,12 @@ on:
       - '.github/workflows/repo-settings.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  administration: write
+# IMPORTANT: This workflow requires admin permissions
+# To enable branch protection, you need to:
+# 1. Go to repository Settings > Actions > General
+# 2. Under "Workflow permissions", select "Read and write permissions"
+# 3. Save the changes
+# Or manually set branch protection in: Settings > Branches > Branch protection rules
 
 jobs:
   branch-protection:
