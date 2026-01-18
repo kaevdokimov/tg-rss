@@ -24,7 +24,7 @@ on:
       - '.github/workflows/go.yml'
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.25.5'
 
 jobs:
   # Fast feedback job - basic checks
@@ -35,10 +35,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04]
-        go-version: ['1.24', '1.25']
+        go-version: ['1.25.5', '1.25']
         include:
           - os: ubuntu-24.04
-            go-version: '1.25'
+            go-version: '1.25.5'
             latest: true
 
     steps:
