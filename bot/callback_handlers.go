@@ -436,7 +436,9 @@ func handleQuickStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, msgText)
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createQuickStartKeyboard(sources, subscribedIds)
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки быстрого меню подписок: %v", err)
+	}
 }
 
 // handleQuickSubscribe обрабатывает подписку через быстрый старт
@@ -552,7 +554,9 @@ func handleTutorialStep(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data
 func handleTutorialSkip(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "✅ Туториал пропущен.\n\nИспользуйте кнопки меню для навигации. Если нужна помощь, нажмите /help")
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения о пропуске туториала: %v", err)
+	}
 }
 
 // handleTutorialComplete завершает туториал
@@ -560,5 +564,7 @@ func handleTutorialComplete(bot *tgbotapi.BotAPI, chatId int64) {
 	msg := tgbotapi.NewMessage(chatId, "🎉 *Туториал завершен!*\n\nТеперь вы готовы использовать бота. Нажмите «🚀 Быстрый старт» чтобы подписаться на популярные источники, или используйте меню для других действий.")
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createMainKeyboard()
-	bot.Send(msg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("⚠️  Ошибка отправки сообщения о завершении туториала: %v", err)
+	}
 }
