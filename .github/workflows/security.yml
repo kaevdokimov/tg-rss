@@ -116,12 +116,14 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-main.sarif'
+          category: 'container-security-main'
 
       - name: Upload Trivy analyzer results
         if: hashFiles('trivy-analyzer.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-analyzer.sarif'
+          category: 'container-security-analyzer'
 
       - name: Scan Dockerfiles
         uses: aquasecurity/trivy-action@master
