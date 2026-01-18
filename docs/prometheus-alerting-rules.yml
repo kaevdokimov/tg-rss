@@ -1,0 +1,216 @@
+groups:
+  - name: tg-rss-application-alerts
+    rules:
+      # RSS Processing Alerts
+      - alert: RSSPollsFailing
+        expr: rate(rss_polls_errors_total[5m]) / rate(rss_polls_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: rss-poller
+        annotations:
+          summary: "Высокий процент ошибок опроса RSS"
+          description: "Более 50% RSS опросов завершаются ошибкой за последние 5 минут"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#rss-polls-failing"
+
+      - alert: RSSPollsCompletelyDown
+        expr: rate(rss_polls_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: tg-rss
+          component: rss-poller
+        annotations:
+          summary: "RSS опросы полностью остановлены"
+          description: "За последние 10 минут не было успешных RSS опросов"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#rss-polls-down"
+
+      # Telegram Message Delivery Alerts
+      - alert: TelegramMessagesFailing
+        expr: rate(telegram_messages_errors_total[5m]) / rate(telegram_messages_sent_total[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: telegram-bot
+        annotations:
+          summary: "Высокий процент ошибок отправки сообщений Telegram"
+          description: "Более 30% сообщений Telegram завершаются ошибкой за последние 5 минут"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#telegram-messages-failing"
+
+      - alert: TelegramMessagesCompletelyDown
+        expr: rate(telegram_messages_sent_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: tg-rss
+          component: telegram-bot
+        annotations:
+          summary: "Отправка сообщений Telegram полностью остановлена"
+          description: "За последние 10 минут не было отправлено ни одного сообщения Telegram"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#telegram-messages-down"
+
+      # Circuit Breaker Alerts
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_rejected_total > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: circuit-breaker
+        annotations:
+          summary: "Circuit Breaker открыт"
+          description: "Circuit Breaker открыт для одного или нескольких сервисов, запросы отклоняются"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#circuit-breaker-open"
+
+      - alert: CircuitBreakerHighFailureRate
+        expr: rate(circuit_breaker_failures_total[5m]) / rate(circuit_breaker_calls_total[5m]) > 0.7
+        for: 3m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: circuit-breaker
+        annotations:
+          summary: "Высокий процент отказов в Circuit Breaker"
+          description: "Более 70% вызовов завершаются ошибкой, Circuit Breaker может открыться"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#circuit-breaker-failures"
+
+      # Database Connection Alerts
+      - alert: DatabaseConnectionsExhausted
+        expr: db_connections_open / db_connections_idle < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: database
+        annotations:
+          summary: "Исчерпаны соединения с базой данных"
+          description: "Количество открытых соединений близко к максимуму, система может замедлиться"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#database-connections"
+
+      - alert: DatabaseHighWaitTime
+        expr: db_connections_wait > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: database
+        annotations:
+          summary: "Высокое время ожидания соединений с БД"
+          description: "Более 10 соединений ожидают доступа к базе данных"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#database-wait-time"
+
+      # HTTP Request Alerts
+      - alert: HTTPRequestsHighErrorRate
+        expr: rate(http_requests_errors_total[5m]) / rate(http_requests_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: http-client
+        annotations:
+          summary: "Высокий процент ошибок HTTP запросов"
+          description: "Более 20% HTTP запросов завершаются ошибкой"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#http-errors"
+
+      - alert: HTTPRequestsTimeoutHigh
+        expr: rate(http_requests_timeout_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: http-client
+        annotations:
+          summary: "Высокое количество таймаутов HTTP запросов"
+          description: "Более 10 HTTP запросов завершились таймаутом за последние 5 минут"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#http-timeouts"
+
+      # Content Validation Alerts
+      - alert: ContentValidationHighErrorRate
+        expr: rate(content_validation_errors_total[5m]) / rate(content_validations_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: content-scraper
+        annotations:
+          summary: "Высокий процент ошибок валидации контента"
+          description: "Более 50% контента не проходит валидацию"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#content-validation"
+
+      # Performance Alerts
+      - alert: HighGoroutineCount
+        expr: go_goroutines > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: runtime
+        annotations:
+          summary: "Высокое количество горутин"
+          description: "Количество активных горутин превышает 1000, возможны проблемы с производительностью"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#high-goroutines"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / process_virtual_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: tg-rss
+          component: runtime
+        annotations:
+          summary: "Высокое использование памяти"
+          description: "Процесс использует более 80% доступной памяти"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#high-memory"
+
+      # Service Health Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: tg-rss
+          component: service
+        annotations:
+          summary: "Сервис недоступен"
+          description: "TG-RSS сервис недоступен для Prometheus"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#service-down"
+
+      - alert: HealthCheckFailing
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: tg-rss
+          component: health-check
+        annotations:
+          summary: "Health check завершается неудачей"
+          description: "HTTP health check endpoint возвращает ошибку"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#health-check-failing"
+
+      # Cache Performance Alerts
+      - alert: CacheMissRateHigh
+        expr: rate(cache_misses_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) > 0.8
+        for: 10m
+        labels:
+          severity: info
+          service: tg-rss
+          component: cache
+        annotations:
+          summary: "Высокий процент промахов кэша"
+          description: "Более 80% запросов к кэшу завершаются промахом"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#cache-miss-rate"
+
+      # Telegram API Rate Limiting
+      - alert: TelegramRateLimitHit
+        expr: rate(telegram_commands_total[1m]) > 25
+        for: 2m
+        labels:
+          severity: info
+          service: tg-rss
+          component: telegram-api
+        annotations:
+          summary: "Достигнут лимит Telegram API"
+          description: "Количество команд Telegram превышает 25 в минуту, возможны rate limits"
+          runbook_url: "https://github.com/kaevdokimov/tg-rss/wiki/Troubleshooting#telegram-rate-limit"

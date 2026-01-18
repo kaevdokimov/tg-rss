@@ -13,6 +13,7 @@ import (
 	"tg-rss/bot"
 	"tg-rss/config"
 	"tg-rss/db"
+	"tg-rss/middleware"
 	"tg-rss/monitoring"
 	"tg-rss/redis"
 	"time"
@@ -199,8 +200,8 @@ func startMetricsUpdater(ctx context.Context, dbConn *sql.DB) {
 func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 	mux := http.NewServeMux()
 
-	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	// Health check endpoint с middleware
+	mux.HandleFunc("/health", middleware.Chain(func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем подключение к БД
 		if err := dbConn.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -210,10 +211,10 @@ func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK")
-	})
+	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(10*time.Second)))
 
 	// OpenAPI спецификация
-	mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/openapi.yaml", middleware.Chain(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.WriteHeader(http.StatusOK)
 		// В реальном приложении здесь можно прочитать файл
@@ -235,10 +236,10 @@ paths:
         200:
           description: Metrics in Prometheus format
 `))
-	})
+	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(5*time.Second)))
 
 	// Metrics endpoint для Prometheus-style метрик
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/metrics", middleware.Chain(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 		// Собираем метрики
@@ -365,7 +366,7 @@ paths:
 		fmt.Fprintf(w, "# HELP db_connections_wait Current number of connections waiting\n")
 		fmt.Fprintf(w, "# TYPE db_connections_wait gauge\n")
 		fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
-	})
+	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(15*time.Second)))
 
 	server := &http.Server{
 		Addr:    ":8080",

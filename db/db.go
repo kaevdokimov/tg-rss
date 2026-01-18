@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
+	"tg-rss/cache"
 	"tg-rss/config"
 	"time"
 
@@ -581,12 +583,22 @@ func SaveSubscription(db *sql.DB, subscription Subscription) error {
 
 // UserExists проверяет, существует ли пользователь в БД
 func UserExists(db *sql.DB, chatId int64) (bool, error) {
+	cacheKey := "user_exists_" + strconv.FormatInt(chatId, 10)
+
+	// Проверяем кэш
+	if cached, found := cache.UserCache.Get(cacheKey); found {
+		return cached.(bool), nil
+	}
+
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE chat_id = $1)`
 	var exists bool
 	err := db.QueryRow(query, chatId).Scan(&exists)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("ошибка проверки существования пользователя: %w", err)
 	}
+
+	// Сохраняем в кэш
+	cache.UserCache.Set(cacheKey, exists)
 	return exists, nil
 }
 
@@ -601,10 +613,17 @@ func DeleteSubscription(db *sql.DB, subscription Subscription) error {
 }
 
 func FindActiveSources(db *sql.DB) ([]Source, error) {
+	cacheKey := "active_sources"
+
+	// Проверяем кэш
+	if cached, found := cache.SourceCache.Get(cacheKey); found {
+		return cached.([]Source), nil
+	}
+
 	query := `SELECT id, name, url, status FROM sources WHERE status = $1`
 	rows, err := db.Query(query, Active)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ошибка получения активных источников: %w", err)
 	}
 	defer rows.Close()
 
@@ -612,10 +631,15 @@ func FindActiveSources(db *sql.DB) ([]Source, error) {
 	for rows.Next() {
 		var item Source
 		if err := rows.Scan(&item.Id, &item.Name, &item.Url, &item.Status); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("ошибка сканирования источника: %w", err)
 		}
 		sources = append(sources, item)
 	}
+
+	// Сохраняем в кэш (копию, чтобы избежать изменений)
+	cachedSources := make([]Source, len(sources))
+	copy(cachedSources, sources)
+	cache.SourceCache.Set(cacheKey, cachedSources)
 
 	return sources, nil
 }
@@ -677,10 +701,17 @@ func GetLatestNewsByUser(db *sql.DB, chatId int64, count int) ([]NewsWithSource,
 
 // GetSubscriptions: получить подписков на источник
 func GetSubscriptions(db *sql.DB, sourceId int64) ([]Subscription, error) {
+	cacheKey := "subscriptions_" + strconv.FormatInt(sourceId, 10)
+
+	// Проверяем кэш
+	if cached, found := cache.SubscriptionCache.Get(cacheKey); found {
+		return cached.([]Subscription), nil
+	}
+
 	query := `SELECT chat_id, source_id, created_at FROM subscriptions WHERE source_id = $1`
 	rows, err := db.Query(query, sourceId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ошибка получения подписок для источника %d: %w", sourceId, err)
 	}
 	defer rows.Close()
 
@@ -688,10 +719,15 @@ func GetSubscriptions(db *sql.DB, sourceId int64) ([]Subscription, error) {
 	for rows.Next() {
 		var item Subscription
 		if err := rows.Scan(&item.ChatId, &item.SourceId, &item.CreatedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("ошибка сканирования подписки: %w", err)
 		}
 		subscriptions = append(subscriptions, item)
 	}
+
+	// Сохраняем в кэш
+	cachedSubscriptions := make([]Subscription, len(subscriptions))
+	copy(cachedSubscriptions, subscriptions)
+	cache.SubscriptionCache.Set(cacheKey, cachedSubscriptions)
 
 	return subscriptions, nil
 }

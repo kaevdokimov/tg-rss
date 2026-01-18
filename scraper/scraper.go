@@ -5,6 +5,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"crypto/md5"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"tg-rss/cache"
 	"tg-rss/monitoring"
 
 	readability "github.com/go-shiori/go-readability"
@@ -145,6 +147,13 @@ type NewsContent struct {
 // Использует библиотеку go-readability (порт Mozilla Readability.js) для качественного извлечения контента
 func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 	scraperLogger.Debug("Начинаем парсинг страницы: %s", articleURL)
+
+	// Проверяем кэш
+	cacheKey := fmt.Sprintf("%x", md5.Sum([]byte(articleURL)))
+	if cached, found := cache.ContentCache.Get(cacheKey); found {
+		scraperLogger.Debug("Возвращаем контент из кэша: %s", articleURL)
+		return cached.(*NewsContent), nil
+	}
 
 	var resp *http.Response
 	var err error
@@ -344,6 +353,10 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 		// Возвращаем ошибку, так как контент не прошел валидацию
 		return nil, fmt.Errorf("content validation failed: %w", err)
 	}
+
+	// Сохраняем в кэш
+	cache.ContentCache.Set(cacheKey, content)
+	scraperLogger.Debug("Контент сохранен в кэш: %s", articleURL)
 
 	return content, nil
 }
