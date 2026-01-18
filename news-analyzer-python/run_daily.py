@@ -12,6 +12,7 @@
 import os
 import sys
 import warnings
+import asyncio
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
@@ -45,7 +46,264 @@ from src.narrative import NarrativeBuilder
 from src.reporter import ReportFormatter, SummaryGenerator, TelegramNotifier
 from src.monitoring.metrics import metrics_manager, init_metrics
 from src.cache.redis_cache import RedisCache
+from src.processor.async_processor import AsyncNewsProcessor
 from src.utils import setup_logger, ensure_dir, get_logger, get_structured_logger
+
+
+async def async_main():
+    """Асинхронная версия основной функции анализа."""
+    try:
+        # Загружаем конфигурацию
+        logger = setup_logger(
+            log_level="INFO",
+            log_dir=Path("./storage/logs"),
+            log_to_file=True
+        )
+        structured_logger = get_structured_logger("news_analyzer")
+
+        logger.info("=" * 60)
+        logger.info("Запуск АСИНХРОННОГО анализа новостей")
+        logger.info("=" * 60)
+
+        # Инициализируем метрики
+        init_metrics("1.0.0")
+        analysis_id = metrics_manager.start_analysis()
+        analysis_start_time = time.time()
+
+        # Проверяем и загружаем NLTK данные
+        await asyncio.get_event_loop().run_in_executor(None, setup_nltk_data)
+
+        settings = load_settings()
+
+        # Создаем необходимые директории
+        ensure_dir(settings.reports_dir)
+        ensure_dir(settings.logs_dir)
+
+        # Инициализация Redis кэша
+        redis_host = os.getenv("REDIS_HOST", "redis")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_password = os.getenv("REDIS_PASSWORD")
+
+        try:
+            cache = RedisCache(host=redis_host, port=redis_port, password=redis_password)
+            structured_logger.info("Redis cache initialized",
+                "host", redis_host,
+                "port", redis_port)
+        except Exception as e:
+            logger.warning(f"Failed to initialize Redis cache: {e}")
+            cache = None
+
+        # Подключаемся к БД
+        logger.info("Подключение к базе данных...")
+        db_start = time.time()
+        db = Database(settings.get_db_connection_string())
+        db.connect()
+        db_duration = time.time() - db_start
+        metrics_manager.record_db_connection(db_duration)
+        logger.info(f"Подключение к БД установлено за {db_duration:.2f} сек")
+
+        try:
+            # Тестируем подключение
+            if not db.test_connection():
+                logger.error("Не удалось подключиться к БД")
+                return
+
+            # ОПТИМИЗАЦИЯ: Проверяем количество новостей перед анализом
+            logger.info("Проверка количества новостей...")
+            min_news_threshold = int(os.getenv("ANALYZER_MIN_NEWS_THRESHOLD",
+                                               os.getenv("MIN_NEWS_THRESHOLD", "10")))
+
+            news_count = db.get_news_count_last_hours(
+                hours=settings.time_window_hours,
+                table_name=settings.db_table
+            )
+
+            if news_count < min_news_threshold:
+                logger.info(
+                    f"Найдено только {news_count} новостей за последние {settings.time_window_hours} часов "
+                    f"(минимум: {min_news_threshold}). Анализ пропущен для снижения нагрузки."
+                )
+                structured_logger.warning("Analysis skipped due to insufficient news",
+                    news_count=news_count,
+                    min_threshold=min_news_threshold,
+                    time_window_hours=settings.time_window_hours,
+                    reason="insufficient_data")
+                return
+
+            # Получаем новости
+            logger.info(f"Найдено {news_count} новостей. Начинаем получение данных...")
+            fetcher = NewsFetcher(db, settings)
+            news_items = fetcher.fetch_recent_news()
+
+            if not news_items:
+                logger.warning("Новости не найдены. Анализ завершен.")
+                return
+
+            logger.info(f"Получено {len(news_items)} новостей для анализа")
+
+            # Ограничиваем количество новостей
+            max_news_limit = int(os.getenv("ANALYZER_MAX_NEWS_LIMIT",
+                                          os.getenv("MAX_NEWS_LIMIT", "1200")))
+            if len(news_items) > max_news_limit:
+                logger.warning(
+                    f"Обнаружено {len(news_items)} новостей, что превышает лимит {max_news_limit}. "
+                    f"Обрабатываем только последние {max_news_limit} новостей."
+                )
+                news_items = news_items[:max_news_limit]
+
+            # Создаем асинхронный процессор
+            async_processor = AsyncNewsProcessor(max_workers=4)
+
+            # Асинхронная обработка
+            result = await async_processor.process_news_batch_async(news_items, settings)
+
+            if not result:
+                logger.error("Async processing failed")
+                return
+
+            # Извлекаем результаты
+            processed_texts = result['processed_texts']
+            vectors = result['vectors']
+            cluster_result = result['cluster_result']
+            narratives = result['narratives']
+
+            labels = cluster_result['labels']
+            n_clusters = cluster_result['n_clusters']
+            n_noise = cluster_result['n_noise']
+
+            # 5. Генерация отчета
+            logger.info("Генерация отчета...")
+            analysis_date = datetime.now()
+
+            # Сохраняем JSON отчет
+            formatter = ReportFormatter(
+                reports_dir=settings.reports_dir,
+                date_format=settings.date_format
+            )
+            report_path = formatter.save_report(
+                narratives=narratives,
+                total_news=len(news_items),
+                analysis_date=analysis_date
+            )
+
+            # Сохраняем результат анализа в БД
+            logger.info("Сохранение результата анализа в БД...")
+            try:
+                db.ensure_analysis_table_exists()
+                analysis_id_db = db.save_analysis_result(
+                    analysis_date=analysis_date,
+                    total_news=len(news_items),
+                    narratives=narratives
+                )
+                logger.info(f"Результат анализа сохранен в БД с ID: {analysis_id_db}")
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении результата анализа в БД: {e}")
+                logger.warning("Продолжаем работу, отчет сохранен в файл")
+
+            # Генерируем текстовое резюме
+            summary_gen = SummaryGenerator()
+            clustering_metrics = {
+                'total_clusters': n_clusters,
+                'noise_points': n_noise,
+                'noise_percentage': n_noise / len(labels) * 100 if labels else 0,
+                'avg_cluster_size': sum(labels.count(cid) for cid in set(labels) if cid != -1) / n_clusters if n_clusters > 0 else 0,
+                'max_cluster_size': max((labels.count(cid) for cid in set(labels) if cid != -1), default=0),
+                'min_cluster_size': min((labels.count(cid) for cid in set(labels) if cid != -1), default=0)
+            }
+
+            summary = summary_gen.generate(
+                narratives=narratives,
+                total_news=len(news_items),
+                analysis_date=analysis_date,
+                clustering_metrics=clustering_metrics
+            )
+
+            logger.info("\n" + summary)
+            logger.info(f"Отчет готов к отправке. Длина: {len(summary)} символов")
+
+            # Отправка отчета в Telegram
+            telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
+            if telegram_token:
+                try:
+                    logger.info("Получение списка пользователей из БД...")
+                    users = db.get_all_users()
+
+                    if not users:
+                        logger.warning("Пользователи не найдены в БД. Отчет не будет отправлен.")
+                    else:
+                        logger.info(f"Найдено {len(users)} пользователей. Отправка отчетов...")
+                        notifier = TelegramNotifier(bot_token=telegram_token, parse_mode=None)
+
+                        chat_ids = [user.chat_id for user in users]
+                        results = {}
+                        for chat_id in chat_ids:
+                            success = notifier.send_themes_separately(chat_id, narratives, len(news_items), analysis_date, clustering_metrics)
+                            results[chat_id] = success
+
+                        successful = sum(1 for success in results.values() if success)
+                        failed = len(results) - successful
+                        metrics_manager.record_telegram_report("success" if successful > 0 else "error")
+
+                        logger.info(f"Отправка завершена: успешно {successful}, ошибок {failed}")
+                except Exception as e:
+                    logger.error(f"Ошибка при отправке отчетов в Telegram: {e}")
+            else:
+                logger.info("Telegram не настроен (TELEGRAM_SIGNAL_API_KEY не установлен)")
+
+            # Завершаем асинхронный процессор
+            async_processor.shutdown()
+
+            # Записываем успешное завершение анализа
+            metrics_manager.end_analysis(analysis_id, "success")
+            metrics_manager.record_news_processed(len(news_items))
+
+            logger.info("=" * 60)
+            logger.info("Асинхронный анализ завершен успешно")
+            logger.info(f"Отчет сохранен: {report_path}")
+            logger.info("=" * 60)
+
+        except Exception as e:
+            metrics_manager.end_analysis(analysis_id, "error")
+            structured_logger.error("Async analysis failed with critical error",
+                operation="news_analysis",
+                status="error",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                duration_seconds=time.time() - analysis_start_time)
+            logger.error(f"Критическая ошибка в асинхронном анализе: {e}")
+            raise
+
+        finally:
+            db.disconnect()
+
+    except FileNotFoundError as e:
+        print(f"Ошибка конфигурации: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        logger = get_logger()
+        logger.exception(f"Критическая ошибка при асинхронном анализе: {e}")
+        sys.exit(1)
+
+
+def setup_nltk_data():
+    """Настройка NLTK данных (выполняется в thread pool)."""
+    try:
+        import nltk
+        nltk_data_dir = os.getenv("NLTK_DATA", "/app/nltk_data")
+        if nltk_data_dir not in nltk.data.path:
+            nltk.data.path.insert(0, nltk_data_dir)
+
+        nltk.data.find('tokenizers/punkt')
+        logger.info("✓ NLTK punkt данные найдены")
+    except LookupError:
+        logger.warning("✗ NLTK punkt данные не найдены, пытаемся загрузить...")
+        try:
+            nltk.download('punkt', download_dir=nltk_data_dir, quiet=False)
+            nltk.data.find('tokenizers/punkt')
+            logger.info("✓ NLTK punkt данные успешно загружены")
+        except Exception as e:
+            logger.error(f"✗ Не удалось загрузить NLTK punkt данные: {e}")
+            logger.warning("Будет использоваться fallback токенизация")
 
 
 def main():
@@ -75,6 +333,13 @@ def main():
         # Начинаем отсчет метрик анализа
         analysis_id = metrics_manager.start_analysis()
         analysis_start_time = time.time()
+
+        # Проверяем, использовать ли async processing
+        use_async = os.getenv("USE_ASYNC_PROCESSING", "false").lower() == "true"
+        async_processor = None
+        if use_async:
+            async_processor = AsyncNewsProcessor(max_workers=int(os.getenv("ASYNC_MAX_WORKERS", "4")))
+            logger.info("Using async processing", "max_workers", async_processor.max_workers)
 
         # Проверяем и загружаем NLTK данные
         try:
@@ -626,4 +891,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Проверяем, использовать ли async режим
+    if os.getenv("USE_ASYNC_PROCESSING", "false").lower() == "true":
+        logger = get_logger()
+        logger.info("Запуск в АСИНХРОННОМ режиме")
+        asyncio.run(async_main())
+    else:
+        logger = get_logger()
+        logger.info("Запуск в СИНХРОННОМ режиме")
+        main()
