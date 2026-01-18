@@ -376,8 +376,9 @@ def load_and_validate_config(config_path: Path, env_name: str = None) -> Tuple[D
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
-    except Exception as e:
-        return {}, False, [f"Ошибка загрузки конфигурации: {e}"], []
+    except Exception:
+        # Возвращаем обобщенное сообщение без деталей исключения
+        return {}, False, ["Ошибка загрузки конфигурации"], []
 
     # Определяем окружение
     if not env_name:

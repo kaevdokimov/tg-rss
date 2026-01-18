@@ -115,8 +115,9 @@ async def status():
                 cache_stats = redis_cache.get_cache_stats()
             else:
                 redis_status = "unhealthy"
-        except Exception as e:
-            redis_status = f"error: {str(e)}"
+        except Exception:
+            # Не раскрываем детали исключения во внешнем API
+            redis_status = "error"
 
         # Статистика новостей
         news_stats = {}
@@ -127,8 +128,9 @@ async def status():
                 "total_news": stats.total_news,
                 "total_sources": stats.total_sources
             }
-        except Exception as e:
-            news_stats = {"error": str(e)}
+        except Exception:
+            # Не возвращаем текст исключения во внешнем ответе
+            news_stats = {"error": "unavailable"}
 
         db.disconnect()
 
