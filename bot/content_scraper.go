@@ -13,7 +13,7 @@ import (
 
 var contentScraperLogger = monitoring.NewLogger("ContentScraper")
 
-const redisCacheTTL = 30 * time.Minute // TTL для Redis кэша
+// RedisCacheTTL определен в constants.go
 
 // convertToCachedNewsContent конвертирует scraper.NewsContent в redis.CachedNewsContent
 func convertToCachedNewsContent(content *scraper.NewsContent) *redis.CachedNewsContent {
@@ -72,14 +72,17 @@ func (cs *ContentScraper) Start() {
 	contentScraperLogger.Info("Запуск фонового парсера контента: интервал=%v, размер батча=%d, параллельно=%d",
 		cs.interval, cs.batchSize, cs.concurrent)
 
-	// Первый запуск через 1 минуту после старта
-	time.Sleep(1 * time.Minute)
-	cs.scrapeBatch()
-
-	// Затем запускаем по расписанию
+	// Создаем тикер с начальной задержкой в 1 минуту
 	ticker := time.NewTicker(cs.interval)
 	defer ticker.Stop()
 
+	// Первый запуск через ContentScraperDelay после старта
+	go func() {
+		time.Sleep(ContentScraperDelay)
+		cs.scrapeBatch()
+	}()
+
+	// Затем запускаем по расписанию
 	for range ticker.C {
 		cs.scrapeBatch()
 	}
@@ -186,7 +189,7 @@ func (cs *ContentScraper) scrapeNews(news db.NewsForScraping, results chan<- scr
 		// Сохраняем в Redis кэш
 		if cs.cache != nil {
 			cachedContent := convertToCachedNewsContent(content)
-			if err := cs.cache.Set(news.Link, cachedContent, redisCacheTTL); err != nil {
+			if err := cs.cache.Set(news.Link, cachedContent, RedisCacheTTL); err != nil {
 				contentScraperLogger.Warn("Ошибка сохранения в Redis кэш для новости ID=%d: %v", news.ID, err)
 			} else {
 				contentScraperLogger.Debug("Контент новости ID=%d сохранен в Redis кэш", news.ID)

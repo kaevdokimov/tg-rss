@@ -18,7 +18,7 @@ var rssLogger = monitoring.NewLogger("RSS")
 
 // Оптимизированный HTTP клиент для RSS парсинга
 var rssHttpClient = &http.Client{
-	Timeout: 10 * time.Second, // Короткий таймаут для RSS
+	Timeout: HTTPTimeout, // Короткий таймаут для RSS
 	Transport: &http.Transport{
 		MaxIdleConns:        50,
 		MaxIdleConnsPerHost: 10,
@@ -62,11 +62,14 @@ func min(a, b int) int {
 // StartRSSPolling запускает регулярный опрос RSS-источников
 func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, redisProducer *redis.Producer) {
 	// Кэшируем источники для снижения нагрузки на БД
-	// Обновляем кэш каждые 30 минут
-	const cacheDuration = 30 * time.Minute
+	// Обновляем кэш каждые SourcesCacheTTL
 	var sourcesCache []db.Source
 	var lastCacheUpdate time.Time
 	rssLogger.Info("Запуск RSS парсера с интервалом %v", interval)
+
+	// Создаем тикер для периодического выполнения вместо блокирующего sleep
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	// Запускаем первый цикл сразу, без ожидания
 	firstRun := true
@@ -81,123 +84,135 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 		}
 	}()
 
-	for {
-		monitoring.IncrementRSSPolls()
-		rssLogger.Info("Начало цикла парсинга RSS-источников")
-
-		// Используем кэшированные источники или обновляем кэш
-		var sources []db.Source
-		if time.Since(lastCacheUpdate) > cacheDuration || len(sourcesCache) == 0 {
-			rssLogger.Debug("Обновление кэша источников")
-			var err error
-			sources, err = fetchSources(dbConn)
-			if err != nil {
-				monitoring.IncrementRSSPollsErrors()
-				rssLogger.Error("Ошибка при получении источников: %v", err)
-				time.Sleep(interval)
-				continue
-			}
-			sourcesCache = sources
-			lastCacheUpdate = time.Now()
-			rssLogger.Info("Кэш источников обновлен: %d источников", len(sources))
-		} else {
-			sources = sourcesCache
-			rssLogger.Debug("Используем кэшированные источники: %d источников", len(sources))
-		}
-
-		rssLogger.Info("Найдено активных источников: %d", len(sources))
-
-		totalNewsFound := 0
-		totalNewsSent := 0
-		sourcesProcessed := 0
-		sourcesWithErrors := 0
-
-		// Оптимизация: параллельная обработка источников
-		// Ограничиваем количество одновременных запросов для избежания перегрузки
-		maxWorkers := min(6, runtime.NumCPU()*2) // максимум 6 воркеров или 2xCPU
-		if len(sources) < maxWorkers {
-			maxWorkers = len(sources)
-		}
-
-		rssLogger.Debug("Запуск параллельного парсинга с %d воркерами", maxWorkers)
-
-		// Каналы для коммуникации между воркерами
-		jobs := make(chan db.Source, len(sources))
-		results := make(chan parseResult, len(sources))
-
-		// Запускаем воркеры
-		var wg sync.WaitGroup
-		for i := 0; i < maxWorkers; i++ {
-			wg.Add(1)
-			go func(workerID int) {
-				defer wg.Done()
-				rssLogger.Debug("Воркер %d запущен", workerID)
-				for source := range jobs {
-					result := parseSource(source, tz)
-					results <- result
-				}
-				rssLogger.Debug("Воркер %d завершен", workerID)
-			}(i)
-		}
-
-		// Отправляем задания воркерам
-		for _, source := range sources {
-			jobs <- source
-		}
-		close(jobs)
-
-		// Собираем результаты
-		var candidates []newsCandidate
-
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
-
-		for result := range results {
-			if result.err != nil {
-				monitoring.IncrementRSSPollsErrors()
-				sourcesWithErrors++
-				rssLogger.Warn("Ошибка парсинга RSS для источника %s (%s): %v", result.source.Name, result.source.Url, result.err)
-				continue
-			}
-
-			sourcesProcessed++
-			totalNewsFound += len(result.newsList)
-			rssLogger.Debug("Источник %s: найдено новостей %d", result.source.Name, len(result.newsList))
-
-			for _, item := range result.newsList {
-				// Пропускаем старые новости (старше 24 часов)
-				if time.Since(item.PublishedAt) > 24*time.Hour {
-					continue
-				}
-
-				// Собираем кандидатов для батч-проверки дубликатов
-				candidates = append(candidates, newsCandidate{
-					source: result.source,
-					item:   item,
-				})
-			}
-		}
-
-		// Оптимизация: батч-проверка дубликатов и отправка в Redis
-		if len(candidates) > 0 {
-			totalNewsSent += processCandidatesBatch(dbConn, redisProducer, candidates)
-		}
-
-		rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Redis %d, ошибок %d",
-			sourcesProcessed, len(sources), totalNewsFound, totalNewsSent, sourcesWithErrors)
-
-		// Первый цикл выполняется сразу, последующие - с интервалом
-		if firstRun {
-			firstRun = false
-			rssLogger.Info("Первый цикл парсинга выполнен. Следующие циклы будут выполняться с интервалом %v", interval)
-		} else {
-			rssLogger.Debug("Ожидание следующего цикла парсинга (%v)", interval)
-		}
-
-		time.Sleep(interval)
+	// Первый цикл выполняется сразу
+	if err := runPollingCycle(dbConn, tz, redisProducer, &sourcesCache, &lastCacheUpdate, &firstRun); err != nil {
+		rssLogger.Error("Ошибка в первом цикле парсинга: %v", err)
 	}
+
+	// Последующие циклы по таймеру
+	for range ticker.C {
+		if err := runPollingCycle(dbConn, tz, redisProducer, &sourcesCache, &lastCacheUpdate, &firstRun); err != nil {
+			rssLogger.Error("Ошибка в цикле парсинга: %v", err)
+		}
+	}
+}
+
+// runPollingCycle выполняет один цикл парсинга RSS
+func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Producer,
+	sourcesCache *[]db.Source, lastCacheUpdate *time.Time, firstRun *bool) error {
+
+	monitoring.IncrementRSSPolls()
+	rssLogger.Info("Начало цикла парсинга RSS-источников")
+
+	// Используем кэшированные источники или обновляем кэш
+	var sources []db.Source
+	if time.Since(*lastCacheUpdate) > SourcesCacheTTL || len(*sourcesCache) == 0 {
+		rssLogger.Debug("Обновление кэша источников")
+		var err error
+		sources, err = fetchSources(dbConn)
+		if err != nil {
+			monitoring.IncrementRSSPollsErrors()
+			rssLogger.Error("Ошибка при получении источников: %v", err)
+			return err
+		}
+		*sourcesCache = sources
+		*lastCacheUpdate = time.Now()
+		rssLogger.Info("Кэш источников обновлен: %d источников", len(sources))
+	} else {
+		sources = *sourcesCache
+		rssLogger.Debug("Используем кэшированные источники: %d источников", len(sources))
+	}
+
+	rssLogger.Info("Найдено активных источников: %d", len(sources))
+
+	totalNewsFound := 0
+	totalNewsSent := 0
+	sourcesProcessed := 0
+	sourcesWithErrors := 0
+
+	// Оптимизация: параллельная обработка источников
+	// Ограничиваем количество одновременных запросов для избежания перегрузки
+	maxWorkers := min(6, runtime.NumCPU()*2) // максимум 6 воркеров или 2xCPU
+	if len(sources) < maxWorkers {
+		maxWorkers = len(sources)
+	}
+
+	rssLogger.Debug("Запуск параллельного парсинга с %d воркерами", maxWorkers)
+
+	// Каналы для коммуникации между воркерами
+	jobs := make(chan db.Source, len(sources))
+	results := make(chan parseResult, len(sources))
+
+	// Запускаем воркеры
+	var wg sync.WaitGroup
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			rssLogger.Debug("Воркер %d запущен", workerID)
+			for source := range jobs {
+				result := parseSource(source, tz)
+				results <- result
+			}
+			rssLogger.Debug("Воркер %d завершен", workerID)
+		}(i)
+	}
+
+	// Отправляем задания воркерам
+	for _, source := range sources {
+		jobs <- source
+	}
+	close(jobs)
+
+	// Собираем результаты
+	var candidates []newsCandidate
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for result := range results {
+		if result.err != nil {
+			monitoring.IncrementRSSPollsErrors()
+			sourcesWithErrors++
+			rssLogger.Warn("Ошибка парсинга RSS для источника %s (%s): %v", result.source.Name, result.source.Url, result.err)
+			continue
+		}
+
+		sourcesProcessed++
+		totalNewsFound += len(result.newsList)
+		rssLogger.Debug("Источник %s: найдено новостей %d", result.source.Name, len(result.newsList))
+
+		for _, item := range result.newsList {
+			// Пропускаем старые новости (старше MaxNewsAge)
+			if time.Since(item.PublishedAt) > MaxNewsAge {
+				continue
+			}
+
+			// Собираем кандидатов для батч-проверки дубликатов
+			candidates = append(candidates, newsCandidate{
+				source: result.source,
+				item:   item,
+			})
+		}
+	}
+
+	// Оптимизация: батч-проверка дубликатов и отправка в Redis
+	if len(candidates) > 0 {
+		totalNewsSent += processCandidatesBatch(dbConn, redisProducer, candidates)
+	}
+
+	rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Redis %d, ошибок %d",
+		sourcesProcessed, len(sources), totalNewsFound, totalNewsSent, sourcesWithErrors)
+
+	// Обновляем статус первого запуска
+	if *firstRun {
+		*firstRun = false
+		rssLogger.Info("Первый цикл парсинга выполнен. Следующие циклы будут выполняться с интервалом")
+	}
+
+	return nil
 }
 
 // processCandidatesBatch обрабатывает кандидатов новостей батчем для оптимизации запросов к БД

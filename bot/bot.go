@@ -70,9 +70,16 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRed
 	// Запуск обработчика новостей из Redis с retry логикой
 	go func() {
 		// Ждем немного, чтобы Redis полностью запустился
-		time.Sleep(5 * time.Second)
+		// Используем select с контекстом вместо блокирующего sleep
+		select {
+		case <-time.After(RedisInitTimeout):
+			// Продолжаем после задержки
+		case <-ctx.Done():
+			return // Контекст отменен, выходим
+		}
 
 		maxRetries := 5
+		baseDelay := 1 * time.Second
 		for i := 0; i < maxRetries; i++ {
 			if err := redisConsumer.SubscribeNews(func(newsItem redis.NewsItem) error {
 				log.Printf("[Redis] Получена новость из Redis: %s (источник: %s)", newsItem.Title, newsItem.SourceName)
@@ -84,8 +91,14 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRed
 			}); err != nil {
 				log.Printf("Ошибка в обработчике Redis новостей (попытка %d/%d): %v", i+1, maxRetries, err)
 				if i < maxRetries-1 {
-					time.Sleep(5 * time.Second)
-					continue
+					// Exponential backoff: 1s, 2s, 4s, 8s
+					delay := time.Duration(1<<uint(i)) * baseDelay
+					select {
+					case <-time.After(delay):
+						continue
+					case <-ctx.Done():
+						return
+					}
 				}
 			} else {
 				log.Printf("Redis consumer успешно запущен")
@@ -96,9 +109,16 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRed
 
 	// Запуск обработчика уведомлений из Redis
 	go func() {
-		time.Sleep(5 * time.Second) // Небольшая задержка
+		// Небольшая задержка для последовательного запуска
+		select {
+		case <-time.After(RedisInitTimeout):
+			// Продолжаем после задержки
+		case <-ctx.Done():
+			return
+		}
 
 		maxRetries := 5
+		baseDelay := 1 * time.Second
 		for i := 0; i < maxRetries; i++ {
 			if err := redisConsumer.SubscribeNotifications(func(notification redis.NewsNotification) error {
 				log.Printf("[Redis] Получено уведомление из Redis для пользователя %d", notification.ChatID)
@@ -106,8 +126,14 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRed
 			}); err != nil {
 				log.Printf("Ошибка в обработчике Redis уведомлений (попытка %d/%d): %v", i+1, maxRetries, err)
 				if i < maxRetries-1 {
-					time.Sleep(5 * time.Second)
-					continue
+					// Exponential backoff
+					delay := time.Duration(1<<uint(i)) * baseDelay
+					select {
+					case <-time.After(delay):
+						continue
+					case <-ctx.Done():
+						return
+					}
 				}
 				break
 			}

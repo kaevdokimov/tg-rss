@@ -1,6 +1,8 @@
 package redis
 
 import (
+	"crypto/md5"
+	"fmt"
 	"reflect"
 	"testing"
 	"tg-rss/config"
@@ -129,4 +131,42 @@ func BenchmarkContentCache_PutGet(b *testing.B) {
 			_, _ = cache.Get(url)
 		}
 	})
+}
+
+// TestGetCacheKey тестирует генерацию ключа кэша
+func TestGetCacheKey(t *testing.T) {
+	cache := &ContentCache{
+		prefix: "content:",
+	}
+
+	tests := []struct {
+		name     string
+		url      string
+		expected string
+	}{
+		{
+			name:     "simple URL",
+			url:      "https://example.com/article",
+			expected: fmt.Sprintf("content:%x", md5.Sum([]byte("https://example.com/article"))),
+		},
+		{
+			name:     "URL with query",
+			url:      "https://example.com/article?id=123",
+			expected: fmt.Sprintf("content:%x", md5.Sum([]byte("https://example.com/article?id=123"))),
+		},
+		{
+			name:     "empty URL",
+			url:      "",
+			expected: fmt.Sprintf("content:%x", md5.Sum([]byte(""))),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := cache.getCacheKey(tt.url)
+			if result != tt.expected {
+				t.Errorf("getCacheKey(%q) = %q, expected %q", tt.url, result, tt.expected)
+			}
+		})
+	}
 }

@@ -46,7 +46,7 @@ type NewsProcessor struct {
 func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 	// Глобальный rate limiter: минимум 50ms между сообщениями (20 сообщений/секунду)
 	// Это дает запас от лимита Telegram в 30 сообщений/секунду
-	globalLimiter := NewGlobalRateLimiter(50 * time.Millisecond)
+	globalLimiter := NewGlobalRateLimiter(DefaultRateLimitInterval)
 
 	// Инициализация кэша подписок
 	cache := make(map[int64][]interface{})
@@ -56,9 +56,9 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 		bot:                bot,
 		globalRateLimiter:  globalLimiter,
 		pendingNews:        make(map[int64][]PendingNews),
-		sendInterval:       15 * time.Minute, // отправка раз в 15 минут
+		sendInterval:       DefaultSendInterval, // отправка раз в 15 минут
 		subscriptionsCache: cache,
-		cacheDuration:      10 * time.Minute, // обновление кэша каждые 10 минут
+		cacheDuration:      SubscriptionsCacheTTL, // обновление кэша каждые 10 минут
 	}
 
 	// Запускаем периодическую отправку накопленных новостей
@@ -92,9 +92,9 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 
 	newsLogger.Debug("Новость сохранена в БД: ID=%d, Title=%s", newsID, newsItem.Title)
 
-	// Проверяем, является ли новость новой (не старше 24 часов)
+	// Проверяем, является ли новость новой (не старше MaxNewsAge)
 	// Это предотвращает отправку старых новостей при первом запуске или перезапуске
-	if time.Since(publishedAt) > 24*time.Hour {
+	if time.Since(publishedAt) > MaxNewsAge {
 		newsLogger.Debug("Пропускаем старую новость (старше 24ч): %s от %v", newsItem.Title, publishedAt)
 		return nil
 	}
@@ -196,8 +196,10 @@ func (np *NewsProcessor) startPeriodicSending() {
 
 	// Первая отправка через интервал (15 минут)
 	// Это позволяет накопить новости за период
-	time.Sleep(np.sendInterval)
-	np.sendPendingNews()
+	go func() {
+		time.Sleep(np.sendInterval)
+		np.sendPendingNews()
+	}()
 
 	// Затем отправляем по расписанию каждые 15 минут
 	for range ticker.C {
@@ -251,8 +253,7 @@ func (np *NewsProcessor) sendPendingNews() {
 		}
 
 		// Отправляем новости частями, если они не помещаются в одно сообщение
-		// Telegram имеет лимит 4096 символов на сообщение
-		const maxMessageLength = 4096
+		// Telegram имеет лимит MaxMessageLength символов на сообщение
 		message := ""
 		newsIndex := 0
 		sentNewsCount := 0
@@ -264,12 +265,12 @@ func (np *NewsProcessor) sendPendingNews() {
 			formattedNews := formatMessage(newsIndex+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
 
 			// Проверяем, не превысит ли добавление этой новости лимит
-			if len(message)+len(formattedNews) > maxMessageLength {
+			if len(message)+len(formattedNews) > MaxMessageLength {
 				// Если это первая новость и она сама превышает лимит, отправляем её отдельно
 				if len(message) == 0 {
 					// Обрезаем форматированную новость, если она слишком длинная
-					if len(formattedNews) > maxMessageLength {
-						truncatedNews := formattedNews[:maxMessageLength]
+					if len(formattedNews) > MaxMessageLength {
+						truncatedNews := formattedNews[:MaxMessageLength]
 						lastNewline := strings.LastIndex(truncatedNews, "\n")
 						if lastNewline > 0 {
 							formattedNews = truncatedNews[:lastNewline]
@@ -346,7 +347,7 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 			if retryAfter > 0 {
 				var newInterval time.Duration
 				if retryAfter > 3600 {
-					newInterval = 60 * time.Second
+					newInterval = MaxRateLimitInterval
 					newsLogger.Warn("Критический rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 1 минута",
 						chatId, retryAfter)
 				} else if retryAfter > 300 {
@@ -355,8 +356,8 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 						chatId, retryAfter)
 				} else {
 					newInterval = time.Duration(retryAfter+5) * time.Second
-					if newInterval > 60*time.Second {
-						newInterval = 60 * time.Second
+					if newInterval > MaxRateLimitInterval {
+						newInterval = MaxRateLimitInterval
 					}
 					newsLogger.Warn("Rate limit для пользователя %d (retry after %d сек), увеличиваем глобальный интервал до %v",
 						chatId, retryAfter, newInterval)
@@ -432,10 +433,10 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 
 	// После успешной отправки постепенно уменьшаем интервал, если он был увеличен
 	currentInterval = np.globalRateLimiter.GetMinInterval()
-	if currentInterval > 50*time.Millisecond {
+	if currentInterval > MinRateLimitInterval {
 		newInterval := currentInterval * 90 / 100
-		if newInterval < 50*time.Millisecond {
-			newInterval = 50 * time.Millisecond
+		if newInterval < MinRateLimitInterval {
+			newInterval = MinRateLimitInterval
 		}
 		np.globalRateLimiter.SetMinInterval(newInterval)
 	}
