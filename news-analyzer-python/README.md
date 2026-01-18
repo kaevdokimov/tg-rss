@@ -69,6 +69,42 @@ python test_connection.py
 - Наличие таблицы `news`
 - Получение новостей за последние 24 часа
 
+### Тестирование
+
+Проект включает comprehensive тестирование:
+
+#### Unit Tests
+```bash
+# Запуск unit тестов
+python run_tests.py
+
+# Или напрямую
+python -m pytest tests/ -v
+```
+
+#### Integration Tests
+```bash
+# Запуск интеграционных тестов (требует Docker)
+python run_integration_tests.py
+
+# Или напрямую
+python -m pytest tests/integration/ -v
+```
+
+**Требования для интеграционных тестов:**
+- Docker
+- Свободные порты для PostgreSQL и Redis контейнеров
+- Минимум 2GB RAM для контейнеров
+
+#### Coverage Report
+```bash
+# Unit tests с покрытием
+python -m pytest tests/ --cov=src --cov-report=html
+
+# Integration tests с покрытием
+python -m pytest tests/integration/ --cov=src --cov-report=html
+```
+
 ### Ручной запуск анализа
 
 ```bash

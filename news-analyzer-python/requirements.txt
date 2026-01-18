@@ -20,4 +20,7 @@ aiofiles==24.1.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
 pytest-mock==3.14.0
+testcontainers==4.8.2
+testcontainers-postgres==0.0.1rc1
+testcontainers-redis==0.0.1rc1
 urllib3>=2.6.0 # not directly required, pinned by Snyk to avoid a vulnerability
