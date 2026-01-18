@@ -24,7 +24,7 @@ on:
       - '.github/workflows/go.yml'
 
 env:
-  GO_VERSION: '1.25.5'
+  GO_VERSION: '1.24.7'  # Compatible with current golangci-lint
 
 jobs:
   # Fast feedback job - basic checks
@@ -102,10 +102,13 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         cache: true
 
+    env:
+      GOTOOLCHAIN: local  # Use local Go version for golangci-lint compatibility
+
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        version: latest
+        version: v1.64.8  # Latest version compatible with Go 1.25.x
         args: --timeout=5m
 
     - name: Run go vet
