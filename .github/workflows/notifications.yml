@@ -71,15 +71,26 @@ jobs:
           ESCAPED_BRANCH=$(echo "$BRANCH" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_ACTOR=$(echo "$ACTOR" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          TELEGRAM_MESSAGE="$STATUS_EMOJI *CI/CD $STATUS_TEXT*
+          # Create message using printf to avoid YAML parsing issues
+          TELEGRAM_MESSAGE=$(printf '%s *CI/CD %s*
 
-🏗️ *Workflow:* \`$ESCAPED_WORKFLOW_NAME\`
-📦 *Repository:* [$ESCAPED_REPO](https://github.com/$REPO)
-🌿 *Branch:* \`$ESCAPED_BRANCH\`
-👤 *Triggered by:* \`$ESCAPED_ACTOR\`
-🔗 *Details:* [View Run](https://github.com/$REPO/actions/runs/$RUN_ID)
+🏗️ *Workflow:* \`%s\`
+📦 *Repository:* [%s](https://github.com/%s)
+🌿 *Branch:* \`%s\`
+👤 *Triggered by:* \`%s\`
+🔗 *Details:* [View Run](https://github.com/%s/actions/runs/%s)
 
-🕐 $(date '+%Y-%m-%d %H:%M:%S UTC')"
+🕐 %s' \
+            "$STATUS_EMOJI" \
+            "$STATUS_TEXT" \
+            "$ESCAPED_WORKFLOW_NAME" \
+            "$ESCAPED_REPO" \
+            "$REPO" \
+            "$ESCAPED_BRANCH" \
+            "$ESCAPED_ACTOR" \
+            "$REPO" \
+            "$RUN_ID" \
+            "$(date '+%Y-%m-%d %H:%M:%S UTC')")
 
           echo "telegram_message<<EOF" >> $GITHUB_OUTPUT
           echo "$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
@@ -151,10 +162,11 @@ jobs:
           REPO_NAME="${{ github.repository }}"
           ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          REPORT_MESSAGE="📊 *Daily CI/CD Status Report*
-📅 $(date -u '+%Y-%m-%d')
+          # Create report message using printf to avoid YAML issues
+          REPORT_MESSAGE=$(printf '📊 *Daily CI/CD Status Report*
+📅 %s
 
-*Repository:* $ESCAPED_REPO
+*Repository:* %s
 
 🔄 *Recent Workflow Runs:*
 • Main Branch: Check Actions tab
@@ -171,7 +183,12 @@ jobs:
 • Check security advisories
 • Review Dependabot PRs
 
-🔗 [View Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+🔗 [View Report](%s/%s/actions/runs/%s)' \
+            "$(date -u '+%Y-%m-%d')" \
+            "$ESCAPED_REPO" \
+            "${{ github.server_url }}" \
+            "${{ github.repository }}" \
+            "${{ github.run_id }}")
 
           # Send to Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
