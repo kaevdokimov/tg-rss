@@ -81,11 +81,19 @@ if [ "${RUN_ON_STARTUP:-false}" = "true" ]; then
     python run_daily.py || log "ОШИБКА: Анализ завершился с ошибкой"
 fi
 
-log "Контейнер готов. Ожидание времени запуска..."
+log "Контейнер готов. Запуск API сервера..."
 for i in "${!SCHEDULE_HOURS[@]}"; do
     log "  - ${SCHEDULE_HOURS[$i]}:$(printf "%02d" ${SCHEDULE_MINUTES[$i]})"
 done
 log "Для ручного запуска: docker exec -it news-analyzer python run_daily.py"
+
+# Запускаем API сервер в фоне
+API_HOST="${API_HOST:-0.0.0.0}"
+API_PORT="${API_PORT:-8000}"
+log "Запуск API сервера на ${API_HOST}:${API_PORT}..."
+python -m uvicorn src.monitoring.api:app --host $API_HOST --port $API_PORT --reload &
+API_PID=$!
+log "API сервер запущен (PID: $API_PID)"
 
 # Храним время последнего запуска для каждого расписания
 declare -A LAST_RUN_TIMES
@@ -138,3 +146,6 @@ while true; do
     # Проверяем каждую минуту
     sleep 60
 done
+
+# Обработка завершения
+trap 'log "Получен сигнал завершения, останавливаем API сервер..."; kill $API_PID 2>/dev/null || true; exit 0' INT TERM

@@ -43,21 +43,37 @@ from src.preprocessor import TextCleaner
 from src.analyzer import TextVectorizer, NewsClusterer
 from src.narrative import NarrativeBuilder
 from src.reporter import ReportFormatter, SummaryGenerator, TelegramNotifier
-from src.utils import setup_logger, ensure_dir, get_logger
+from src.monitoring.metrics import metrics_manager, init_metrics
+from src.utils import setup_logger, ensure_dir, get_logger, get_structured_logger
 
 
 def main():
     """Основная функция запуска анализа."""
     try:
+        # Инициализируем метрики
+        init_metrics("1.0.0")
+
         # Загружаем конфигурацию
         logger = setup_logger(
             log_level="INFO",
             log_dir=Path("./storage/logs"),
             log_to_file=True
         )
+        structured_logger = get_structured_logger("news_analyzer")
+
         logger.info("=" * 60)
         logger.info("Запуск анализа новостей")
         logger.info("=" * 60)
+
+        # Структурированное логирование начала анализа
+        structured_logger.info("Analysis started",
+            operation="news_analysis",
+            time_window_hours=settings.time_window_hours,
+            top_narratives=settings.top_narratives)
+
+        # Начинаем отсчет метрик анализа
+        analysis_id = metrics_manager.start_analysis()
+        analysis_start_time = time.time()
 
         # Проверяем и загружаем NLTK данные
         try:
@@ -114,8 +130,12 @@ def main():
 
         # Подключаемся к БД
         logger.info("Подключение к базе данных...")
+        db_start = time.time()
         db = Database(settings.get_db_connection_string())
         db.connect()
+        db_duration = time.time() - db_start
+        metrics_manager.record_db_connection(db_duration)
+        logger.info(f"Подключение к БД установлено за {db_duration:.2f} сек")
         
         try:
             # Тестируем подключение
@@ -138,6 +158,11 @@ def main():
                     f"Найдено только {news_count} новостей за последние {settings.time_window_hours} часов "
                     f"(минимум: {min_news_threshold}). Анализ пропущен для снижения нагрузки."
                 )
+                structured_logger.warning("Analysis skipped due to insufficient news",
+                    news_count=news_count,
+                    min_threshold=min_news_threshold,
+                    time_window_hours=settings.time_window_hours,
+                    reason="insufficient_data")
                 return
 
             # Получаем новости
@@ -167,6 +192,7 @@ def main():
             
             # 1. Предобработка текста
             logger.info("Предобработка текста...")
+            preprocess_start = time.time()
             cleaner = TextCleaner(
                 stopwords_extra=settings.stopwords_extra,
                 min_word_length=settings.min_word_length,
@@ -199,6 +225,10 @@ def main():
             non_empty_texts = [t for t in processed_texts if t.strip()]
             logger.info(f"Непустых текстов после предобработки: {len(non_empty_texts)} из {len(processed_texts)}")
 
+            # Записываем метрики предобработки
+            preprocess_duration = time.time() - preprocess_start
+            metrics_manager.record_preprocessing(preprocess_duration, len(processed_texts))
+
             # Проверяем, что processed_texts не пустые
             if not processed_texts or len(processed_texts) == 0:
                 logger.error("processed_texts пустой!")
@@ -214,6 +244,7 @@ def main():
 
             # 2. Векторизация
             logger.info("Векторизация текстов...")
+            vectorize_start = time.time()
             try:
                 # Уменьшаем max_features для контейнера с ограниченными ресурсами
                 max_features = min(settings.max_features, 5000)  # Ограничиваем до 5k признаков для экономии памяти
@@ -240,6 +271,10 @@ def main():
                 if vectors and len(vectors) > 0 and vectors[0]:
                     estimated_memory_mb = (len(vectors) * len(vectors[0]) * 4) / (1024 * 1024)  # float32 = 4 bytes
                     logger.info(f"Оценка использования памяти векторами: {estimated_memory_mb:.1f} MB")
+
+                # Записываем метрики векторизации
+                vectorize_duration = time.time() - vectorize_start
+                metrics_manager.record_vectorization(vectorize_duration)
             except Exception as e:
                 logger.error(f"Ошибка при векторизации: {e}")
                 logger.exception("Подробности ошибки векторизации:")
@@ -248,6 +283,7 @@ def main():
             # 3. Кластеризация
             logger.info("Кластеризация новостей...")
             logger.info(f"Количество векторов для кластеризации: {len(vectors)}")
+            cluster_start = time.time()
             try:
                 clusterer = NewsClusterer(
                     min_cluster_size=settings.cluster_min_size,
@@ -258,6 +294,19 @@ def main():
                 labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
                 logger.info(f"Кластеризация завершена: {n_clusters} кластеров, {n_noise} шумовых точек")
                 logger.info(f"Метки кластеров: {len(labels)} элементов, уникальные: {len(unique_labels)}")
+
+                # Структурированное логирование результатов кластеризации
+                structured_logger.info("Clustering completed",
+                    operation="clustering",
+                    total_vectors=len(vectors),
+                    n_clusters=n_clusters,
+                    n_noise=n_noise,
+                    noise_ratio=n_noise / len(labels) if labels else 0,
+                    duration_seconds=time.time() - cluster_start)
+
+                # Записываем метрики кластеризации
+                cluster_duration = time.time() - cluster_start
+                metrics_manager.record_clustering(cluster_duration, n_clusters, n_noise, len(vectors))
             except Exception as e:
                 logger.error(f"Ошибка при кластеризации: {e}")
                 raise
@@ -265,6 +314,7 @@ def main():
             # 4. Построение нарративов
             logger.info("Построение нарративов...")
             logger.info(f"Количество новостей: {len(news_items)}, меток: {len(labels)}")
+            narrative_start = time.time()
             try:
                 narrative_builder = NarrativeBuilder()
                 logger.info("Инициализация NarrativeBuilder...")
@@ -277,6 +327,10 @@ def main():
                 )
                 logger.info(f"Нарративы построены: {len(narratives)} из {n_clusters} кластеров")
                 print(f"DEBUG: Построено {len(narratives)} нарративов из {n_clusters} кластеров")
+
+                # Записываем метрики построения нарративов
+                narrative_duration = time.time() - narrative_start
+                metrics_manager.record_narrative_building(narrative_duration)
             except Exception as e:
                 print(f"DEBUG: Ошибка при построении нарративов: {e}")
                 logger.error(f"Ошибка при построении нарративов: {e}")
@@ -378,9 +432,14 @@ def main():
                         # Статистика отправки
                         successful = sum(1 for success in results.values() if success)
                         failed = len(results) - successful
-                        
+
+                        # Записываем метрики отправки
+                        for success in results.values():
+                            status = "success" if success else "error"
+                            metrics_manager.record_telegram_report(status)
+
                         logger.info(f"Отправка завершена: успешно {successful}, ошибок {failed}")
-                        
+
                         if failed > 0:
                             failed_chat_ids = [chat_id for chat_id, success in results.items() if not success]
                             logger.warning(f"Не удалось отправить {failed} пользователям: {failed_chat_ids[:10]}...")  # Показываем первые 10
@@ -389,12 +448,37 @@ def main():
             else:
                 logger.info("Telegram не настроен (TELEGRAM_SIGNAL_API_KEY не установлен)")
             
+            # Записываем успешное завершение анализа
+            metrics_manager.end_analysis(analysis_id, "success")
+            metrics_manager.record_news_processed(len(news_items))
+
             logger.info("=" * 60)
             logger.info("Анализ завершен успешно")
             logger.info(f"Отчет сохранен: {report_path}")
             logger.info("=" * 60)
 
+            # Структурированное логирование завершения анализа
+            analysis_duration = time.time() - analysis_start_time
+            structured_logger.info("Analysis completed successfully",
+                operation="news_analysis",
+                status="success",
+                news_processed=len(news_items),
+                narratives_count=len(narratives),
+                report_path=str(report_path),
+                duration_seconds=analysis_duration)
+
         except Exception as e:
+            # Записываем ошибку анализа в метрики
+            metrics_manager.end_analysis(analysis_id, "error")
+
+            # Структурированное логирование ошибки
+            structured_logger.error("Analysis failed with critical error",
+                operation="news_analysis",
+                status="error",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                duration_seconds=time.time() - analysis_start_time)
+
             logger.error(f"Критическая ошибка в основной логике анализа: {e}")
             logger.exception("Подробности ошибки:")
             logger.error(f"Тип ошибки: {type(e).__name__}")

@@ -104,6 +104,8 @@ services:
     mem_limit: 512m
     mem_reservation: 256m
     cpus: 0.3
+    ports:
+      - "8000:8000"
     volumes:
       - analyzer_reports:/app/storage/reports
       - analyzer_logs:/app/storage/logs

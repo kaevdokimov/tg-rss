@@ -111,6 +111,9 @@ RUN rm -f /tmp/requirements.txt && \
 ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages:/app/nltk_data
 # Устанавливаем директорию для данных NLTK
 ENV NLTK_DATA=/app/nltk_data
+# Настройки для FastAPI
+ENV API_HOST=0.0.0.0
+ENV API_PORT=8000
 
 # Копируем исходный код
 COPY --chown=appuser:appuser . .
