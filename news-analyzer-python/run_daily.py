@@ -44,6 +44,7 @@ from src.analyzer import TextVectorizer, NewsClusterer
 from src.narrative import NarrativeBuilder
 from src.reporter import ReportFormatter, SummaryGenerator, TelegramNotifier
 from src.monitoring.metrics import metrics_manager, init_metrics
+from src.cache.redis_cache import RedisCache
 from src.utils import setup_logger, ensure_dir, get_logger, get_structured_logger
 
 
@@ -116,10 +117,24 @@ def main():
             logger.info("✓ TELEGRAM_SIGNAL_API_KEY установлен")
 
         settings = load_settings()
-        
+
         # Создаем необходимые директории
         ensure_dir(settings.reports_dir)
         ensure_dir(settings.logs_dir)
+
+        # Инициализация Redis кэша
+        redis_host = os.getenv("REDIS_HOST", "redis")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_password = os.getenv("REDIS_PASSWORD")
+
+        try:
+            cache = RedisCache(host=redis_host, port=redis_port, password=redis_password)
+            structured_logger.info("Redis cache initialized",
+                "host", redis_host,
+                "port", redis_port)
+        except Exception as e:
+            logger.warning(f"Failed to initialize Redis cache: {e}")
+            cache = None
         
         # Проверяем настройки Telegram бота
         telegram_token = os.getenv("TELEGRAM_SIGNAL_API_KEY")
@@ -257,8 +272,31 @@ def main():
                 )
                 logger.info(f"Начинаем векторизацию {len(processed_texts)} текстов...")
                 logger.info(f"Векторизация {len(processed_texts)} текстов с {max_features} признаками...")
-                vectors = vectorizer.fit_transform(processed_texts)
-                logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
+
+                # Проверяем кэш векторов
+                vectors = None
+                if cache:
+                    vectors = cache.get_vectorized_texts(processed_texts)
+                    if vectors:
+                        logger.info("Векторы получены из Redis кэша")
+                        structured_logger.info("Vectors retrieved from cache",
+                            "texts_count", len(processed_texts))
+                        metrics_manager.record_cache_hit("vectors")
+                    else:
+                        metrics_manager.record_cache_miss("vectors")
+
+                if vectors is None:
+                    # Векторизация если не найдено в кэше
+                    vectors = vectorizer.fit_transform(processed_texts)
+                    logger.info(f"Векторы созданы: форма {len(vectors)}x{len(vectors[0]) if vectors else 0}")
+
+                    # Сохраняем в кэш
+                    if cache and vectors:
+                        try:
+                            cache.set_vectorized_texts(processed_texts, vectors, ttl_seconds=3600)  # 1 час
+                            logger.debug("Векторы сохранены в Redis кэш")
+                        except Exception as e:
+                            logger.warning(f"Failed to cache vectors: {e}")
 
                 if not vectors or len(vectors) == 0:
                     logger.error("Векторизация вернула пустой результат!")
@@ -291,7 +329,64 @@ def main():
                     metric=settings.cluster_metric
                 )
                 logger.info("Запуск кластеризации HDBSCAN...")
-                labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
+
+                # Проверяем кэш кластеризации
+                cluster_params = {
+                    "min_cluster_size": settings.cluster_min_size,
+                    "min_samples": settings.cluster_min_samples,
+                    "metric": settings.cluster_metric
+                }
+
+                vectors_hash = cache._hash_texts(processed_texts) if cache else None
+                cached_result = None
+                if cache and vectors_hash:
+                    cached_result = cache.get_clustering_result(vectors_hash, cluster_params)
+                    if cached_result:
+                        labels = cached_result["labels"]
+                        n_clusters = cached_result["n_clusters"]
+                        n_noise = cached_result["n_noise"]
+                        unique_labels = cached_result["unique_labels"]
+                        logger.info("Результаты кластеризации получены из Redis кэша")
+                        structured_logger.info("Clustering result retrieved from cache",
+                            "clusters", n_clusters,
+                            "noise", n_noise)
+                        metrics_manager.record_cache_hit("clusters")
+                    else:
+                        metrics_manager.record_cache_miss("clusters")
+
+                if cached_result is None:
+                    # Кластеризация если не найдено в кэше
+                    labels, n_clusters, n_noise, unique_labels = clusterer.fit_predict(vectors)
+                    logger.info(f"Кластеризация завершена: {n_clusters} кластеров, {n_noise} шумовых точек")
+                    logger.info(f"Метки кластеров: {len(labels)} элементов, уникальные: {len(unique_labels)}")
+
+                    # Сохраняем в кэш
+                    if cache and vectors_hash:
+                        try:
+                            result_data = {
+                                "labels": labels,
+                                "n_clusters": n_clusters,
+                                "n_noise": n_noise,
+                                "unique_labels": list(unique_labels)
+                            }
+                            cache.set_clustering_result(vectors_hash, cluster_params, result_data, ttl_seconds=1800)  # 30 мин
+                            logger.debug("Результаты кластеризации сохранены в Redis кэш")
+                        except Exception as e:
+                            logger.warning(f"Failed to cache clustering result: {e}")
+
+                # Структурированное логирование результатов кластеризации (только если не из кэша)
+                if cached_result is None:
+                    logger.info(f"Кластеризация завершена: {n_clusters} кластеров, {n_noise} шумовых точек")
+                    logger.info(f"Метки кластеров: {len(labels)} элементов, уникальные: {len(unique_labels)}")
+
+                structured_logger.info("Clustering completed",
+                    operation="clustering",
+                    total_vectors=len(vectors),
+                    n_clusters=n_clusters,
+                    n_noise=n_noise,
+                    noise_ratio=n_noise / len(labels) if labels else 0,
+                    from_cache=cached_result is not None,
+                    duration_seconds=time.time() - cluster_start)
                 logger.info(f"Кластеризация завершена: {n_clusters} кластеров, {n_noise} шумовых точек")
                 logger.info(f"Метки кластеров: {len(labels)} элементов, уникальные: {len(unique_labels)}")
 
@@ -316,15 +411,46 @@ def main():
             logger.info(f"Количество новостей: {len(news_items)}, меток: {len(labels)}")
             narrative_start = time.time()
             try:
-                narrative_builder = NarrativeBuilder()
-                logger.info("Инициализация NarrativeBuilder...")
-                narratives = narrative_builder.build_narratives(
-                    news_items=news_items,
-                    labels=labels,
-                    vectorizer=vectorizer,
-                    top_n=settings.top_narratives,
-                    processed_texts=processed_texts
-                )
+                # Проверяем кэш нарративов
+                narrative_params = {
+                    "top_n": settings.top_narratives,
+                    "top_keywords": 20,
+                    "top_titles": 10
+                }
+
+                clusters_hash = f"{vectors_hash}_{hash(tuple(labels))}" if cache and vectors_hash else None
+                narratives = None
+                if cache and clusters_hash:
+                    narratives = cache.get_narratives(clusters_hash, narrative_params)
+                    if narratives:
+                        logger.info("Нарративы получены из Redis кэша")
+                        structured_logger.info("Narratives retrieved from cache",
+                            "narratives_count", len(narratives))
+                        metrics_manager.record_cache_hit("narratives")
+                    else:
+                        metrics_manager.record_cache_miss("narratives")
+
+                if narratives is None:
+                    # Построение нарративов если не найдено в кэше
+                    narrative_builder = NarrativeBuilder()
+                    logger.info("Инициализация NarrativeBuilder...")
+                    narratives = narrative_builder.build_narratives(
+                        news_items=news_items,
+                        labels=labels,
+                        vectorizer=vectorizer,
+                        top_n=settings.top_narratives,
+                        processed_texts=processed_texts
+                    )
+                    logger.info(f"Нарративы построены: {len(narratives)} из {n_clusters} кластеров")
+                    print(f"DEBUG: Построено {len(narratives)} нарративов из {n_clusters} кластеров")
+
+                    # Сохраняем в кэш
+                    if cache and clusters_hash:
+                        try:
+                            cache.set_narratives(clusters_hash, narrative_params, narratives, ttl_seconds=1800)  # 30 мин
+                            logger.debug("Нарративы сохранены в Redis кэш")
+                        except Exception as e:
+                            logger.warning(f"Failed to cache narratives: {e}")
                 logger.info(f"Нарративы построены: {len(narratives)} из {n_clusters} кластеров")
                 print(f"DEBUG: Построено {len(narratives)} нарративов из {n_clusters} кластеров")
 

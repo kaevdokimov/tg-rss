@@ -130,6 +130,18 @@ cache_size_current = Gauge(
     ['cache_type']  # vectorizer, cluster, narrative
 )
 
+cache_hits_total = Counter(
+    'cache_hits_total',
+    'Total number of cache hits',
+    ['cache_type']  # vectors, clusters, narratives
+)
+
+cache_misses_total = Counter(
+    'cache_misses_total',
+    'Total number of cache misses',
+    ['cache_type']  # vectors, clusters, narratives
+)
+
 
 class MetricsManager:
     """Менеджер для управления метриками."""
@@ -211,6 +223,18 @@ class MetricsManager:
     def record_news_processed(self, count: int):
         """Записывает количество обработанных новостей."""
         news_processed_total.inc(count)
+
+    def record_cache_hit(self, cache_type: str):
+        """Записывает попадание в кэш."""
+        cache_hits_total.labels(cache_type=cache_type).inc()
+
+    def record_cache_miss(self, cache_type: str):
+        """Записывает промах кэша."""
+        cache_misses_total.labels(cache_type=cache_type).inc()
+
+    def update_cache_size(self, cache_type: str, size: int):
+        """Обновляет размер кэша."""
+        cache_size_current.labels(cache_type=cache_type).set(size)
 
 
 # Глобальный экземпляр менеджера метрик

@@ -10,6 +10,11 @@ from datetime import datetime
 
 from ..config import load_settings
 from ..db import Database
+from ..cache.redis_cache import RedisCache
+from ..fetcher import NewsFetcher
+import os
+import subprocess
+import threading
 
 app = FastAPI(title="News Analyzer API", version="1.0.0")
 
@@ -21,11 +26,55 @@ async def health_check():
         settings = load_settings()
         db = Database(settings.get_db_connection_string())
 
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "checks": {}
+        }
+
+        # Проверка базы данных
+        db_healthy = False
         if db.connect() and db.test_connection():
-            db.disconnect()
-            return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+            db_healthy = True
+            health_status["checks"]["database"] = "healthy"
         else:
-            raise HTTPException(status_code=503, detail="Database unhealthy")
+            health_status["checks"]["database"] = "unhealthy"
+            health_status["status"] = "unhealthy"
+
+        db.disconnect()
+
+        # Проверка Redis
+        redis_healthy = False
+        try:
+            redis_host = os.getenv("REDIS_HOST", "redis")
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+            redis_password = os.getenv("REDIS_PASSWORD")
+
+            redis_cache = RedisCache(host=redis_host, port=redis_port, password=redis_password)
+            if redis_cache.health_check():
+                redis_healthy = True
+                health_status["checks"]["redis"] = "healthy"
+            else:
+                health_status["checks"]["redis"] = "unhealthy"
+        except Exception as e:
+            health_status["checks"]["redis"] = f"error: {str(e)}"
+
+        # Проверка NLTK данных
+        nltk_healthy = False
+        try:
+            import nltk
+            nltk.data.find('tokenizers/punkt')
+            nltk.data.find('corpora/stopwords')
+            nltk_healthy = True
+            health_status["checks"]["nltk"] = "healthy"
+        except Exception as e:
+            health_status["checks"]["nltk"] = f"error: {str(e)}"
+
+        # Общий статус
+        if not (db_healthy and redis_healthy and nltk_healthy):
+            health_status["status"] = "degraded"
+
+        return health_status
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
 
@@ -52,30 +101,65 @@ async def status():
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
 
+        # Проверка Redis
+        redis_status = "unknown"
+        cache_stats = {}
+        try:
+            redis_host = os.getenv("REDIS_HOST", "redis")
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+            redis_password = os.getenv("REDIS_PASSWORD")
+
+            redis_cache = RedisCache(host=redis_host, port=redis_port, password=redis_password)
+            if redis_cache.health_check():
+                redis_status = "healthy"
+                cache_stats = redis_cache.get_cache_stats()
+            else:
+                redis_status = "unhealthy"
+        except Exception as e:
+            redis_status = f"error: {str(e)}"
+
+        # Статистика новостей
+        news_stats = {}
+        try:
+            stats = db.get_admin_stats()
+            news_stats = {
+                "total_users": stats.total_users,
+                "total_news": stats.total_news,
+                "total_sources": stats.total_sources
+            }
+        except Exception as e:
+            news_stats = {"error": str(e)}
+
+        db.disconnect()
+
         return {
             "service": "news-analyzer",
             "version": "1.0.0",
-            "status": "healthy" if db_status == "healthy" else "unhealthy",
-            "database": db_status,
+            "status": "healthy" if db_status == "healthy" and redis_status == "healthy" else "degraded",
+            "components": {
+                "database": db_status,
+                "redis": redis_status,
+                "nltk": "healthy"  # Проверяется в /health
+            },
             "timestamp": datetime.now().isoformat(),
             "system": {
-                "memory_used_percent": memory.percent,
-                "disk_used_percent": disk.percent,
+                "memory_used_percent": round(memory.percent, 1),
+                "memory_total_gb": round(memory.total / (1024**3), 1),
+                "disk_used_percent": round(disk.percent, 1),
+                "disk_total_gb": round(disk.total / (1024**3), 1),
                 "cpu_count": os.cpu_count()
             },
             "configuration": {
                 "time_window_hours": settings.time_window_hours,
                 "top_narratives": settings.top_narratives,
-                "cluster_min_size": settings.cluster_min_size
-            }
+                "cluster_min_size": settings.cluster_min_size,
+                "max_features": settings.max_features
+            },
+            "cache": cache_stats,
+            "news_stats": news_stats
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
-    finally:
-        try:
-            db.disconnect()
-        except:
-            pass
 
 
 @app.get("/")
@@ -87,6 +171,116 @@ async def root():
         "endpoints": {
             "/health": "Health check",
             "/metrics": "Prometheus metrics",
-            "/status": "Detailed service status"
+            "/status": "Detailed service status",
+            "/diagnostics": "Component diagnostics",
+            "/analyze": "Trigger manual analysis"
         }
     }
+
+
+@app.get("/diagnostics")
+async def diagnostics():
+    """Диагностика всех компонентов."""
+    try:
+        diagnostics_result = {
+            "timestamp": datetime.now().isoformat(),
+            "diagnostics": {}
+        }
+
+        # Диагностика базы данных
+        try:
+            settings = load_settings()
+            db = Database(settings.get_db_connection_string())
+            if db.connect() and db.test_connection():
+                # Получаем статистику новостей
+                news_count = db.get_news_count_last_hours(hours=24, table_name=settings.db_table)
+                diagnostics_result["diagnostics"]["database"] = {
+                    "status": "healthy",
+                    "news_count_24h": news_count,
+                    "connection_string": f"{settings.db_host}:{settings.db_port}/{settings.db_name}"
+                }
+            else:
+                diagnostics_result["diagnostics"]["database"] = {"status": "unhealthy"}
+            db.disconnect()
+        except Exception as e:
+            diagnostics_result["diagnostics"]["database"] = {"status": "error", "error": str(e)}
+
+        # Диагностика Redis
+        try:
+            redis_host = os.getenv("REDIS_HOST", "redis")
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+            redis_password = os.getenv("REDIS_PASSWORD")
+
+            redis_cache = RedisCache(host=redis_host, port=redis_port, password=redis_password)
+            if redis_cache.health_check():
+                stats = redis_cache.get_cache_stats()
+                diagnostics_result["diagnostics"]["redis"] = {
+                    "status": "healthy",
+                    "host": f"{redis_host}:{redis_port}",
+                    "cache_stats": stats
+                }
+            else:
+                diagnostics_result["diagnostics"]["redis"] = {"status": "unhealthy"}
+        except Exception as e:
+            diagnostics_result["diagnostics"]["redis"] = {"status": "error", "error": str(e)}
+
+        # Диагностика NLTK
+        try:
+            import nltk
+            nltk.data.find('tokenizers/punkt')
+            nltk.data.find('corpora/stopwords')
+            diagnostics_result["diagnostics"]["nltk"] = {"status": "healthy"}
+        except Exception as e:
+            diagnostics_result["diagnostics"]["nltk"] = {"status": "error", "error": str(e)}
+
+        # Диагностика ML компонентов
+        try:
+            import sklearn
+            import hdbscan
+            import numpy as np
+            diagnostics_result["diagnostics"]["ml"] = {
+                "status": "healthy",
+                "sklearn_version": sklearn.__version__,
+                "hdbscan_available": True,
+                "numpy_available": True
+            }
+        except Exception as e:
+            diagnostics_result["diagnostics"]["ml"] = {"status": "error", "error": str(e)}
+
+        return diagnostics_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Diagnostics failed: {str(e)}")
+
+
+@app.post("/analyze")
+async def trigger_analysis():
+    """Принудительный запуск анализа новостей."""
+    try:
+        # Запускаем анализ в отдельном потоке, чтобы не блокировать API
+        def run_analysis():
+            try:
+                result = subprocess.run(
+                    ["python3", "run_daily.py"],
+                    cwd="/app",
+                    capture_output=True,
+                    text=True,
+                    timeout=1800  # 30 минут таймаут
+                )
+                print(f"Analysis completed with code: {result.returncode}")
+                if result.returncode != 0:
+                    print(f"Analysis stderr: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                print("Analysis timed out")
+            except Exception as e:
+                print(f"Analysis failed: {e}")
+
+        thread = threading.Thread(target=run_analysis, daemon=True)
+        thread.start()
+
+        return {
+            "status": "analysis_started",
+            "message": "News analysis has been triggered in background",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger analysis: {str(e)}")
