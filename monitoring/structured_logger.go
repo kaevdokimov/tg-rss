@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -10,6 +11,33 @@ import (
 // StructuredLogger предоставляет структурированное логирование с zap
 type StructuredLogger struct {
 	logger *zap.SugaredLogger
+}
+
+// sanitizeLogValue удаляет символы перевода строки из строковых значений,
+// чтобы предотвратить подделку логов через многострочные записи.
+func sanitizeLogValue(v interface{}) interface{} {
+	switch s := v.(type) {
+	case string:
+		s = strings.ReplaceAll(s, "\n", "")
+		s = strings.ReplaceAll(s, "\r", "")
+		return s
+	default:
+		return v
+	}
+}
+
+// sanitizeKeysAndValues применяет sanitizeLogValue ко всем значениям (каждый
+// второй элемент с нечетным индексом), сохраняя ключи без изменений.
+func sanitizeKeysAndValues(keysAndValues []interface{}) []interface{} {
+	if len(keysAndValues) == 0 {
+		return keysAndValues
+	}
+	sanitized := make([]interface{}, len(keysAndValues))
+	copy(sanitized, keysAndValues)
+	for i := 1; i < len(sanitized); i += 2 {
+		sanitized[i] = sanitizeLogValue(sanitized[i])
+	}
+	return sanitized
 }
 
 // NewStructuredLogger создает новый структурированный логгер
@@ -50,33 +78,33 @@ func NewStructuredLogger(component string) *StructuredLogger {
 
 // Debug логирует сообщение уровня DEBUG
 func (l *StructuredLogger) Debug(msg string, keysAndValues ...interface{}) {
-	l.logger.Debugw(msg, keysAndValues...)
+	l.logger.Debugw(msg, sanitizeKeysAndValues(keysAndValues)...)
 }
 
 // Info логирует сообщение уровня INFO
 func (l *StructuredLogger) Info(msg string, keysAndValues ...interface{}) {
-	l.logger.Infow(msg, keysAndValues...)
+	l.logger.Infow(msg, sanitizeKeysAndValues(keysAndValues)...)
 }
 
 // Warn логирует сообщение уровня WARN
 func (l *StructuredLogger) Warn(msg string, keysAndValues ...interface{}) {
-	l.logger.Warnw(msg, keysAndValues...)
+	l.logger.Warnw(msg, sanitizeKeysAndValues(keysAndValues)...)
 }
 
 // Error логирует сообщение уровня ERROR
 func (l *StructuredLogger) Error(msg string, keysAndValues ...interface{}) {
-	l.logger.Errorw(msg, keysAndValues...)
+	l.logger.Errorw(msg, sanitizeKeysAndValues(keysAndValues)...)
 }
 
 // Fatal логирует сообщение уровня FATAL и завершает программу
 func (l *StructuredLogger) Fatal(msg string, keysAndValues ...interface{}) {
-	l.logger.Fatalw(msg, keysAndValues...)
+	l.logger.Fatalw(msg, sanitizeKeysAndValues(keysAndValues)...)
 }
 
 // With добавляет постоянные поля к логгеру
 func (l *StructuredLogger) With(keysAndValues ...interface{}) *StructuredLogger {
 	return &StructuredLogger{
-		logger: l.logger.With(keysAndValues...),
+		logger: l.logger.With(sanitizeKeysAndValues(keysAndValues)...),
 	}
 }
 
