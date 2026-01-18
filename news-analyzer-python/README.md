@@ -315,7 +315,35 @@ make analyzer-restart
 - Multi-stage build для оптимизации размера образа
 - Автоматическая установка зависимостей через `uv`
 - Автоматическая загрузка данных NLTK
-- Healthcheck для мониторинга работоспособности
+- Healthcheck с валидацией конфигурации
 - Непривилегированный пользователь для безопасности
+
+### Make команды
+
+Для удобства разработки доступны make команды:
+
+```bash
+# Установка и настройка
+make setup              # Полная установка + валидация конфига
+make install            # Установка зависимостей
+make validate-config    # Валидация конфигурации
+
+# Сборка и тестирование
+make build              # Компиляция Python файлов
+make test               # Unit тесты
+make test-integration   # Integration тесты с Docker
+make lint               # Линтинг кода
+
+# Docker операции
+make docker-build       # Сборка Docker образа
+make docker-run         # Запуск контейнера локально
+
+# Development
+make run-dev            # Запуск в синхронном режиме
+make run-async          # Запуск в асинхронном режиме
+
+# Очистка
+make clean              # Очистка кэша и временных файлов
+```
 
 Подробнее: [`README_DEPLOY.md`](README_DEPLOY.md)

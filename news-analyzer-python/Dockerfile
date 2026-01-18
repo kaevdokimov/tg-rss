@@ -120,6 +120,9 @@ ENV API_PORT=8000
 # Копируем исходный код
 COPY --chown=appuser:appuser . .
 
+# Устанавливаем права на healthcheck скрипт
+RUN chmod +x healthcheck.py
+
 # Копируем config.yaml.example как config.yaml, если config.yaml не существует
 # Это позволяет использовать конфигурацию по умолчанию
 RUN if [ ! -f config.yaml ]; then cp config.yaml.example config.yaml; fi && \
@@ -160,33 +163,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV UV_SYSTEM_PYTHON=1
 # PYTHONPATH и NLTK_DATA уже установлены выше
 
-# Healthcheck для проверки работоспособности (с валидацией конфигурации)
+# Healthcheck для проверки работоспособности
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "
-import sys
-sys.path.insert(0, '/app/src')
-try:
-    from src.config import validate_config_file
-    from src.db import Database
-    from src.config import load_settings
-
-    # Проверяем валидность конфигурации
-    is_valid, errors, warnings = validate_config_file()
-    if not is_valid:
-        print(f'Config validation failed: {errors}')
-        exit(1)
-
-    # Проверяем подключение к БД
-    s = load_settings()
-    db = Database(s.get_db_connection_string())
-    db.connect()
-    result = db.test_connection()
-    db.disconnect()
-    exit(0 if result else 1)
-except Exception as e:
-    print(f'Health check failed: {e}')
-    exit(1)
-" || exit 1
+    CMD python healthcheck.py || exit 1
 
 # По умолчанию запускаем entrypoint скрипт
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
