@@ -1,0 +1,71 @@
+# Основные переменные для всех хостов
+
+# Версии ПО
+versions:
+  docker_compose: "2.24.5"
+  docker_ce: "27.1.1"
+  node_exporter: "1.8.2"
+  prometheus: "2.53.2"
+  alertmanager: "0.27.0"
+  grafana: "11.1.0"
+
+# Настройки сети
+network:
+  ssh_port: 22
+  prometheus_port: 9090
+  grafana_port: 3000
+  node_exporter_port: 9100
+  alertmanager_port: 9093
+  docker_api_port: 2376
+
+# Директории
+directories:
+  app_root: "/opt/tg-rss"
+  docker_data: "/var/lib/docker"
+  prometheus_data: "/var/lib/prometheus"
+  grafana_data: "/var/lib/grafana"
+  backup_root: "/opt/backups"
+  logs_root: "/var/log/tg-rss"
+
+# Настройки безопасности
+security:
+  fail2ban_maxretry: 3
+  fail2ban_bantime: 3600
+  ufw_default_policy: "deny"
+  ssh_permit_root_login: "no"
+  ssh_password_authentication: "no"
+
+# Настройки мониторинга
+monitoring:
+  scrape_interval: "15s"
+  evaluation_interval: "15s"
+  backup_schedule: "*-*-* 02:00:00"  # Каждый день в 2:00
+  monitor_interval: "5m"  # Проверка каждые 5 минут
+  alert_retention_days: 7
+
+# Настройки Docker
+docker:
+  daemon_config:
+    storage_driver: "overlay2"
+    log_driver: "json-file"
+    log_max_size: "10m"
+    log_max_file: "3"
+    iptables: false
+    bridge: "none"
+    ip_masq: false
+    userland_proxy: false
+  container_limits:
+    bot_memory: "{{ lookup('env', 'BOT_MEM_LIMIT') | default('400m') }}"
+    bot_cpus: "{{ lookup('env', 'BOT_CPUS') | default('0.4') }}"
+    db_memory: "{{ lookup('env', 'DB_MEM_LIMIT') | default('200m') }}"
+    db_cpus: "{{ lookup('env', 'DB_CPUS') | default('0.12') }}"
+    redis_memory: "{{ lookup('env', 'REDIS_MEM_LIMIT') | default('80m') }}"
+    redis_cpus: "{{ lookup('env', 'REDIS_CPUS') | default('0.05') }}"
+
+# Системные оптимизации
+system:
+  swap_size: "1G"
+  vm_swappiness: 60
+  vm_vfs_cache_pressure: 50
+  fs_file_max: 2097152
+  net_core_somaxconn: 1024

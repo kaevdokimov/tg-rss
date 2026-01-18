@@ -122,6 +122,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install ansible
 
+      - name: Setup Ansible Vault
+        run: |
+          cd ansible
+          # Создаем vault password из GitHub секрета
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_password
+          chmod 600 .vault_password
+
+          # Проверяем vault файлы
+          if [ -f "inventory/group_vars/all/vault.yml" ]; then
+            echo "🔐 Vault файл найден"
+            ansible-vault view inventory/group_vars/all/vault.yml --vault-password-file .vault_password > /dev/null && echo "✅ Vault файл корректный" || exit 1
+          else
+            echo "⚠️ Vault файл не найден, создаем шаблон..."
+            mkdir -p inventory/group_vars/all
+            cat > inventory/group_vars/all/vault.yml << 'EOF'
+# Ansible Vault template - will be encrypted
+vault_postgres_password: "${{ secrets.POSTGRES_PASSWORD }}"
+vault_postgres_user: "${{ secrets.POSTGRES_USER }}"
+vault_postgres_db: "${{ secrets.POSTGRES_DB }}"
+vault_redis_password: "${{ secrets.REDIS_PASSWORD }}"
+vault_telegram_api_key: "${{ secrets.TELEGRAM_API_KEY }}"
+vault_telegram_signal_api_key: "${{ secrets.TELEGRAM_SIGNAL_API_KEY }}"
+EOF
+            # Шифруем файл
+            ansible-vault encrypt inventory/group_vars/all/vault.yml --vault-password-file .vault_password
+            echo "✅ Vault файл создан и зашифрован"
+          fi
+
       - name: Run Ansible server setup
         run: |
           cd ansible
@@ -148,8 +176,9 @@ jobs:
           echo "🔗 Тестируем SSH подключение..."
           ssh -i /home/runner/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH подключение успешно'" || exit 1
 
-          # Запускаем ansible-playbook для инфраструктуры
+          # Запускаем ansible-playbook с vault
           echo "🔧 Версия Ansible: $(ansible-playbook --version | head -1)"
+          echo "🔐 Используем Ansible Vault для секретов"
           echo "📋 Проверяем роли перед запуском:"
           find playbooks/roles -name "system_optimization" -type d || echo "system_optimization not found in playbooks/roles"
           find ../roles -name "system_optimization" -type d || echo "system_optimization not found in ../roles"
@@ -160,12 +189,11 @@ jobs:
           echo "Ansible config:"
           cat ansible.cfg
           echo ""
-          # Очищаем кэш Ansible и запускаем playbook
+          # Очищаем кэш Ansible и запускаем playbook с vault
           export ANSIBLE_CACHE_DIR=/tmp/ansible_cache
           rm -rf /tmp/ansible_cache
-          echo "🔧 Запуск Ansible с правильными настройками..."
-          echo "📋 Используемый inventory: inventory/hosts.ini"
-          ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml -v
+          echo "🔧 Запуск Ansible с vault..."
+          ansible-playbook -i inventory/hosts.ini playbooks/server-setup.yml --vault-password-file .vault_password -v
 
   deploy:
     name: Deploy to Server

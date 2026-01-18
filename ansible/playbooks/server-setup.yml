@@ -7,11 +7,11 @@
   vars:
     # Защита данных
     create_backups: true
-    backup_retention_days: 7
+    backup_retention_days: "{{ backup_retention_days | default(7) }}"
 
     # Настройки swap
-    swap_file_size: "1G"
-    swap_file_path: "/swapfile"
+    swap_file_size: "{{ swap_file_size | default('1G') }}"
+    swap_file_path: "{{ swap_file_path | default('/swapfile') }}"
 
     # Настройки Docker
     docker_daemon_config:

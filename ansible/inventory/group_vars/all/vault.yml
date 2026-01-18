@@ -1,0 +1,60 @@
+# Ansible Vault - Защищенные секреты
+# Шифруется с помощью: ansible-vault encrypt inventory/group_vars/all/vault.yml
+
+# База данных
+vault_postgres_password: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+vault_postgres_user: "tg_rss"
+vault_postgres_db: "tg_rss"
+
+# Redis
+vault_redis_password: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+# Telegram
+vault_telegram_api_key: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+vault_telegram_signal_api_key: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+# SSH ключи (для управления серверами)
+vault_ssh_private_key: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+vault_ssh_public_key: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+# SSL/TLS сертификаты (если используются)
+vault_ssl_cert: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+vault_ssl_key: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+# API ключи для внешних сервисов
+vault_grafana_admin_password: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+vault_prometheus_web_password: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+# Docker registry credentials (если private registry)
+vault_docker_registry_username: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
+
+vault_docker_registry_password: !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  66386439653...  # Будет зашифровано
