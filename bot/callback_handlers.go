@@ -426,7 +426,7 @@ func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, da
 					ChatId:   chatId,
 					Username: "unknown",
 				}
-				if err := db.SaveUser(dbConn, user); err != nil {
+				if _, err := db.SaveUser(dbConn, user); err != nil {
 					log.Printf("⚠️  Ошибка сохранения пользователя %d: %v", chatId, err)
 				}
 			}

@@ -2,7 +2,6 @@ package bot
 
 import (
 	"net/http"
-	"sync"
 	"time"
 
 	"tg-rss/monitoring"
