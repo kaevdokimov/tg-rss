@@ -95,7 +95,7 @@ jobs:
       if: matrix.language == 'go'
       run: |
         go mod download
-        go build -ldflags='-s -w' -o tg-rss-app ./...
+        go build -ldflags='-s -w' -o tg-rss-app .
         go test -v ./... -cover
 
     - name: Build Python application

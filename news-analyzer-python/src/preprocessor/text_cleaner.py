@@ -19,9 +19,6 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Для обратной совместимости
-TextCleaner = AdvancedTextCleaner
-
 # Флаг для отслеживания загрузки NLTK данных
 _nltk_initialized = False
 
@@ -268,6 +265,10 @@ class AdvancedTextCleaner:
         })
 
         return stats
+
+
+# Для обратной совместимости
+TextCleaner = AdvancedTextCleaner
 
 
 class TextCleaner:

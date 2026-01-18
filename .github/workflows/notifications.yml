@@ -65,23 +65,25 @@ jobs:
           esac
 
           # Create Telegram message with MarkdownV2 formatting
-          TELEGRAM_MESSAGE=$(cat <<EOF
-          $STATUS_EMOJI *CI/CD $STATUS_TEXT*
+          # First escape the variables that contain special characters
+          ESCAPED_WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
+          ESCAPED_REPO=$(echo "$REPO" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
+          ESCAPED_BRANCH=$(echo "$BRANCH" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
+          ESCAPED_ACTOR=$(echo "$ACTOR" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          🏗️ *Workflow:* \`$WORKFLOW_NAME\`
-          📦 *Repository:* [$REPO]($REPO_URL)
-          🌿 *Branch:* \`$BRANCH\`
-          👤 *Triggered by:* \`$ACTOR\`
-          🔗 *Details:* [View Run](https://github.com/$REPO/actions/runs/$RUN_ID)
+          TELEGRAM_MESSAGE="$STATUS_EMOJI *CI/CD $STATUS_TEXT*
 
-          🕐 $(date '+%Y-%m-%d %H:%M:%S UTC')
-          EOF
-          )
+🏗️ *Workflow:* \`$ESCAPED_WORKFLOW_NAME\`
+📦 *Repository:* [$ESCAPED_REPO](https://github.com/$REPO)
+🌿 *Branch:* \`$ESCAPED_BRANCH\`
+👤 *Triggered by:* \`$ESCAPED_ACTOR\`
+🔗 *Details:* [View Run](https://github.com/$REPO/actions/runs/$RUN_ID)
 
-          # Escape special characters for Telegram MarkdownV2
-          TELEGRAM_MESSAGE=$(echo "$TELEGRAM_MESSAGE" | sed 's/[-.+?^${}()|[\]\\]/\\&/g')
+🕐 $(date '+%Y-%m-%d %H:%M:%S UTC')"
 
-          echo "telegram_message=$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
+          echo "telegram_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "status=$STATUS_TEXT" >> $GITHUB_OUTPUT
           echo "workflow=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
 
@@ -89,14 +91,20 @@ jobs:
         if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
         run: |
           # Send message to Telegram bot
+          # Create JSON payload with proper escaping
+          JSON_PAYLOAD=$(cat <<EOF
+          {
+            "chat_id": "${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}",
+            "text": "${{ steps.notification.outputs.telegram_message }}",
+            "parse_mode": "MarkdownV2",
+            "disable_web_page_preview": true
+          }
+          EOF
+          )
+
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H 'Content-Type: application/json' \
-            -d '{
-              "chat_id": "${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}",
-              "text": "${{ steps.notification.outputs.telegram_message }}",
-              "parse_mode": "MarkdownV2",
-              "disable_web_page_preview": true
-            }'
+            -d "$JSON_PAYLOAD"
 
       - name: Log failure details
         if: github.event.workflow_run.conclusion == 'failure'
@@ -139,34 +147,31 @@ jobs:
       - name: Send daily report to Telegram
         if: env.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && env.GH_NOTIFY_TELEGRAM_CHAT_ID != ''
         run: |
-          # Create daily report message
-          REPORT_MESSAGE=$(cat <<EOF
-          📊 *Daily CI/CD Status Report*
-          📅 $(date -u '+%Y-%m-%d')
+          # Create daily report message with proper escaping
+          REPO_NAME="${{ github.repository }}"
+          ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          *Repository:* ${{ github.repository }}
+          REPORT_MESSAGE="📊 *Daily CI/CD Status Report*
+📅 $(date -u '+%Y-%m-%d')
 
-          🔄 *Recent Workflow Runs:*
-          • Main Branch: Check Actions tab
-          • Security Scans: CodeQL, SAST, Container
-          • Dependency Updates: Dependabot PRs
+*Repository:* $ESCAPED_REPO
 
-          📈 *Health Metrics:*
-          • Build Success Rate: Monitor via Actions
-          • Test Coverage: Check Codecov reports
-          • Security Issues: Check Security tab
+🔄 *Recent Workflow Runs:*
+• Main Branch: Check Actions tab
+• Security Scans: CodeQL, SAST, Container
+• Dependency Updates: Dependabot PRs
 
-          🎯 *Recommendations:*
-          • Review failed workflows
-          • Check security advisories
-          • Review Dependabot PRs
+📈 *Health Metrics:*
+• Build Success Rate: Monitor via Actions
+• Test Coverage: Check Codecov reports
+• Security Issues: Check Security tab
 
-          🔗 [View Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          EOF
-          )
+🎯 *Recommendations:*
+• Review failed workflows
+• Check security advisories
+• Review Dependabot PRs
 
-          # Escape special characters for Telegram MarkdownV2
-          REPORT_MESSAGE=$(echo "$REPORT_MESSAGE" | sed 's/[-.+?^${}()|[\]\\]/\\&/g')
+🔗 [View Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
 
           # Send to Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
