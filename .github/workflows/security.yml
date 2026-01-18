@@ -172,9 +172,12 @@ jobs:
 
       - name: Install Yor (Infrastructure as Code scanner)
         run: |
-          # Install Yor using go install (more reliable)
-          go install github.com/bridgecrewio/yor@latest
-          sudo cp $(go env GOPATH)/bin/yor /usr/local/bin/yor 2>/dev/null || sudo cp ~/go/bin/yor /usr/local/bin/yor
+          # Install Yor via binary download
+          curl -L -o yor.tar.gz https://github.com/bridgecrewio/yor/releases/download/0.1.142/yor_0.1.142_linux_amd64.tar.gz
+          tar -xzf yor.tar.gz
+          sudo mv yor /usr/local/bin/yor
+          sudo chmod +x /usr/local/bin/yor
+          rm yor.tar.gz
 
       - name: Scan Ansible playbooks with Yor
         run: |
