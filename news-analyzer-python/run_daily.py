@@ -47,6 +47,7 @@ from src.reporter import ReportFormatter, SummaryGenerator, TelegramNotifier
 from src.monitoring.metrics import metrics_manager, init_metrics
 from src.cache.redis_cache import RedisCache
 from src.processor.async_processor import AsyncNewsProcessor
+from src.analyzer.clustering_quality import ClusteringQualityMetrics
 from src.utils import setup_logger, ensure_dir, get_logger, get_structured_logger
 
 
@@ -667,6 +668,11 @@ def main():
                 # Записываем метрики кластеризации
                 cluster_duration = time.time() - cluster_start
                 metrics_manager.record_clustering(cluster_duration, n_clusters, n_noise, len(vectors))
+
+                # Записываем метрики качества кластеризации
+                if hasattr(clusterer, 'get_quality_metrics') and clusterer.get_quality_metrics():
+                    quality_metrics = clusterer.get_quality_metrics()
+                    metrics_manager.update_clustering_quality(quality_metrics)
             except Exception as e:
                 logger.error(f"Ошибка при кластеризации: {e}")
                 raise

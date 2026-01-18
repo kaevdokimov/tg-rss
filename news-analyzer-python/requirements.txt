@@ -4,6 +4,8 @@ pandas==2.3.3
 numpy==2.4.1
 scikit-learn==1.8.0
 nltk==3.9.2
+pymorphy2==0.9.1
+navec==0.10.0
 hdbscan>=0.8.40,<0.9.0
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1

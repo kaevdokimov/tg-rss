@@ -142,6 +142,42 @@ cache_misses_total = Counter(
     ['cache_type']  # vectors, clusters, narratives
 )
 
+# Метрики качества кластеризации
+clustering_quality_silhouette = Gauge(
+    'clustering_quality_silhouette',
+    'Silhouette score for clustering quality (-1 to 1)'
+)
+
+clustering_quality_calinski = Gauge(
+    'clustering_quality_calinski_harabasz',
+    'Calinski-Harabasz index for clustering quality'
+)
+
+clustering_quality_davies = Gauge(
+    'clustering_quality_davies_bouldin',
+    'Davies-Bouldin index for clustering quality'
+)
+
+clustering_overall_score = Gauge(
+    'clustering_overall_quality_score',
+    'Overall clustering quality score (0 to 1)'
+)
+
+clustering_noise_ratio = Gauge(
+    'clustering_noise_ratio',
+    'Ratio of noise points in clustering (0 to 1)'
+)
+
+clustering_balance_score = Gauge(
+    'clustering_balance_score',
+    'Cluster balance score (0 to 1)'
+)
+
+clustering_coverage_score = Gauge(
+    'clustering_coverage_score',
+    'Clustering coverage score (0 to 1)'
+)
+
 
 class MetricsManager:
     """Менеджер для управления метриками."""
@@ -235,6 +271,29 @@ class MetricsManager:
     def update_cache_size(self, cache_type: str, size: int):
         """Обновляет размер кэша."""
         cache_size_current.labels(cache_type=cache_type).set(size)
+
+    def update_clustering_quality(self, quality_metrics: Dict[str, Any]):
+        """Обновляет метрики качества кластеризации."""
+        if 'silhouette_score' in quality_metrics:
+            clustering_quality_silhouette.set(quality_metrics['silhouette_score'])
+
+        if 'calinski_harabasz_score' in quality_metrics:
+            clustering_quality_calinski.set(quality_metrics['calinski_harabasz_score'])
+
+        if 'davies_bouldin_score' in quality_metrics:
+            clustering_quality_davies.set(quality_metrics['davies_bouldin_score'])
+
+        if 'overall_quality_score' in quality_metrics:
+            clustering_overall_score.set(quality_metrics['overall_quality_score'])
+
+        if 'noise_ratio' in quality_metrics:
+            clustering_noise_ratio.set(quality_metrics['noise_ratio'])
+
+        if 'balance_score' in quality_metrics:
+            clustering_balance_score.set(quality_metrics['balance_score'])
+
+        if 'coverage_score' in quality_metrics:
+            clustering_coverage_score.set(quality_metrics['coverage_score'])
 
 
 # Глобальный экземпляр менеджера метрик
