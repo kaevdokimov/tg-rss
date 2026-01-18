@@ -89,7 +89,7 @@ func createQuickStartKeyboard(sources []db.Source, subscribedIds map[int64]bool)
 	for i := 0; i < maxSources; i++ {
 		source := sources[i]
 		isSubscribed := subscribedIds[source.Id]
-		
+
 		var buttonText string
 		var callbackData string
 		if isSubscribed {

@@ -44,12 +44,12 @@ func (r *RateLimiter) Allow(chatID int64) bool {
 
 	now := time.Now()
 	last, exists := r.rates[chatID]
-	
+
 	if !exists || now.Sub(last) >= r.period {
 		r.rates[chatID] = now
 		return true
 	}
-	
+
 	return false
 }
 
@@ -63,7 +63,7 @@ func (gr *GlobalRateLimiter) AllowGlobal() bool {
 		gr.lastSent = now
 		return true
 	}
-	
+
 	return false
 }
 

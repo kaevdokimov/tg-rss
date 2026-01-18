@@ -27,7 +27,7 @@ var httpClient = &http.Client{
 	Timeout: 15 * time.Second, // Сократили таймаут с 45 до 15 секунд
 	Transport: &http.Transport{
 		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 20,  // Увеличили с 10 до 20
+		MaxIdleConnsPerHost: 20, // Увеличили с 10 до 20
 		IdleConnTimeout:     90 * time.Second,
 		DisableKeepAlives:   false,
 		DisableCompression:  false, // Включаем сжатие
@@ -129,18 +129,17 @@ func removeNullBytes(s string) string {
 
 // NewsContent содержит полный контент новости со страницы
 type NewsContent struct {
-	FullText      string            // Полный текст новости
-	Author        string            // Автор статьи
-	Category      string            // Категория новости
-	Tags          []string          // Теги/ключевые слова
-	Images        []string          // URL изображений из статьи
-	PublishedAt   *time.Time        // Дата публикации со страницы (может отличаться от RSS)
-	MetaKeywords  string            // Мета-тег keywords
-	MetaDescription string          // Мета-тег description
-	MetaData      map[string]string // Дополнительные метаданные
-	ContentHTML   string            // HTML контента статьи (для будущего анализа)
+	FullText        string            // Полный текст новости
+	Author          string            // Автор статьи
+	Category        string            // Категория новости
+	Tags            []string          // Теги/ключевые слова
+	Images          []string          // URL изображений из статьи
+	PublishedAt     *time.Time        // Дата публикации со страницы (может отличаться от RSS)
+	MetaKeywords    string            // Мета-тег keywords
+	MetaDescription string            // Мета-тег description
+	MetaData        map[string]string // Дополнительные метаданные
+	ContentHTML     string            // HTML контента статьи (для будущего анализа)
 }
-
 
 // ScrapeNewsContent парсит страницу новости и извлекает полный контент
 // Использует библиотеку go-readability (порт Mozilla Readability.js) для качественного извлечения контента
@@ -291,7 +290,7 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 
 	// Извлекаем полный текст статьи (уже очищенный от лишнего и null байтов)
 	content.FullText = removeNullBytes(strings.TrimSpace(article.TextContent))
-	
+
 	// Сохраняем HTML контента (очищенный от null байтов)
 	content.ContentHTML = removeNullBytes(article.Content)
 
@@ -316,19 +315,19 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 	if err == nil {
 		// Извлекаем дополнительные метаданные
 		extractMetaData(doc, content)
-		
+
 		// Извлекаем категорию
 		extractCategory(doc, content)
-		
+
 		// Извлекаем теги
 		extractTags(doc, content)
-		
+
 		// Извлекаем дополнительные изображения
 		extractImages(doc, content)
-		
+
 		// Извлекаем дату публикации
 		extractPublishedDate(doc, content)
-		
+
 		// Если автор не найден через readability, пробуем через метаданные
 		if content.Author == "" {
 			extractAuthor(doc, content)
@@ -461,21 +460,21 @@ func extractFullText(doc *goquery.Document, content *NewsContent) {
 
 	// Извлекаем только параграфы и заголовки из статьи
 	var textParts []string
-	
+
 	// Ищем параграфы внутри контента статьи
 	cleanContent.Find("p, h1, h2, h3, h4, h5, h6").Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())
-		
+
 		// Фильтруем короткие и нерелевантные тексты
 		if len(text) < 30 {
 			return
 		}
-		
+
 		// Пропускаем тексты, которые выглядят как навигация или реклама
 		if isNonContentText(text) {
 			return
 		}
-		
+
 		textParts = append(textParts, text)
 	})
 
@@ -484,7 +483,7 @@ func extractFullText(doc *goquery.Document, content *NewsContent) {
 		// Разбиваем на строки и фильтруем
 		fullText := strings.TrimSpace(cleanContent.Text())
 		lines := strings.Split(fullText, "\n")
-		
+
 		var filteredLines []string
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
@@ -492,7 +491,7 @@ func extractFullText(doc *goquery.Document, content *NewsContent) {
 				filteredLines = append(filteredLines, line)
 			}
 		}
-		
+
 		if len(filteredLines) > len(textParts) {
 			textParts = filteredLines
 		}
@@ -509,7 +508,7 @@ func extractFullText(doc *goquery.Document, content *NewsContent) {
 // isNonContentText проверяет, является ли текст навигацией, рекламой или другим нерелевантным контентом
 func isNonContentText(text string) bool {
 	text = strings.ToLower(text)
-	
+
 	// Паттерны, указывающие на нерелевантный контент
 	nonContentPatterns := []string{
 		"читать также",
@@ -573,18 +572,18 @@ func isNonContentText(text string) bool {
 		"xml",
 		"atom",
 	}
-	
+
 	for _, pattern := range nonContentPatterns {
 		if strings.Contains(text, pattern) {
 			return true
 		}
 	}
-	
+
 	// Проверяем, слишком ли короткий текст или состоит только из заглавных букв (часто реклама)
 	if len(text) < 20 {
 		return true
 	}
-	
+
 	upperCount := 0
 	for _, r := range text {
 		if r >= 'А' && r <= 'Я' || r >= 'A' && r <= 'Z' {
@@ -594,7 +593,7 @@ func isNonContentText(text string) bool {
 	if float64(upperCount)/float64(len(text)) > 0.7 && len(text) < 100 {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -603,7 +602,7 @@ func cleanText(text string) string {
 	// Удаляем множественные пробелы
 	text = strings.ReplaceAll(text, "  ", " ")
 	text = strings.ReplaceAll(text, "   ", " ")
-	
+
 	// Удаляем множественные переносы строк
 	lines := strings.Split(text, "\n")
 	var cleanedLines []string
@@ -613,15 +612,15 @@ func cleanText(text string) string {
 			cleanedLines = append(cleanedLines, line)
 		}
 	}
-	
+
 	// Объединяем обратно, оставляя по одному переносу между параграфами
 	result := strings.Join(cleanedLines, "\n\n")
-	
+
 	// Удаляем множественные переносы в конце
 	for strings.HasSuffix(result, "\n\n") {
 		result = strings.TrimSuffix(result, "\n\n")
 	}
-	
+
 	return result
 }
 

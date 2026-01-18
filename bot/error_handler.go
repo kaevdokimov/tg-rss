@@ -93,12 +93,12 @@ func extractRetryAfter(err error) int {
 	if err == nil {
 		return 0
 	}
-	
+
 	errStr := err.Error()
 	if !strings.Contains(errStr, "retry after") {
 		return 0
 	}
-	
+
 	// Парсим число из строки "retry after 52833"
 	re := regexp.MustCompile(`retry after (\d+)`)
 	matches := re.FindStringSubmatch(errStr)
@@ -107,6 +107,6 @@ func extractRetryAfter(err error) int {
 			return seconds
 		}
 	}
-	
+
 	return 0
 }

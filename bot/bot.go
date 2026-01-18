@@ -118,4 +118,3 @@ func StartBotWithRedis(ctx context.Context, cfgTgBot *config.TgBotConfig, cfgRed
 	<-ctx.Done()
 	log.Println("Бот завершает работу...")
 }
-

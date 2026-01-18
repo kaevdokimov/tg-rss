@@ -155,4 +155,3 @@ type NewsForScraping struct {
 	Link        string
 	PublishedAt time.Time
 }
-

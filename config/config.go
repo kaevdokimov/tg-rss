@@ -15,19 +15,19 @@ type DBConfig struct {
 }
 
 type TgBotConfig struct {
-	ApiKey                  string
-	TZ                      string
-	Timeout                 int
-	ContentScraperInterval  int // интервал в минутах
-	ContentScraperBatch     int // размер батча
+	ApiKey                   string
+	TZ                       string
+	Timeout                  int
+	ContentScraperInterval   int // интервал в минутах
+	ContentScraperBatch      int // размер батча
 	ContentScraperConcurrent int // количество параллельных запросов
 }
 
 type RedisConfig struct {
-	Addr         string
-	Password     string
-	DB           int
-	NewsChannel  string
+	Addr          string
+	Password      string
+	DB            int
+	NewsChannel   string
 	NotifyChannel string
 }
 
@@ -67,11 +67,11 @@ func LoadTgBotConfig() *TgBotConfig {
 		log.Fatalf("Некорректное значение количества параллельных запросов парсера контента: %v", err)
 	}
 	return &TgBotConfig{
-		ApiKey:                  TelegramApiKey,
-		TZ:                      getEnv("TZ", "Europe/Moscow"),
-		Timeout:                 Timeout,
-		ContentScraperInterval:  ContentScraperInterval,
-		ContentScraperBatch:     ContentScraperBatch,
+		ApiKey:                   TelegramApiKey,
+		TZ:                       getEnv("TZ", "Europe/Moscow"),
+		Timeout:                  Timeout,
+		ContentScraperInterval:   ContentScraperInterval,
+		ContentScraperBatch:      ContentScraperBatch,
 		ContentScraperConcurrent: ContentScraperConcurrent,
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 	"tg-rss/db"
-	"tg-rss/redis"
 	"tg-rss/monitoring"
+	"tg-rss/redis"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -52,18 +52,18 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 	cache := make(map[int64][]interface{})
 
 	np := &NewsProcessor{
-		db:                db,
-		bot:               bot,
-		globalRateLimiter: globalLimiter,
-		pendingNews:       make(map[int64][]PendingNews),
-		sendInterval:      15 * time.Minute, // отправка раз в 15 минут
+		db:                 db,
+		bot:                bot,
+		globalRateLimiter:  globalLimiter,
+		pendingNews:        make(map[int64][]PendingNews),
+		sendInterval:       15 * time.Minute, // отправка раз в 15 минут
 		subscriptionsCache: cache,
 		cacheDuration:      10 * time.Minute, // обновление кэша каждые 10 минут
 	}
-	
+
 	// Запускаем периодическую отправку накопленных новостей
 	go np.startPeriodicSending()
-	
+
 	return np
 }
 
@@ -130,7 +130,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 	np.pendingMutex.Lock()
 	addedToQueue := 0
 	for _, subscription := range subscriptions {
-			// Проверяем, не отправляли ли уже эту новость пользователю
+		// Проверяем, не отправляли ли уже эту новость пользователю
 		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsID)
 		if err != nil {
 			newsLogger.Error("Ошибка при проверке отправленной новости для пользователя %d: %v", subscription.ChatId, err)
@@ -154,7 +154,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 		}
 		np.pendingNews[subscription.ChatId] = append(np.pendingNews[subscription.ChatId], pending)
 		addedToQueue++
-		newsLogger.Debug("Новость добавлена в очередь для пользователя %d: %s (всего в очереди: %d)", 
+		newsLogger.Debug("Новость добавлена в очередь для пользователя %d: %s (всего в очереди: %d)",
 			subscription.ChatId, newsItem.Title, len(np.pendingNews[subscription.ChatId]))
 	}
 	np.pendingMutex.Unlock()
@@ -189,16 +189,16 @@ func (np *NewsProcessor) isNewsAlreadySentGlobally(newsID int64) (bool, error) {
 // startPeriodicSending запускает периодическую отправку накопленных новостей
 func (np *NewsProcessor) startPeriodicSending() {
 	newsLogger.Info("Запуск периодической отправки новостей с интервалом %v", np.sendInterval)
-	
+
 	// Создаем тикер для периодической отправки
 	ticker := time.NewTicker(np.sendInterval)
 	defer ticker.Stop()
-	
+
 	// Первая отправка через интервал (15 минут)
 	// Это позволяет накопить новости за период
 	time.Sleep(np.sendInterval)
 	np.sendPendingNews()
-	
+
 	// Затем отправляем по расписанию каждые 15 минут
 	for range ticker.C {
 		np.sendPendingNews()
@@ -208,7 +208,7 @@ func (np *NewsProcessor) startPeriodicSending() {
 // sendPendingNews отправляет все накопленные новости пользователям списком
 func (np *NewsProcessor) sendPendingNews() {
 	np.pendingMutex.Lock()
-	
+
 	// Копируем очередь и очищаем оригинал
 	pendingCopy := make(map[int64][]PendingNews)
 	for chatId, news := range np.pendingNews {
@@ -218,7 +218,7 @@ func (np *NewsProcessor) sendPendingNews() {
 		}
 	}
 	np.pendingNews = make(map[int64][]PendingNews)
-	
+
 	np.pendingMutex.Unlock()
 
 	if len(pendingCopy) == 0 {
@@ -262,7 +262,7 @@ func (np *NewsProcessor) sendPendingNews() {
 			news := newsList[newsIndex]
 			// Нумерация продолжается между сообщениями
 			formattedNews := formatMessage(newsIndex+1, news.Title, news.PublishedAt, news.SourceName, news.Link)
-			
+
 			// Проверяем, не превысит ли добавление этой новости лимит
 			if len(message)+len(formattedNews) > maxMessageLength {
 				// Если это первая новость и она сама превышает лимит, отправляем её отдельно
@@ -311,7 +311,7 @@ func (np *NewsProcessor) sendPendingNews() {
 			np.pendingMutex.Lock()
 			np.pendingNews[chatId] = append(np.pendingNews[chatId], newsList[sentNewsCount:]...)
 			np.pendingMutex.Unlock()
-			newsLogger.Warn("Не все новости были отправлены пользователю %d, %d новостей возвращено в очередь", 
+			newsLogger.Warn("Не все новости были отправлены пользователю %d, %d новостей возвращено в очередь",
 				chatId, len(newsList)-sentNewsCount)
 		} else if sentNewsCount > 0 {
 			newsLogger.Info("Список из %d новостей отправлен пользователю %d", sentNewsCount, chatId)
@@ -338,107 +338,107 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 	msg.DisableWebPagePreview = true
 
 	if _, err := np.bot.Send(msg); err != nil {
-			monitoring.IncrementTelegramMessagesErrors()
-			
-			// Улучшенная обработка ошибок
-			if isRateLimitError(err) {
-				retryAfter := extractRetryAfter(err)
-				if retryAfter > 0 {
-					var newInterval time.Duration
-					if retryAfter > 3600 {
-						newInterval = 60 * time.Second
-						newsLogger.Warn("Критический rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 1 минута", 
-							chatId, retryAfter)
-					} else if retryAfter > 300 {
-						newInterval = 30 * time.Second
-						newsLogger.Warn("Высокий rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 30 секунд", 
-							chatId, retryAfter)
-					} else {
-						newInterval = time.Duration(retryAfter+5) * time.Second
-						if newInterval > 60*time.Second {
-							newInterval = 60 * time.Second
-						}
-						newsLogger.Warn("Rate limit для пользователя %d (retry after %d сек), увеличиваем глобальный интервал до %v", 
-							chatId, retryAfter, newInterval)
-					}
-					np.globalRateLimiter.SetMinInterval(newInterval)
+		monitoring.IncrementTelegramMessagesErrors()
+
+		// Улучшенная обработка ошибок
+		if isRateLimitError(err) {
+			retryAfter := extractRetryAfter(err)
+			if retryAfter > 0 {
+				var newInterval time.Duration
+				if retryAfter > 3600 {
+					newInterval = 60 * time.Second
+					newsLogger.Warn("Критический rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 1 минута",
+						chatId, retryAfter)
+				} else if retryAfter > 300 {
+					newInterval = 30 * time.Second
+					newsLogger.Warn("Высокий rate limit для пользователя %d (retry after %d сек). Устанавливаем интервал 30 секунд",
+						chatId, retryAfter)
 				} else {
-					np.globalRateLimiter.SetMinInterval(5 * time.Second)
-					newsLogger.Warn("Rate limit для пользователя %d (время не указано), увеличиваем глобальный интервал до 5 секунд", chatId)
+					newInterval = time.Duration(retryAfter+5) * time.Second
+					if newInterval > 60*time.Second {
+						newInterval = 60 * time.Second
+					}
+					newsLogger.Warn("Rate limit для пользователя %d (retry after %d сек), увеличиваем глобальный интервал до %v",
+						chatId, retryAfter, newInterval)
 				}
-				return false
-			}
-
-			errorMsg := handleTelegramError(err)
-			newsLogger.Error("Ошибка отправки списка новостей пользователю %d: %v (сообщение: %s)", chatId, err, errorMsg)
-			
-			// Если ошибка связана с форматированием, пробуем отправить без Markdown
-			if strings.Contains(err.Error(), "can't parse entities") || strings.Contains(err.Error(), "Bad Request") {
-				newsLogger.Warn("Ошибка парсинга Markdown для пользователя %d, пробуем отправить без форматирования", chatId)
-				// Формируем простое сообщение без Markdown
-				simpleMessage := ""
-				for i, news := range newsList {
-					// Используем функцию из пакета msg для форматирования времени
-					relativeTime := formatRelativeTime(news.PublishedAt)
-					// Добавляем ссылку на новость в конце строки
-					simpleMessage += fmt.Sprintf("%d. %s - %s • %s\n%s\n\n", 
-						i+1, news.Title, news.SourceName, relativeTime, news.Link)
-				}
-				simpleMessage = strings.TrimRight(simpleMessage, "\n")
-				
-				simpleMsg := tgbotapi.NewMessage(chatId, simpleMessage)
-				simpleMsg.DisableWebPagePreview = true
-				// Не устанавливаем ParseMode, отправляем как обычный текст
-				
-				if _, sendErr := np.bot.Send(simpleMsg); sendErr != nil {
-					newsLogger.Error("Ошибка отправки простого сообщения пользователю %d: %v", chatId, sendErr)
-					return false
-				}
-				// Если простое сообщение отправилось успешно, продолжаем
+				np.globalRateLimiter.SetMinInterval(newInterval)
 			} else {
+				np.globalRateLimiter.SetMinInterval(5 * time.Second)
+				newsLogger.Warn("Rate limit для пользователя %d (время не указано), увеличиваем глобальный интервал до 5 секунд", chatId)
+			}
+			return false
+		}
+
+		errorMsg := handleTelegramError(err)
+		newsLogger.Error("Ошибка отправки списка новостей пользователю %d: %v (сообщение: %s)", chatId, err, errorMsg)
+
+		// Если ошибка связана с форматированием, пробуем отправить без Markdown
+		if strings.Contains(err.Error(), "can't parse entities") || strings.Contains(err.Error(), "Bad Request") {
+			newsLogger.Warn("Ошибка парсинга Markdown для пользователя %d, пробуем отправить без форматирования", chatId)
+			// Формируем простое сообщение без Markdown
+			simpleMessage := ""
+			for i, news := range newsList {
+				// Используем функцию из пакета msg для форматирования времени
+				relativeTime := formatRelativeTime(news.PublishedAt)
+				// Добавляем ссылку на новость в конце строки
+				simpleMessage += fmt.Sprintf("%d. %s - %s • %s\n%s\n\n",
+					i+1, news.Title, news.SourceName, relativeTime, news.Link)
+			}
+			simpleMessage = strings.TrimRight(simpleMessage, "\n")
+
+			simpleMsg := tgbotapi.NewMessage(chatId, simpleMessage)
+			simpleMsg.DisableWebPagePreview = true
+			// Не устанавливаем ParseMode, отправляем как обычный текст
+
+			if _, sendErr := np.bot.Send(simpleMsg); sendErr != nil {
+				newsLogger.Error("Ошибка отправки простого сообщения пользователю %d: %v", chatId, sendErr)
 				return false
 			}
-		}
-
-		// Сохраняем информацию об отправке в таблицу messages
-		tx, err := np.db.Begin()
-		if err != nil {
-			newsLogger.Error("Ошибка начала транзакции для сохранения сообщений: %v", err)
+			// Если простое сообщение отправилось успешно, продолжаем
+		} else {
 			return false
 		}
+	}
 
-		// Сохраняем все отправленные новости
-		saveErrors := false
-		for _, news := range newsList {
-			if err := db.SaveMessage(tx, chatId, news.NewsID); err != nil {
-				newsLogger.Error("Ошибка сохранения сообщения для новости %d: %v", news.NewsID, err)
-				saveErrors = true
-				// Продолжаем сохранять остальные
-			}
-		}
+	// Сохраняем информацию об отправке в таблицу messages
+	tx, err := np.db.Begin()
+	if err != nil {
+		newsLogger.Error("Ошибка начала транзакции для сохранения сообщений: %v", err)
+		return false
+	}
 
-		if err := tx.Commit(); err != nil {
-			newsLogger.Error("Ошибка коммита транзакции: %v", err)
-			return false
+	// Сохраняем все отправленные новости
+	saveErrors := false
+	for _, news := range newsList {
+		if err := db.SaveMessage(tx, chatId, news.NewsID); err != nil {
+			newsLogger.Error("Ошибка сохранения сообщения для новости %d: %v", news.NewsID, err)
+			saveErrors = true
+			// Продолжаем сохранять остальные
 		}
+	}
 
-		// Если были ошибки сохранения, но транзакция прошла, логируем предупреждение
-		if saveErrors {
-			newsLogger.Warn("Некоторые новости не были сохранены в БД для пользователя %d, но сообщение отправлено", chatId)
-		}
+	if err := tx.Commit(); err != nil {
+		newsLogger.Error("Ошибка коммита транзакции: %v", err)
+		return false
+	}
 
-		monitoring.IncrementTelegramMessagesSent()
-		newsLogger.Debug("Сообщение с %d новостями отправлено пользователю %d", len(newsList), chatId)
-		
-		// После успешной отправки постепенно уменьшаем интервал, если он был увеличен
-		currentInterval = np.globalRateLimiter.GetMinInterval()
-		if currentInterval > 50*time.Millisecond {
-			newInterval := currentInterval * 90 / 100
-			if newInterval < 50*time.Millisecond {
-				newInterval = 50 * time.Millisecond
-			}
-			np.globalRateLimiter.SetMinInterval(newInterval)
+	// Если были ошибки сохранения, но транзакция прошла, логируем предупреждение
+	if saveErrors {
+		newsLogger.Warn("Некоторые новости не были сохранены в БД для пользователя %d, но сообщение отправлено", chatId)
+	}
+
+	monitoring.IncrementTelegramMessagesSent()
+	newsLogger.Debug("Сообщение с %d новостями отправлено пользователю %d", len(newsList), chatId)
+
+	// После успешной отправки постепенно уменьшаем интервал, если он был увеличен
+	currentInterval = np.globalRateLimiter.GetMinInterval()
+	if currentInterval > 50*time.Millisecond {
+		newInterval := currentInterval * 90 / 100
+		if newInterval < 50*time.Millisecond {
+			newInterval = 50 * time.Millisecond
 		}
+		np.globalRateLimiter.SetMinInterval(newInterval)
+	}
 
 	return true
 }

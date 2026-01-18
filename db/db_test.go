@@ -23,7 +23,7 @@ func TestCleanUTF8String(t *testing.T) {
 		{
 			name:     "string with invalid UTF-8",
 			input:    "Hello\x80\x81World", // Invalid UTF-8 bytes
-			expected: "Hello�World",       // Should be replaced with replacement char
+			expected: "Hello�World",        // Should be replaced with replacement char
 		},
 		{
 			name:     "string with both null bytes and invalid UTF-8",

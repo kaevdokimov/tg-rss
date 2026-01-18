@@ -52,7 +52,7 @@ type ContentScraper struct {
 	db         *sql.DB
 	interval   time.Duration
 	batchSize  int
-	concurrent int // количество одновременных запросов
+	concurrent int                 // количество одновременных запросов
 	cache      *redis.ContentCache // Redis кэш для контента
 }
 

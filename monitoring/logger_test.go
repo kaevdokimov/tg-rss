@@ -55,7 +55,7 @@ func TestSetLogLevelFromString(t *testing.T) {
 
 func TestLogger(t *testing.T) {
 	logger := NewLogger("TEST")
-	
+
 	// Тест что логгер создается
 	if logger == nil {
 		t.Error("Ожидалось создание логгера")

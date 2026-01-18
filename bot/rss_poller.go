@@ -9,8 +9,8 @@ import (
 
 	"github.com/lib/pq"
 	"tg-rss/db"
-	"tg-rss/redis"
 	"tg-rss/monitoring"
+	"tg-rss/redis"
 	"tg-rss/rss"
 )
 
@@ -37,8 +37,8 @@ type parseResult struct {
 
 // newsCandidate представляет кандидата новости для обработки
 type newsCandidate struct {
-	source   db.Source
-	item     rss.News
+	source db.Source
+	item   rss.News
 }
 
 // parseSource парсит один RSS источник
@@ -67,10 +67,10 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 	var sourcesCache []db.Source
 	var lastCacheUpdate time.Time
 	rssLogger.Info("Запуск RSS парсера с интервалом %v", interval)
-	
+
 	// Запускаем первый цикл сразу, без ожидания
 	firstRun := true
-	
+
 	// Защита от паники - если произойдет ошибка, парсер продолжит работу
 	defer func() {
 		if r := recover(); r != nil {
@@ -80,7 +80,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 			go StartRSSPolling(dbConn, interval, tz, redisProducer)
 		}
 	}()
-	
+
 	for {
 		monitoring.IncrementRSSPolls()
 		rssLogger.Info("Начало цикла парсинга RSS-источников")
@@ -187,7 +187,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 
 		rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Redis %d, ошибок %d",
 			sourcesProcessed, len(sources), totalNewsFound, totalNewsSent, sourcesWithErrors)
-		
+
 		// Первый цикл выполняется сразу, последующие - с интервалом
 		if firstRun {
 			firstRun = false
@@ -195,7 +195,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 		} else {
 			rssLogger.Debug("Ожидание следующего цикла парсинга (%v)", interval)
 		}
-		
+
 		time.Sleep(interval)
 	}
 }

@@ -8,50 +8,50 @@ import (
 
 func TestFormatMessage(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
-		name        string
-		i           int
-		title       string
-		publishedAt time.Time
-		sourceName  string
-		newsLink    string
+		name         string
+		i            int
+		title        string
+		publishedAt  time.Time
+		sourceName   string
+		newsLink     string
 		wantContains []string
 	}{
 		{
-			name:        "basic message",
-			i:           1,
-			title:       "Test News Title",
-			publishedAt: now.Add(-30 * time.Minute),
-			sourceName:  "Test Source",
-			newsLink:    "https://example.com/news/1",
+			name:         "basic message",
+			i:            1,
+			title:        "Test News Title",
+			publishedAt:  now.Add(-30 * time.Minute),
+			sourceName:   "Test Source",
+			newsLink:     "https://example.com/news/1",
 			wantContains: []string{"1.", "Test News Title", "Test Source", "30 мин"},
 		},
 		{
-			name:        "message with description",
-			i:           7,
-			title:       "Рэпер Гуф сравнил Долину",
-			publishedAt: now.Add(-28 * time.Minute),
-			sourceName:  "Lenta.ru",
-			newsLink:    "https://lenta.ru/news/123",
+			name:         "message with description",
+			i:            7,
+			title:        "Рэпер Гуф сравнил Долину",
+			publishedAt:  now.Add(-28 * time.Minute),
+			sourceName:   "Lenta.ru",
+			newsLink:     "https://lenta.ru/news/123",
 			wantContains: []string{"7.", "Рэпер Гуф сравнил Долину", "Lenta.ru", "28 мин"},
 		},
 		{
-			name:        "message with hyphen",
-			i:           2,
-			title:       "Семья с ребенком-инвалидом осталась без единственного жилья",
-			publishedAt: now.Add(-7 * time.Hour),
-			sourceName:  "Lenta.ru",
-			newsLink:    "https://lenta.ru/news/456",
+			name:         "message with hyphen",
+			i:            2,
+			title:        "Семья с ребенком-инвалидом осталась без единственного жилья",
+			publishedAt:  now.Add(-7 * time.Hour),
+			sourceName:   "Lenta.ru",
+			newsLink:     "https://lenta.ru/news/456",
 			wantContains: []string{"2.", "Семья с ребенком-инвалидом", "Lenta.ru", "7 ч"},
 		},
 		{
-			name:        "message with long title",
-			i:           10,
-			title:       "Очень длинный заголовок новости который может быть очень длинным",
-			publishedAt: now.Add(-1 * time.Hour),
-			sourceName:  "Ria.ru",
-			newsLink:    "https://ria.ru/news/456",
+			name:         "message with long title",
+			i:            10,
+			title:        "Очень длинный заголовок новости который может быть очень длинным",
+			publishedAt:  now.Add(-1 * time.Hour),
+			sourceName:   "Ria.ru",
+			newsLink:     "https://ria.ru/news/456",
 			wantContains: []string{"10.", "Ria.ru", "1 ч"},
 		},
 	}
@@ -59,14 +59,14 @@ func TestFormatMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatMessage(tt.i, tt.title, tt.publishedAt, tt.sourceName, tt.newsLink)
-			
+
 			// Проверяем, что результат содержит все необходимые элементы
 			for _, want := range tt.wantContains {
 				if !strings.Contains(result, want) {
 					t.Errorf("formatMessage() не содержит '%s'. Результат: %q", want, result)
 				}
 			}
-			
+
 			// Проверяем, что формат компактный (нет лишних пустых строк между новостями)
 			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
 			emptyLines := 0
@@ -79,17 +79,17 @@ func TestFormatMessage(t *testing.T) {
 			if emptyLines > 0 {
 				t.Errorf("formatMessage() содержит пустые строки между элементами. Результат: %q", result)
 			}
-			
+
 			// Проверяем, что формат содержит номер, заголовок, источник и время
 			if !strings.Contains(result, "•") {
 				t.Errorf("formatMessage() должна содержать разделитель '•' между источником и временем. Результат: %q", result)
 			}
-			
+
 			// Проверяем, что источник является ссылкой
 			if !strings.Contains(result, "[") || !strings.Contains(result, "](") {
 				t.Errorf("formatMessage() должна содержать ссылку. Результат: %q", result)
 			}
-			
+
 			// Проверяем, что заголовок НЕ является ссылкой (обычный текст)
 			// Заголовок должен быть без квадратных скобок в начале
 			titleIndex := strings.Index(result, tt.title)
@@ -99,7 +99,7 @@ func TestFormatMessage(t *testing.T) {
 					t.Errorf("formatMessage() заголовок не должен быть ссылкой. Результат: %q", result)
 				}
 			}
-			
+
 			// Проверяем, что источник является ссылкой
 			if !strings.Contains(result, "[") || !strings.Contains(result, "](") {
 				t.Errorf("formatMessage() должна содержать ссылку. Результат: %q", result)
@@ -110,40 +110,40 @@ func TestFormatMessage(t *testing.T) {
 
 func TestFormatNewsMessage(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
-		name        string
-		title       string
-		description string
-		publishedAt time.Time
-		sourceName  string
-		wantContains []string
+		name            string
+		title           string
+		description     string
+		publishedAt     time.Time
+		sourceName      string
+		wantContains    []string
 		wantNotContains []string
 	}{
 		{
-			name:        "message without description",
-			title:       "Test News Title",
-			description: "",
-			publishedAt: now.Add(-30 * time.Minute),
-			sourceName:  "Test Source",
-			wantContains: []string{"*Test News Title*", "Test Source", "30 мин"},
+			name:            "message without description",
+			title:           "Test News Title",
+			description:     "",
+			publishedAt:     now.Add(-30 * time.Minute),
+			sourceName:      "Test Source",
+			wantContains:    []string{"*Test News Title*", "Test Source", "30 мин"},
 			wantNotContains: []string{"📰", "⏰"},
 		},
 		{
-			name:        "message with description",
-			title:       "Important News",
-			description: "This is a description of the news",
-			publishedAt: now.Add(-2 * time.Hour),
-			sourceName:  "News Source",
-			wantContains: []string{"*Important News*", "News Source", "2 ч", "This is a description"},
+			name:            "message with description",
+			title:           "Important News",
+			description:     "This is a description of the news",
+			publishedAt:     now.Add(-2 * time.Hour),
+			sourceName:      "News Source",
+			wantContains:    []string{"*Important News*", "News Source", "2 ч", "This is a description"},
 			wantNotContains: []string{"📰", "⏰"},
 		},
 		{
-			name:        "message with long description",
-			title:       "Long Description News",
-			description: strings.Repeat("A", 300), // Длинное описание
-			publishedAt: now.Add(-5 * time.Minute),
-			sourceName:  "Source",
+			name:         "message with long description",
+			title:        "Long Description News",
+			description:  strings.Repeat("A", 300), // Длинное описание
+			publishedAt:  now.Add(-5 * time.Minute),
+			sourceName:   "Source",
 			wantContains: []string{"*Long Description News*", "Source", "5 мин"},
 		},
 	}
@@ -151,26 +151,26 @@ func TestFormatNewsMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatNewsMessage(tt.title, tt.description, tt.publishedAt, tt.sourceName)
-			
+
 			// Проверяем, что результат содержит все необходимые элементы
 			for _, want := range tt.wantContains {
 				if !strings.Contains(result, want) {
 					t.Errorf("formatNewsMessage() не содержит '%s'. Результат: %q", want, result)
 				}
 			}
-			
+
 			// Проверяем, что результат не содержит старые элементы
 			for _, notWant := range tt.wantNotContains {
 				if strings.Contains(result, notWant) {
 					t.Errorf("formatNewsMessage() содержит нежелательный элемент '%s'. Результат: %q", notWant, result)
 				}
 			}
-			
+
 			// Проверяем, что формат компактный
 			if strings.Count(result, "\n\n\n") > 0 {
 				t.Errorf("formatNewsMessage() содержит слишком много пустых строк. Результат: %q", result)
 			}
-			
+
 			// Проверяем, что есть разделитель между источником и временем
 			if !strings.Contains(result, "•") {
 				t.Errorf("formatNewsMessage() должна содержать разделитель '•' между источником и временем. Результат: %q", result)
@@ -181,35 +181,35 @@ func TestFormatNewsMessage(t *testing.T) {
 
 func TestFormatRelativeTime(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
-		name     string
-		publishedAt time.Time
+		name         string
+		publishedAt  time.Time
 		wantContains string
 	}{
 		{
-			name:     "just now",
-			publishedAt: now.Add(-30 * time.Second),
+			name:         "just now",
+			publishedAt:  now.Add(-30 * time.Second),
 			wantContains: "только что",
 		},
 		{
-			name:     "minutes ago",
-			publishedAt: now.Add(-28 * time.Minute),
+			name:         "minutes ago",
+			publishedAt:  now.Add(-28 * time.Minute),
 			wantContains: "мин",
 		},
 		{
-			name:     "hours ago",
-			publishedAt: now.Add(-2 * time.Hour),
+			name:         "hours ago",
+			publishedAt:  now.Add(-2 * time.Hour),
 			wantContains: "ч",
 		},
 		{
-			name:     "days ago",
-			publishedAt: now.Add(-3 * 24 * time.Hour),
+			name:         "days ago",
+			publishedAt:  now.Add(-3 * 24 * time.Hour),
 			wantContains: "дн",
 		},
 		{
-			name:     "old news",
-			publishedAt: now.Add(-10 * 24 * time.Hour),
+			name:         "old news",
+			publishedAt:  now.Add(-10 * 24 * time.Hour),
 			wantContains: ".",
 		},
 	}
@@ -217,11 +217,11 @@ func TestFormatRelativeTime(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatRelativeTime(tt.publishedAt)
-			
+
 			if !strings.Contains(result, tt.wantContains) {
 				t.Errorf("formatRelativeTime() = %q, должен содержать %q", result, tt.wantContains)
 			}
-			
+
 			if result == "" {
 				t.Error("formatRelativeTime() вернул пустую строку")
 			}
@@ -263,11 +263,11 @@ func TestTrimDescription(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := trimDescription(tt.desc, tt.maxLength)
-			
+
 			if len(result) > tt.wantMax {
 				t.Errorf("trimDescription() вернул строку длиной %d, максимум %d. Результат: %q", len(result), tt.wantMax, result)
 			}
-			
+
 			if tt.wantEnds != "" && !strings.HasSuffix(result, tt.wantEnds) {
 				t.Errorf("trimDescription() должен заканчиваться на %q, получили: %q", tt.wantEnds, result)
 			}

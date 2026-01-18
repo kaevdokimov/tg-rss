@@ -380,7 +380,7 @@ func handleQuickStart(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 Выберите популярные источники, на которые хотите подписаться:
 
 *Доступные источники:*`
-	
+
 	msg := tgbotapi.NewMessage(chatId, msgText)
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.ReplyMarkup = createQuickStartKeyboard(sources, subscribedIds)
@@ -447,7 +447,7 @@ func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, da
 
 	// Используем существующую логику подписки
 	handleSubscribe(bot, dbConn, chatId, fmt.Sprintf("subscribe_%d", sourceId))
-	
+
 	// Обновляем клавиатуру быстрого старта
 	handleQuickStart(bot, dbConn, chatId)
 }
@@ -468,7 +468,7 @@ func handleQuickUnsubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, 
 
 	// Используем существующую логику отписки
 	handleUnsubscribe(bot, dbConn, chatId, fmt.Sprintf("unsubscribe_%d", sourceId))
-	
+
 	// Обновляем клавиатуру быстрого старта
 	handleQuickStart(bot, dbConn, chatId)
 }

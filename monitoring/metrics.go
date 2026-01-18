@@ -10,19 +10,19 @@ type Metrics struct {
 	mu sync.RWMutex
 
 	// RSS метрики
-	RSSPollsTotal      int64
-	RSSPollsErrors     int64
+	RSSPollsTotal     int64
+	RSSPollsErrors    int64
 	RSSItemsProcessed int64
 
 	// Redis метрики
 	RedisMessagesProduced int64
-	RedisMessagesConsumed  int64
-	RedisErrors            int64
+	RedisMessagesConsumed int64
+	RedisErrors           int64
 
 	// Telegram метрики
-	TelegramMessagesSent    int64
-	TelegramMessagesErrors  int64
-	TelegramCommandsTotal   int64
+	TelegramMessagesSent   int64
+	TelegramMessagesErrors int64
+	TelegramCommandsTotal  int64
 
 	// Database метрики
 	DBQueriesTotal  int64
@@ -40,7 +40,7 @@ var globalMetrics = &Metrics{
 func GetMetrics() *Metrics {
 	globalMetrics.mu.RLock()
 	defer globalMetrics.mu.RUnlock()
-	
+
 	// Возвращаем копию для безопасности
 	return &Metrics{
 		RSSPollsTotal:          globalMetrics.RSSPollsTotal,

@@ -12,8 +12,8 @@ import (
 	"tg-rss/bot"
 	"tg-rss/config"
 	"tg-rss/db"
-	"tg-rss/redis"
 	"tg-rss/monitoring"
+	"tg-rss/redis"
 	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL драйвер
@@ -119,7 +119,7 @@ func main() {
 	select {
 	case sig := <-sigChan:
 		logger.Info("Получен сигнал %v, начинаем graceful shutdown...", sig)
-		cancel() // отменяем контекст
+		cancel()                    // отменяем контекст
 		time.Sleep(5 * time.Second) // даем время на завершение
 	case <-ctx.Done():
 		logger.Info("Завершение по контексту")
