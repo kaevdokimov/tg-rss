@@ -31,11 +31,9 @@ jobs:
       # Установка зависимостей
       - name: Install dependencies
         run: go mod download
-      
       # Сборка приложения
       - name: Build application
         run: go build -ldflags='-s -w -extldflags "-static"' -o ./tg-rss-app
-      
       # Запуск тестов
       - name: Run tests
         run: go test ./... -v
@@ -136,15 +134,16 @@ jobs:
           else
             echo "⚠️ Vault файл не найден, создаем шаблон..."
             mkdir -p inventory/group_vars/all
-            cat > inventory/group_vars/all/vault.yml << 'EOF'
-# Ansible Vault template - will be encrypted
-vault_postgres_password: "${{ secrets.POSTGRES_PASSWORD }}"
-vault_postgres_user: "${{ secrets.POSTGRES_USER }}"
-vault_postgres_db: "${{ secrets.POSTGRES_DB }}"
-vault_redis_password: "${{ secrets.REDIS_PASSWORD }}"
-vault_telegram_api_key: "${{ secrets.TELEGRAM_API_KEY }}"
-vault_telegram_signal_api_key: "${{ secrets.TELEGRAM_SIGNAL_API_KEY }}"
-EOF
+            # Создаем vault файл с секретами
+            {
+              echo "# Ansible Vault template - will be encrypted"
+              echo "vault_postgres_password: ${{ secrets.POSTGRES_PASSWORD }}"
+              echo "vault_postgres_user: ${{ secrets.POSTGRES_USER }}"
+              echo "vault_postgres_db: ${{ secrets.POSTGRES_DB }}"
+              echo "vault_redis_password: ${{ secrets.REDIS_PASSWORD }}"
+              echo "vault_telegram_api_key: ${{ secrets.TELEGRAM_API_KEY }}"
+              echo "vault_telegram_signal_api_key: ${{ secrets.TELEGRAM_SIGNAL_API_KEY }}"
+            } > inventory/group_vars/all/vault.yml
             # Шифруем файл
             ansible-vault encrypt inventory/group_vars/all/vault.yml --vault-password-file .vault_password
             echo "✅ Vault файл создан и зашифрован"
