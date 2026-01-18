@@ -266,6 +266,7 @@ jobs:
           export ANSIBLE_CACHE_DIR=/tmp/ansible_cache
           rm -rf /tmp/ansible_cache
           echo "🚀 Запуск Ansible в PRODUCTION окружении..."
+          echo "📋 Использование inventory: inventory/prod/hosts.ini (из ansible.cfg)"
           ansible-playbook playbooks/server-setup.yml --vault-password-file .vault_password -v
 
   deploy:
