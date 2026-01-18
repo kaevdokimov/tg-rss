@@ -69,8 +69,10 @@ func NewContentScraper(db *sql.DB, interval time.Duration, batchSize, concurrent
 
 // Start запускает фоновый процесс парсинга контента
 func (cs *ContentScraper) Start() {
-	contentScraperLogger.Info("Запуск фонового парсера контента: интервал=%v, размер батча=%d, параллельно=%d",
-		cs.interval, cs.batchSize, cs.concurrent)
+	contentScraperLogger.Info("Запуск фонового парсера контента",
+		"interval", cs.interval,
+		"batch_size", cs.batchSize,
+		"concurrent", cs.concurrent)
 
 	// Создаем тикер с начальной задержкой в 1 минуту
 	ticker := time.NewTicker(cs.interval)

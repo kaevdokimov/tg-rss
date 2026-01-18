@@ -100,7 +100,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 	// Обновляем кэш каждые SourcesCacheTTL
 	var sourcesCache []db.Source
 	var lastCacheUpdate time.Time
-	rssLogger.Info("Запуск RSS парсера с интервалом %v", interval)
+	rssLogger.Info("Запуск RSS парсера с интервалом", "interval", interval)
 
 	// Создаем тикер для периодического выполнения вместо блокирующего sleep
 	ticker := time.NewTicker(interval)
@@ -248,8 +248,12 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 		totalNewsSent += processCandidatesBatch(dbConn, redisProducer, candidates)
 	}
 
-	rssLogger.Info("Цикл парсинга завершен: обработано источников %d/%d, найдено новостей %d, отправлено в Redis %d, ошибок %d",
-		sourcesProcessed, len(sources), totalNewsFound, totalNewsSent, sourcesWithErrors)
+	rssLogger.Info("Цикл парсинга завершен",
+		"sources_processed", sourcesProcessed,
+		"total_sources", len(sources),
+		"news_found", totalNewsFound,
+		"news_sent", totalNewsSent,
+		"errors_count", sourcesWithErrors)
 
 	// Обновляем статус первого запуска
 	if *firstRun {

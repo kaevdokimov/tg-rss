@@ -146,12 +146,12 @@ type NewsContent struct {
 // ScrapeNewsContent парсит страницу новости и извлекает полный контент
 // Использует библиотеку go-readability (порт Mozilla Readability.js) для качественного извлечения контента
 func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
-	scraperLogger.Debug("Начинаем парсинг страницы: %s", articleURL)
+	scraperLogger.Debug("Начинаем парсинг страницы", "url", articleURL)
 
 	// Проверяем кэш
 	cacheKey := fmt.Sprintf("%x", md5.Sum([]byte(articleURL)))
 	if cached, found := cache.ContentCache.Get(cacheKey); found {
-		scraperLogger.Debug("Возвращаем контент из кэша: %s", articleURL)
+		scraperLogger.Debug("Возвращаем контент из кэша", "url", articleURL)
 		return cached.(*NewsContent), nil
 	}
 
@@ -184,7 +184,12 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 		if attempt < maxRetries-1 {
 			// Экспоненциальная задержка между попытками
 			delay := time.Duration(attempt+1) * time.Second
-			scraperLogger.Debug("Попытка %d/%d не удалась для %s: %v. Повтор через %v", attempt+1, maxRetries, articleURL, err, delay)
+			scraperLogger.Debug("Попытка не удалась",
+				"attempt", attempt+1,
+				"max_retries", maxRetries,
+				"url", articleURL,
+				"error", err,
+				"retry_delay", delay)
 			time.Sleep(delay)
 			continue
 		}
@@ -233,7 +238,8 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 		scraperLogger.Debug("Данные без сжатия")
 
 	default:
-		scraperLogger.Warn("Неизвестный тип сжатия: %s, пробуем обработать как обычные данные", contentEncoding)
+		scraperLogger.Warn("Неизвестный тип сжатия, пробуем обработать как обычные данные",
+			"content_encoding", contentEncoding)
 		// Пробуем определить сжатие автоматически
 		if isCompressedData(resp.Body) {
 			scraperLogger.Debug("Обнаружены сжатые данные без указания Content-Encoding, пробуем распаковать")
@@ -275,7 +281,9 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 
 	// Проверяем, не был ли контент обрезан из-за лимита
 	if len(bodyBytes) >= maxContentSize {
-		scraperLogger.Warn("Контент страницы %s был обрезан из-за превышения лимита %d байт", articleURL, maxContentSize)
+		scraperLogger.Warn("Контент страницы был обрезан из-за превышения лимита",
+			"url", articleURL,
+			"max_size_bytes", maxContentSize)
 	}
 
 	// Парсим URL для передачи в readability
@@ -349,14 +357,16 @@ func ScrapeNewsContent(articleURL string) (*NewsContent, error) {
 	// Валидируем и санитизируем контент
 	validator := NewContentValidator()
 	if err := validator.ValidateAndSanitizeContent(content); err != nil {
-		scraperLogger.Warn("Валидация контента не удалась для %s: %v", articleURL, err)
+		scraperLogger.Warn("Валидация контента не удалась",
+			"url", articleURL,
+			"error", err)
 		// Возвращаем ошибку, так как контент не прошел валидацию
 		return nil, fmt.Errorf("content validation failed: %w", err)
 	}
 
 	// Сохраняем в кэш
 	cache.ContentCache.Set(cacheKey, content)
-	scraperLogger.Debug("Контент сохранен в кэш: %s", articleURL)
+	scraperLogger.Debug("Контент сохранен в кэш", "url", articleURL)
 
 	return content, nil
 }

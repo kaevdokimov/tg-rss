@@ -38,7 +38,7 @@ func main() {
 	monitoring.SetLogLevelFromString(logLevel)
 	logger := monitoring.NewLogger("Main")
 	logger.Info("Запуск TG-RSS бота, версия 1.0.0")
-	logger.Info("Уровень логирования: %s", logLevel)
+	logger.Info("Уровень логирования", "level", logLevel)
 
 	// Настройки
 	cfgDB := config.LoadDBConfig()
