@@ -71,26 +71,19 @@ jobs:
           ESCAPED_BRANCH=$(echo "$BRANCH" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_ACTOR=$(echo "$ACTOR" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create message using printf to avoid YAML parsing issues
-          TELEGRAM_MESSAGE=$(printf '%s *CI/CD %s*
+          # Create message using cat and sed to avoid YAML parsing issues
+          TELEGRAM_MESSAGE=$(cat << EOF | sed "s|{{STATUS_EMOJI}}|$STATUS_EMOJI|g; s|{{STATUS_TEXT}}|$STATUS_TEXT|g; s|{{WORKFLOW}}|$ESCAPED_WORKFLOW_NAME|g; s|{{REPO}}|$ESCAPED_REPO|g; s|{{REPO_RAW}}|$REPO|g; s|{{BRANCH}}|$ESCAPED_BRANCH|g; s|{{ACTOR}}|$ESCAPED_ACTOR|g; s|{{RUN_ID}}|$RUN_ID|g; s|{{DATE}}|$(date '+%Y-%m-%d %H:%M:%S UTC')|g"
+{{STATUS_EMOJI}} *CI/CD {{STATUS_TEXT}}*
 
-🏗️ *Workflow:* \`%s\`
-📦 *Repository:* [%s](https://github.com/%s)
-🌿 *Branch:* \`%s\`
-👤 *Triggered by:* \`%s\`
-🔗 *Details:* [View Run](https://github.com/%s/actions/runs/%s)
+🏗️ *Workflow:* \`{{WORKFLOW}}\`
+📦 *Repository:* [{{REPO}}](https://github.com/{{REPO_RAW}})
+🌿 *Branch:* \`{{BRANCH}}\`
+👤 *Triggered by:* \`{{ACTOR}}\`
+🔗 *Details:* [View Run](https://github.com/{{REPO_RAW}}/actions/runs/{{RUN_ID}})
 
-🕐 %s' \
-            "$STATUS_EMOJI" \
-            "$STATUS_TEXT" \
-            "$ESCAPED_WORKFLOW_NAME" \
-            "$ESCAPED_REPO" \
-            "$REPO" \
-            "$ESCAPED_BRANCH" \
-            "$ESCAPED_ACTOR" \
-            "$REPO" \
-            "$RUN_ID" \
-            "$(date '+%Y-%m-%d %H:%M:%S UTC')")
+🕐 {{DATE}}
+EOF
+)
 
           echo "telegram_message<<EOF" >> $GITHUB_OUTPUT
           echo "$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
@@ -162,11 +155,12 @@ jobs:
           REPO_NAME="${{ github.repository }}"
           ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create report message using printf to avoid YAML issues
-          REPORT_MESSAGE=$(printf '📊 *Daily CI/CD Status Report*
-📅 %s
+          # Create report message using cat and sed to avoid YAML issues
+          REPORT_MESSAGE=$(cat << EOF | sed "s|{{DATE}}|$(date -u '+%Y-%m-%d')|g; s|{{REPO}}|$ESCAPED_REPO|g; s|{{SERVER_URL}}|${{ github.server_url }}|g; s|{{REPOSITORY}}|${{ github.repository }}|g; s|{{RUN_ID}}|${{ github.run_id }}|g"
+📊 *Daily CI/CD Status Report*
+📅 {{DATE}}
 
-*Repository:* %s
+*Repository:* {{REPO}}
 
 🔄 *Recent Workflow Runs:*
 • Main Branch: Check Actions tab
@@ -183,12 +177,9 @@ jobs:
 • Check security advisories
 • Review Dependabot PRs
 
-🔗 [View Report](%s/%s/actions/runs/%s)' \
-            "$(date -u '+%Y-%m-%d')" \
-            "$ESCAPED_REPO" \
-            "${{ github.server_url }}" \
-            "${{ github.repository }}" \
-            "${{ github.run_id }}")
+🔗 [View Report]({{SERVER_URL}}/{{REPOSITORY}}/actions/runs/{{RUN_ID}})
+EOF
+)
 
           # Send to Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
