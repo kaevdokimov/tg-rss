@@ -71,28 +71,25 @@ jobs:
           ESCAPED_BRANCH=$(echo "$BRANCH" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
           ESCAPED_ACTOR=$(echo "$ACTOR" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create message template
-          TEMPLATE="{{STATUS_EMOJI}} *CI/CD {{STATUS_TEXT}}*
+          # Create message parts separately to avoid YAML issues
+          LINE1="$STATUS_EMOJI *CI/CD $STATUS_TEXT*"
+          LINE2="🏗️ *Workflow:* \`$ESCAPED_WORKFLOW_NAME\`"
+          LINE3="📦 *Repository:* [$ESCAPED_REPO](https://github.com/$REPO)"
+          LINE4="🌿 *Branch:* \`$ESCAPED_BRANCH\`"
+          LINE5="👤 *Triggered by:* \`$ESCAPED_ACTOR\`"
+          LINE6="🔗 *Details:* [View Run](https://github.com/$REPO/actions/runs/$RUN_ID)"
+          LINE7="🕐 $(date '+%Y-%m-%d %H:%M:%S UTC')"
 
-🏗️ *Workflow:* \`{{WORKFLOW}}\`
-📦 *Repository:* [{{REPO}}](https://github.com/{{REPO_RAW}})
-🌿 *Branch:* \`{{BRANCH}}\`
-👤 *Triggered by:* \`{{ACTOR}}\`
-🔗 *Details:* [View Run](https://github.com/{{REPO_RAW}}/actions/runs/{{RUN_ID}})
+          # Combine into final message
+          TELEGRAM_MESSAGE="$LINE1
 
-🕐 {{DATE}}"
+$LINE2
+$LINE3
+$LINE4
+$LINE5
+$LINE6
 
-          # Replace placeholders with actual values
-          TELEGRAM_MESSAGE="${TEMPLATE}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{STATUS_EMOJI\}\}/$STATUS_EMOJI}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{STATUS_TEXT\}\}/$STATUS_TEXT}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{WORKFLOW\}\}/$ESCAPED_WORKFLOW_NAME}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{REPO\}\}/$ESCAPED_REPO}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{REPO_RAW\}\}/$REPO}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{BRANCH\}\}/$ESCAPED_BRANCH}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{ACTOR\}\}/$ESCAPED_ACTOR}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{RUN_ID\}\}/$RUN_ID}"
-          TELEGRAM_MESSAGE="${TELEGRAM_MESSAGE//\{\{DATE\}\}/$(date '+%Y-%m-%d %H:%M:%S UTC')}"
+$LINE7"
 
           echo "telegram_message<<EOF" >> $GITHUB_OUTPUT
           echo "$TELEGRAM_MESSAGE" >> $GITHUB_OUTPUT
@@ -164,36 +161,51 @@ jobs:
           REPO_NAME="${{ github.repository }}"
           ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
 
-          # Create report message template
-          REPORT_TEMPLATE="📊 *Daily CI/CD Status Report*
-📅 {{DATE}}
+          # Create report message parts separately
+          REPORT_LINE1="📊 *Daily CI/CD Status Report*"
+          REPORT_LINE2="📅 $(date -u '+%Y-%m-%d')"
+          REPORT_LINE3=""
+          REPORT_LINE4="*Repository:* $ESCAPED_REPO"
+          REPORT_LINE5=""
+          REPORT_LINE6="🔄 *Recent Workflow Runs:*"
+          REPORT_LINE7="• Main Branch: Check Actions tab"
+          REPORT_LINE8="• Security Scans: CodeQL, SAST, Container"
+          REPORT_LINE9="• Dependency Updates: Dependabot PRs"
+          REPORT_LINE10=""
+          REPORT_LINE11="📈 *Health Metrics:*"
+          REPORT_LINE12="• Build Success Rate: Monitor via Actions"
+          REPORT_LINE13="• Test Coverage: Check Codecov reports"
+          REPORT_LINE14="• Security Issues: Check Security tab"
+          REPORT_LINE15=""
+          REPORT_LINE16="🎯 *Recommendations:*"
+          REPORT_LINE17="• Review failed workflows"
+          REPORT_LINE18="• Check security advisories"
+          REPORT_LINE19="• Review Dependabot PRs"
+          REPORT_LINE20=""
+          REPORT_LINE21="🔗 [View Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
 
-*Repository:* {{REPO}}
+          # Combine into final report message
+          REPORT_MESSAGE="$REPORT_LINE1
+$REPORT_LINE2
 
-🔄 *Recent Workflow Runs:*
-• Main Branch: Check Actions tab
-• Security Scans: CodeQL, SAST, Container
-• Dependency Updates: Dependabot PRs
+$REPORT_LINE4
 
-📈 *Health Metrics:*
-• Build Success Rate: Monitor via Actions
-• Test Coverage: Check Codecov reports
-• Security Issues: Check Security tab
+$REPORT_LINE6
+$REPORT_LINE7
+$REPORT_LINE8
+$REPORT_LINE9
 
-🎯 *Recommendations:*
-• Review failed workflows
-• Check security advisories
-• Review Dependabot PRs
+$REPORT_LINE11
+$REPORT_LINE12
+$REPORT_LINE13
+$REPORT_LINE14
 
-🔗 [View Report]({{SERVER_URL}}/{{REPOSITORY}}/actions/runs/{{RUN_ID}})"
+$REPORT_LINE16
+$REPORT_LINE17
+$REPORT_LINE18
+$REPORT_LINE19
 
-          # Replace placeholders with actual values
-          REPORT_MESSAGE="${REPORT_TEMPLATE}"
-          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{DATE\}\}/$(date -u '+%Y-%m-%d')}"
-          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{REPO\}\}/$ESCAPED_REPO}"
-          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{SERVER_URL\}\}/${{ github.server_url }}}"
-          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{REPOSITORY\}\}/${{ github.repository }}}"
-          REPORT_MESSAGE="${REPORT_MESSAGE//\{\{RUN_ID\}\}/${{ github.run_id }}}"
+$REPORT_LINE21"
 
           # Send to Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}/sendMessage" \
