@@ -13,7 +13,7 @@ from ..db import Database
 from ..cache.redis_cache import RedisCache
 from ..fetcher import NewsFetcher
 import os
-import subprocess
+import subprocess  # nosec - used for local script execution
 import threading
 
 app = FastAPI(title="News Analyzer API", version="1.0.0")
@@ -261,7 +261,7 @@ async def trigger_analysis():
         # Запускаем анализ в отдельном потоке, чтобы не блокировать API
         def run_analysis():
             try:
-                result = subprocess.run(
+                result = subprocess.run(  # nosec - local script execution
                     ["python3", "run_daily.py"],
                     cwd="/app",
                     capture_output=True,

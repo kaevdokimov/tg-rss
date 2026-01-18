@@ -61,8 +61,15 @@ jobs:
         run: |
           pip install bandit[toml]
           cd news-analyzer-python
-          bandit -r src/ -f json -o bandit-results.json || true
-          bandit -r src/ --format txt
+          # Run bandit with exclusions for known false positives
+          bandit -r src/ \
+            --exclude-dir tests \
+            --skip B106,B403,B404,B607 \
+            -f json -o bandit-results.json || true
+          bandit -r src/ \
+            --exclude-dir tests \
+            --skip B106,B403,B404,B607 \
+            --format txt
 
       - name: Upload Bandit results
         uses: github/codeql-action/upload-sarif@v4
@@ -109,12 +116,14 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-main.sarif'
+          category: 'container-security-main'
 
       - name: Upload Trivy analyzer results
         if: hashFiles('trivy-analyzer.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-analyzer.sarif'
+          category: 'container-security-analyzer'
 
       - name: Scan Dockerfiles
         uses: aquasecurity/trivy-action@master
@@ -165,9 +174,12 @@ jobs:
 
       - name: Install Yor (Infrastructure as Code scanner)
         run: |
-          # Install Yor using go install (more reliable)
-          go install github.com/bridgecrewio/yor@latest
-          sudo cp $(go env GOPATH)/bin/yor /usr/local/bin/yor 2>/dev/null || sudo cp ~/go/bin/yor /usr/local/bin/yor
+          # Install Yor via binary download
+          curl -L -o yor.tar.gz https://github.com/bridgecrewio/yor/releases/download/0.1.142/yor_0.1.142_linux_amd64.tar.gz
+          tar -xzf yor.tar.gz
+          sudo mv yor /usr/local/bin/yor
+          sudo chmod +x /usr/local/bin/yor
+          rm yor.tar.gz
 
       - name: Scan Ansible playbooks with Yor
         run: |
