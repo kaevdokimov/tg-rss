@@ -28,6 +28,13 @@ on:
 # Settings > Branches > Add rule > Branch name pattern: main
 # (Requires manual configuration of all protection rules)
 
+permissions:
+  contents: read
+  # Required for branch protection management
+  actions: write
+  # Required for repository settings
+  administration: write
+
 jobs:
   branch-protection:
     name: 'Configure Branch Protection'
