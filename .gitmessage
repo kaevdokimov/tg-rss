@@ -1,7 +1,7 @@
 # Формат: тип(область): краткое описание
 #
 # СТРОГО ≤ 72 СИМВОЛА! ПРОВЕРЯЙ ДЛИНУ: echo "заголовок" | wc -c
-# Описание должно быть на РУССКОМ языке!
+# АБСОЛЮТНО ВСЕ ДОЛЖНО БЫТЬ НА РУССКОМ ЯЗЫКЕ! АНГЛИЙСКИЙ ЗАПРЕЩЕН!
 #
 # Типы: feat, fix, docs, style, refactor, test, chore, perf, ci, build
 # Области: bot, scraper, rss, redis, db, config, monitoring, docker, ci, docs, test

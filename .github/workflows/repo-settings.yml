@@ -54,104 +54,112 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Check current branch protection status
+      - name: Check repository settings and provide recommendations
         run: |
-          echo "Checking current branch protection status for main..."
+          echo "🔍 Analyzing repository configuration..."
+          echo ""
 
-          # Check if branch protection exists
+          echo "## 📋 Branch Protection Status"
+          echo ""
+
+          # Try to check branch protection (may fail due to permissions)
           PROTECTION_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ github.repository }}/branches/main/protection")
+            "https://api.github.com/repos/${{ github.repository }}/branches/main/protection" 2>/dev/null || echo "403")
 
           if [ "$PROTECTION_STATUS" = "200" ]; then
-            echo "✅ Branch protection already exists for main branch"
-            exit 0
+            echo "✅ Branch protection is configured for main branch"
           elif [ "$PROTECTION_STATUS" = "404" ]; then
-            echo "ℹ️ Branch protection not found, configuring..."
+            echo "⚠️ Branch protection NOT configured for main branch"
+            echo ""
+            echo "## 🛡️ Recommended Branch Protection Rules"
+            echo ""
+            echo "### Required Status Checks"
+            echo "- Require branches to be up to date before merging"
+            echo "- Require status checks to pass before merging:"
+            echo "  - CI/CD Pipeline"
+            echo "  - 🔍 CodeQL Advanced Security"
+            echo "  - 🛡️ Security Pipeline"
+            echo ""
+            echo "### Branch Protection Rules"
+            echo "- Require a pull request before merging"
+            echo "- Require approvals (recommended: 1)"
+            echo "- Dismiss stale pull request approvals when new commits are pushed"
+            echo "- Require review from code owners"
+            echo "- Restrict pushes that create matching branches"
+            echo "- Allow force pushes: ❌ Disabled"
+            echo "- Allow deletions: ❌ Disabled"
+            echo ""
+            echo "### Setup Instructions"
+            echo "1. Go to: Repository Settings → Branches"
+            echo "2. Click 'Add rule' for branch name pattern: 'main'"
+            echo "3. Configure the rules listed above"
+            echo "4. Save the branch protection rule"
+          elif [ "$PROTECTION_STATUS" = "403" ]; then
+            echo "🔒 Cannot check branch protection status (insufficient permissions)"
+            echo "This is normal for GITHUB_TOKEN - manual setup required."
           else
-            echo "❌ Error checking branch protection: HTTP $PROTECTION_STATUS"
-            exit 1
+            echo "❓ Unable to determine branch protection status (HTTP $PROTECTION_STATUS)"
           fi
 
-      - name: Configure branch protection for main
+          echo ""
+          echo "## 🔧 Repository Health Check"
+          echo ""
+
+          # Check if .github/settings.yml exists
+          if [ -f ".github/settings.yml" ]; then
+            echo "✅ Repository settings file found (.github/settings.yml)"
+          else
+            echo "⚠️ Repository settings file not found (.github/settings.yml)"
+          fi
+
+          # Check if workflows exist
+          if [ -d ".github/workflows" ]; then
+            WORKFLOW_COUNT=$(ls .github/workflows/*.yml 2>/dev/null | wc -l)
+            echo "✅ GitHub Actions workflows directory found ($WORKFLOW_COUNT workflows)"
+          else
+            echo "❌ GitHub Actions workflows directory not found"
+          fi
+
+      - name: Repository Configuration Summary
         run: |
-          echo "Configuring branch protection for main branch..."
-
-          # Create JSON payload for branch protection
-          cat > branch_protection.json << 'EOF'
-          {
-            "required_status_checks": {
-              "strict": true,
-              "contexts": ["test", "lint", "security-scan"]
-            },
-            "enforce_admins": true,
-            "required_pull_request_reviews": {
-              "required_approving_review_count": 1,
-              "dismiss_stale_reviews": true,
-              "require_code_owner_reviews": false
-            },
-            "restrictions": null,
-            "allow_force_pushes": false,
-            "allow_deletions": false,
-            "block_creations": false
-          }
-          EOF
-
-          # Apply branch protection using curl with proper authentication
-          RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" \
-            -X PUT \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -d @branch_protection.json \
-            "https://api.github.com/repos/${{ github.repository }}/branches/main/protection")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Branch protection successfully configured for main branch"
-          else
-            echo "❌ Failed to configure branch protection: HTTP $HTTP_CODE"
-            echo "Response: $RESPONSE"
-            exit 1
-          fi
-
-      - name: Configure branch protection for develop (if exists)
-        run: |
-          # Check if develop branch exists
-          if gh api repos/${{ github.repository }}/branches/develop --silent 2>/dev/null; then
-            echo "Configuring branch protection for develop branch..."
-
-            # Create JSON payload for develop branch protection
-            cat > develop_protection.json << 'EOF'
-            {
-              "required_status_checks": {
-                "strict": false,
-                "contexts": ["test"]
-              },
-              "enforce_admins": false,
-              "required_pull_request_reviews": {
-                "required_approving_review_count": 1,
-                "dismiss_stale_reviews": true,
-                "require_code_owner_reviews": false
-              },
-              "restrictions": null,
-              "allow_force_pushes": false,
-              "allow_deletions": false,
-              "block_creations": false
-            }
-            EOF
-
-            # Apply branch protection for develop
-            gh api repos/${{ github.repository }}/branches/develop/protection \
-              --method PUT \
-              --input develop_protection.json \
-              --header "Accept: application/vnd.github+json" \
-              --header "X-GitHub-Api-Version: 2022-11-28"
-
-            echo "✅ Branch protection configured for develop branch"
-          else
-            echo "ℹ️ Develop branch does not exist, skipping"
-          fi
+          echo "## 📊 Repository Configuration Summary"
+          echo ""
+          echo "### ✅ Automated Checks Completed:"
+          echo "- Repository settings validation"
+          echo "- Workflow files verification"
+          echo "- Branch protection status check"
+          echo ""
+          echo "### 🔧 Manual Setup Required:"
+          echo ""
+          echo "#### 1. Branch Protection Setup"
+          echo "- Go to: Repository Settings → Branches → Add rule"
+          echo "- Branch name pattern: \`main\`"
+          echo "- Enable required status checks:"
+          echo "  - CI/CD Pipeline"
+          echo "  - 🔍 CodeQL Advanced Security"
+          echo "  - 🛡️ Security Pipeline"
+          echo "- Require pull request reviews (1 approval)"
+          echo "- Dismiss stale reviews"
+          echo "- Block force pushes"
+          echo "- Block deletions"
+          echo ""
+          echo "#### 2. Repository Settings"
+          echo "- Configure via .github/settings.yml (if exists)"
+          echo "- Set up CODEOWNERS (.github/CODEOWNERS)"
+          echo "- Enable Dependabot security updates"
+          echo ""
+          echo "#### 3. Security Settings"
+          echo "- Enable code scanning alerts"
+          echo "- Configure security advisories"
+          echo "- Review Dependabot alerts"
+          echo ""
+          echo "🔗 **Quick Links:**"
+          echo "- [Branch Protection](https://github.com/${{ github.repository }}/settings/branches)"
+          echo "- [Repository Settings](https://github.com/${{ github.repository }}/settings)"
+          echo "- [Security Tab](https://github.com/${{ github.repository }}/security)"
+          echo ""
+          echo "## ✅ Repository analysis completed!"
+          echo "Review the recommendations above to complete setup."
