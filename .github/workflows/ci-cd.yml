@@ -24,7 +24,7 @@ jobs:
 
       # Установка Go с кэшированием
       - name: Setup Go
-        uses: actions/setup-go@4469467ce421d7e43a4ae6c2657c22dd5dc0a98
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
         with:
           go-version: '1.25'
           cache: true
