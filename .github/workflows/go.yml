@@ -42,6 +42,13 @@ jobs:
             latest: true
 
     steps:
+    - name: Update system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get upgrade -y
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+
     - name: Checkout code
       uses: actions/checkout@v6
 
@@ -93,6 +100,13 @@ jobs:
     name: Lint & Static Analysis
     runs-on: ubuntu-24.04
     steps:
+    - name: Update system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get upgrade -y
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+
     - name: Checkout code
       uses: actions/checkout@v6
 
@@ -124,6 +138,13 @@ jobs:
     permissions:
       security-events: write
     steps:
+    - name: Update system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get upgrade -y
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+
     - name: Checkout code
       uses: actions/checkout@v6
 
@@ -168,6 +189,13 @@ jobs:
             cgo: 0
 
     steps:
+    - name: Update system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get upgrade -y
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+
     - name: Checkout code
       uses: actions/checkout@v6
 
@@ -208,6 +236,13 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [test, lint, security, build]
     steps:
+    - name: Update system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get upgrade -y
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+
     - name: Checkout code
       uses: actions/checkout@v6
 
