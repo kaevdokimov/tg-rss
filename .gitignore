@@ -2,10 +2,11 @@
 /.docker
 /.context
 /.cursor
+.cursor/rules/general.mdc
 tg-rss-bot
+tg-rss-bot-test
 tg-rss-analyzer
 
 coverage.html
 coverage.out
 ansible/.vault_password
-.cursor/rules/general.mdc
