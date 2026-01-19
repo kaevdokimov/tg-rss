@@ -89,7 +89,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: Upload coverage artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: coverage-report-${{ matrix.os }}-${{ matrix.go-version }}
         path: coverage.html
@@ -223,7 +223,7 @@ jobs:
         ./tg-rss-app-${{ matrix.os }}-${{ matrix.arch }} --help || echo "Binary built successfully"
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: tg-rss-app-${{ matrix.os }}-${{ matrix.arch }}
         path: tg-rss-app-${{ matrix.os }}-${{ matrix.arch }}
@@ -261,7 +261,7 @@ jobs:
         ls -la
 
     - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: release-artifacts
         path: artifacts/*.tar.gz*
