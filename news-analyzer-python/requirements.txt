@@ -19,7 +19,7 @@ fastapi==0.128.0
 uvicorn==0.32.1
 aiofiles==24.1.0
 pytest==8.3.3
-pytest-asyncio==0.24.0
+pytest-asyncio==1.3.0
 pytest-mock==3.14.0
 testcontainers==4.14.0
 testcontainers-postgres==0.0.1rc1
