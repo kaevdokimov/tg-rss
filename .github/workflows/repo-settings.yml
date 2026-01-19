@@ -32,8 +32,8 @@ permissions:
   contents: read
   # Required for branch protection management
   actions: write
-  # Required for repository settings
-  administration: write
+  # Note: Full branch protection management requires admin token
+  # This workflow will check status but may fail to apply changes
 
 jobs:
   branch-protection:
