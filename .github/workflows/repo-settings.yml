@@ -13,16 +13,20 @@ on:
 
 # BRANCH PROTECTION ACTIVATION INSTRUCTIONS
 #
-# To enable automatic branch protection, follow these steps:
+# ERROR 403: Insufficient permissions for GITHUB_TOKEN
 #
-# 1. Go to: https://github.com/[YOUR-USERNAME]/tg-rss/settings/actions
-# 2. Under "Workflow permissions", select "Read and write permissions"
+# SOLUTION: Configure GITHUB_TOKEN permissions:
+#
+# 1. Go to: Repository Settings > Actions > General
+# 2. Under "Workflow permissions":
+#    ✅ Select "Read and write permissions" (NOT "Read repository contents permission")
 # 3. Click "Save"
 #
-# Then run this workflow manually to apply branch protection rules.
+# Then re-run this workflow to apply branch protection.
 #
 # ALTERNATIVE: Manual setup via web interface:
 # Settings > Branches > Add rule > Branch name pattern: main
+# (Requires manual configuration of all protection rules)
 
 jobs:
   branch-protection:
