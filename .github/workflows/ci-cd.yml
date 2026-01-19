@@ -39,7 +39,7 @@ jobs:
 
       # Кэширование Go build
       - name: Cache Go build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/go-build
@@ -91,7 +91,7 @@ jobs:
 
       # Кэширование Docker layers
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -147,7 +147,7 @@ jobs:
 
       # Кэширование Docker layers для analyzer
       - name: Cache Docker layers (analyzer)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache-analyzer
           key: ${{ runner.os }}-buildx-analyzer-${{ github.sha }}
