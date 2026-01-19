@@ -2,7 +2,6 @@
 /.docker
 /.context
 /.cursor
-.cursor/rules/general.mdc
 tg-rss-bot
 tg-rss-bot-test
 tg-rss-analyzer
