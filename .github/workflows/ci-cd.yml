@@ -518,7 +518,7 @@ jobs:
               
               # Логи для диагностики
               echo "📋 Логи бота:"
-              docker logs news-bot --tail 30 2>&1 || true
+              docker logs bot --tail 30 2>&1 || true
               
               if [ -n "$PREVIOUS_IMAGE" ]; then
                 echo "🔄 Rollback к образу: $PREVIOUS_IMAGE"
@@ -526,14 +526,14 @@ jobs:
                 cd ~/news-bot
                 
                 # Останавливаем текущую версию
-                docker-compose stop news-bot || true
-                docker-compose rm -f news-bot || true
+                docker compose stop bot || true
+                docker compose rm -f bot || true
                 
                 # Обновляем .env для использования предыдущего образа
                 sed -i "s|BOT_IMAGE_TAG=.*|BOT_IMAGE_TAG=${PREVIOUS_IMAGE##*:}|" .env || true
                 
                 # Запускаем предыдущую версию
-                docker-compose up -d news-bot
+                docker compose up -d bot
                 
                 sleep 15
                 

@@ -24,6 +24,8 @@ services:
       CONTENT_SCRAPER_INTERVAL: ${CONTENT_SCRAPER_INTERVAL:-"1"}
       CONTENT_SCRAPER_BATCH: ${CONTENT_SCRAPER_BATCH:-"50"}
       CONTENT_SCRAPER_CONCURRENT: ${CONTENT_SCRAPER_CONCURRENT:-"3"}
+    ports:
+      - "8080:8080"
     restart: unless-stopped
     # ОПТИМИЗИРОВАННЫЕ ограничения ресурсов для сервера с 900MB RAM
     mem_limit: ${BOT_MEM_LIMIT:-400m}
