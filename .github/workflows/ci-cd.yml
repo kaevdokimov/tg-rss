@@ -321,6 +321,10 @@ jobs:
           CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH }}
           CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT }}
           GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
+
+          # News Analyzer API Security
+          NEWS_ANALYZER_ADMIN=${{ secrets.NEWS_ANALYZER_ADMIN }}
+          NEWS_ANALYZER_PASSWORD=${{ secrets.NEWS_ANALYZER_PASSWORD }}
           EOL
 
       # Деплой на сервер
@@ -358,6 +362,10 @@ jobs:
           CONTENT_SCRAPER_INTERVAL=${{ secrets.CONTENT_SCRAPER_INTERVAL }}
           CONTENT_SCRAPER_BATCH=${{ secrets.CONTENT_SCRAPER_BATCH }}
           CONTENT_SCRAPER_CONCURRENT=${{ secrets.CONTENT_SCRAPER_CONCURRENT }}
+
+          # News Analyzer API Security
+          NEWS_ANALYZER_ADMIN=${{ secrets.NEWS_ANALYZER_ADMIN }}
+          NEWS_ANALYZER_PASSWORD=${{ secrets.NEWS_ANALYZER_PASSWORD }}
           EOF
 
           # Сначала логинимся в GitHub Container Registry локально

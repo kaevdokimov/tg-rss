@@ -99,6 +99,9 @@ services:
       MAX_NEWS_LIMIT: ${ANALYZER_MAX_NEWS_LIMIT:-600}
       TELEGRAM_SEND_DELAY: ${ANALYZER_TELEGRAM_DELAY:-0.1}
       MIN_NEWS_THRESHOLD: ${ANALYZER_MIN_NEWS_THRESHOLD:-10}
+      # API Security
+      NEWS_ANALYZER_ADMIN: ${NEWS_ANALYZER_ADMIN:-admin}
+      NEWS_ANALYZER_PASSWORD: ${NEWS_ANALYZER_PASSWORD:-changeme}
     restart: unless-stopped
     # Увеличенные ресурсы для обработки большего количества новостей
     mem_limit: 512m
