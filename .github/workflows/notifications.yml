@@ -28,6 +28,9 @@ jobs:
     name: 'Send Notifications'
     runs-on: ubuntu-latest
     if: always()
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -98,16 +101,13 @@ jobs:
           echo "workflow=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
 
       - name: Send Telegram notification
-        if: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && secrets.GH_NOTIFY_TELEGRAM_CHAT_ID != '' }}
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
           # Send message to Telegram bot
           # Create JSON payload with proper escaping
           JSON_PAYLOAD=$(cat <<EOF
           {
-            "chat_id": "${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}",
+            "chat_id": "$TELEGRAM_CHAT_ID",
             "text": "${{ steps.notification.outputs.telegram_message }}",
             "parse_mode": "MarkdownV2",
             "disable_web_page_preview": true
@@ -130,6 +130,9 @@ jobs:
     name: 'Daily Status Report'
     runs-on: ubuntu-latest
     if: github.event.schedule == '0 8 * * *'
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
     steps:
       - name: Generate daily report
         run: |
@@ -158,10 +161,7 @@ jobs:
           echo "- Проверить PRs от Dependabot" >> $GITHUB_STEP_SUMMARY
 
       - name: Отправить ежедневный отчет в Telegram
-        if: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN != '' && secrets.GH_NOTIFY_TELEGRAM_CHAT_ID != '' }}
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.GH_NOTIFY_TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
           # Создаем ежедневное сообщение отчета с правильным экранированием
           REPO_NAME="${{ github.repository }}"
