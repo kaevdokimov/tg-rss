@@ -5,11 +5,8 @@ permissions:
 
 on:
   workflow_dispatch:
-    inputs:
-      test_ssh:
-        description: 'Test SSH connection'
-        required: true
-        default: 'true'
+    # CKV_GHA_7: workflow_dispatch inputs removed for security
+    # Use repository variables/secrets instead
 
 jobs:
   ssh-test:

@@ -64,6 +64,13 @@
             msg: "✅ PostgreSQL данные восстановлены из {{ postgres_backup.stdout }}"
           when: postgres_backup.stdout != ""
 
+      rescue:
+        - name: Обработка ошибки восстановления PostgreSQL
+          debug:
+            msg: "❌ Ошибка при восстановлении PostgreSQL: {{ ansible_failed_result.msg | default('неизвестная ошибка') }}"
+        - name: Завершение с ошибкой
+          fail:
+            msg: "Восстановление PostgreSQL завершилось с ошибкой"
       when: postgres_backup.stdout != ""
 
     - name: Восстанавливаем Redis данные
@@ -85,6 +92,13 @@
             msg: "✅ Redis данные восстановлены из {{ redis_backup.stdout }}"
           when: redis_backup.stdout != ""
 
+      rescue:
+        - name: Обработка ошибки восстановления Redis
+          debug:
+            msg: "❌ Ошибка при восстановлении Redis: {{ ansible_failed_result.msg | default('неизвестная ошибка') }}"
+        - name: Завершение с ошибкой
+          fail:
+            msg: "Восстановление Redis завершилось с ошибкой"
       when: redis_backup.stdout != ""
 
     - name: Запускаем сервисы после восстановления

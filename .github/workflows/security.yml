@@ -79,9 +79,20 @@ jobs:
             --skip B106,B403,B404,B607 \
             --format txt
 
+      - name: Check Bandit results file exists
+        id: check_bandit
+        run: |
+          if [ -f "news-analyzer-python/bandit-results.sarif" ]; then
+            echo "file_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Bandit SARIF results file exists"
+          else
+            echo "file_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Bandit SARIF results file not found"
+          fi
+
       - name: Upload Bandit results
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: always() && steps.check_bandit.outputs.file_exists == 'true'
         with:
           sarif_file: news-analyzer-python/bandit-results.sarif
         continue-on-error: true

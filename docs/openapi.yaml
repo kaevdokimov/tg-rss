@@ -28,6 +28,7 @@ paths:
       summary: Проверка здоровья сервиса
       description: Возвращает статус здоровья приложения и подключения к БД
       operationId: getHealth
+      security: []  # Public endpoint - no authentication required
       responses:
         "200":
           description: Сервис здоров
@@ -49,6 +50,7 @@ paths:
       summary: Получение метрик в формате Prometheus
       description: Возвращает метрики производительности в формате, совместимом с Prometheus
       operationId: getMetrics
+      security: []  # Public endpoint - no authentication required
       responses:
         "200":
           description: Метрики успешно получены
@@ -81,6 +83,8 @@ paths:
   /api/v1/users:
     get:
       summary: Get all users
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: chat_id
           in: query
@@ -98,6 +102,8 @@ paths:
   /api/v1/sources:
     get:
       summary: Get all sources
+      security:
+        - ApiKeyAuth: []
       responses:
         "200":
           description: List of sources
@@ -107,6 +113,8 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     post:
       summary: Create new source
+      security:
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -124,6 +132,8 @@ paths:
   /api/v1/sources/info:
     get:
       summary: Get source by ID
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: id
           in: query
@@ -141,6 +151,8 @@ paths:
   /api/v1/sources/update:
     put:
       summary: Update source
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: id
           in: query
@@ -164,6 +176,8 @@ paths:
   /api/v1/sources/delete:
     delete:
       summary: Delete source
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: id
           in: query
@@ -181,6 +195,8 @@ paths:
   /api/v1/subscriptions:
     get:
       summary: Get user subscriptions
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: chat_id
           in: query
@@ -198,6 +214,8 @@ paths:
   /api/v1/subscriptions/subscribe:
     post:
       summary: Subscribe user to source
+      security:
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -220,6 +238,8 @@ paths:
   /api/v1/subscriptions/unsubscribe:
     delete:
       summary: Unsubscribe user from source
+      security:
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -320,5 +340,3 @@ components:
           type: string
         status:
           type: string
-
-security: []

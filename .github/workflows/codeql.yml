@@ -24,6 +24,9 @@ on:
     # Weekly security scan every Thursday at 7 PM UTC
     - cron: '0 19 * * 4'
 
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: 'CodeQL Scan (${{ matrix.language }})'

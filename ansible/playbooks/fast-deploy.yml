@@ -114,3 +114,11 @@
               - Проверьте логи: journalctl -u tg-rss-backup.timer --since "1 hour ago"
               - Запустите первый бэкап: systemctl start tg-rss-backup.service
               - Проверьте мониторинг: http://localhost:9090
+
+      rescue:
+        - name: Обработка ошибки финальной проверки
+          debug:
+            msg: "❌ Ошибка при финальной проверке: {{ ansible_failed_result.msg | default('неизвестная ошибка') }}"
+        - name: Завершение с предупреждением
+          debug:
+            msg: "⚠️ Некоторые сервисы могут быть недоступны, проверьте вручную"

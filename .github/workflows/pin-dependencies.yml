@@ -5,11 +5,8 @@ name: "🔒 Pin Dependencies"
 
 on:
   workflow_dispatch:
-    inputs:
-      workflow_path:
-        description: 'Path to workflow file to pin'
-        required: true
-        default: '.github/workflows/ci-cd.yml'
+    # CKV_GHA_7: workflow_dispatch inputs removed for security
+    # Use repository variables to specify workflow path
 
 permissions:
   contents: write
@@ -19,6 +16,11 @@ jobs:
   pin-dependencies:
     name: 'Pin Dependencies'
     runs-on: ubuntu-latest
+    
+    env:
+      # Default workflow to pin
+      WORKFLOW_PATH: '.github/workflows/ci-cd.yml'
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -26,17 +28,17 @@ jobs:
       - name: Pin dependencies
         uses: step-security/pin-workflows-action@v1
         with:
-          workflow_path: ${{ github.event.inputs.workflow_path }}
+          workflow_path: ${{ env.WORKFLOW_PATH }}
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v8
         with:
-          title: "🔒 Pin dependencies for ${{ github.event.inputs.workflow_path }}"
+          title: "🔒 Pin dependencies for ${{ env.WORKFLOW_PATH }}"
           body: |
             This PR pins dependencies to specific SHAs for security.
 
             Pinned by: ${{ github.actor }}
-            Workflow: ${{ github.event.inputs.workflow_path }}
+            Workflow: ${{ env.WORKFLOW_PATH }}
 
             ## Changes
             - Pinned GitHub Actions to commit SHAs

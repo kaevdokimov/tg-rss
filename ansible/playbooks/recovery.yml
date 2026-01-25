@@ -106,6 +106,13 @@
           shell: systemctl daemon-reload
           ignore_errors: true
 
+      rescue:
+        - name: Обработка ошибки восстановления системных сервисов
+          debug:
+            msg: "❌ Ошибка при восстановлении системных сервисов: {{ ansible_failed_result.msg | default('неизвестная ошибка') }}"
+        - name: Продолжение с предупреждением
+          debug:
+            msg: "⚠️ Некоторые системные сервисы не восстановлены, но работа продолжается"
       when: recovery_type in ['full', 'services']
       tags: ['recovery', 'services']
 
@@ -177,6 +184,13 @@
             post_reboot_delay: 30
           when: ansible_uptime_seconds > 3600  # Только если система работает > 1 часа
 
+      rescue:
+        - name: Обработка ошибки финальной очистки
+          debug:
+            msg: "❌ Ошибка при финальной очистке: {{ ansible_failed_result.msg | default('неизвестная ошибка') }}"
+        - name: Продолжение с предупреждением
+          debug:
+            msg: "⚠️ Финальная очистка не выполнена, но система восстановлена"
       tags: ['recovery', 'cleanup']
 
   post_tasks:
