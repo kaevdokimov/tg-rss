@@ -11,6 +11,7 @@ import (
 	"tg-rss/config"
 	"time"
 
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -191,12 +192,12 @@ func IsNewsSentToUsers(db *sql.DB, chatIDs []int64, newsID int64) (map[int64]boo
 		return make(map[int64]bool), nil
 	}
 
-	// Используем ANY для батч-запроса
+	// Используем ANY для батч-запроса с pq.Array для корректной передачи слайса
 	rows, err := db.Query(`
 		SELECT DISTINCT chat_id
 		FROM messages
 		WHERE chat_id = ANY($1) AND news_id = $2
-	`, chatIDs, newsID)
+	`, pq.Array(chatIDs), newsID)
 
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при батч-проверке отправленных новостей: %w", err)
@@ -444,6 +445,32 @@ func initSourcesAsync(db *sql.DB) {
 func UpdateOutdatedRSSSources(db *sql.DB) {
 	log.Println("Обновление устаревших RSS источников...")
 
+	// Список устаревших источников для деактивации (возвращают 404)
+	urlsToDeactivate := []string{
+		"https://ria.ru/export/rss2/politics/index.xml",
+		"https://ria.ru/export/rss2/economy/index.xml",
+		"https://ria.ru/export/rss2/society/index.xml",
+		"https://sport.ria.ru/export/rss2/sport/index.xml",
+	}
+
+	// Деактивируем источники, которые больше не работают
+	for _, url := range urlsToDeactivate {
+		result, err := db.Exec(`
+			UPDATE sources
+			SET status = 'inactive'
+			WHERE url = $1 AND status = 'active'
+		`, url)
+
+		if err != nil {
+			log.Printf("Ошибка деактивации источника %s: %v", url, err)
+		} else {
+			rowsAffected, _ := result.RowsAffected()
+			if rowsAffected > 0 {
+				log.Printf("✅ Деактивирован источник с URL %s (404 Not Found)", url)
+			}
+		}
+	}
+
 	// Обновляем источники с новыми URL
 	updates := []struct {
 		oldURL string
@@ -454,10 +481,6 @@ func UpdateOutdatedRSSSources(db *sql.DB) {
 		{"https://www.rbc.ru/rss", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "РБК"},
 		{"https://www.travel.ru/inc/side/yandex.rdf", "https://www.travel.ru/news/feed/", "Travel.ru"},
 		{"https://www.fontanka.ru/_transmission_for_yandex.thtml", "https://www.fontanka.ru/rss", "Фонтанка.ру"},
-		{"https://ria.ru/export/rss2/politics/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Политика"},
-		{"https://ria.ru/export/rss2/economy/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Экономика"},
-		{"https://ria.ru/export/rss2/society/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Общество"},
-		{"https://sport.ria.ru/export/rss2/sport/index.xml", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss", "Ria.ru - Спорт"},
 	}
 
 	for _, update := range updates {
