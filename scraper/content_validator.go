@@ -187,7 +187,8 @@ func (cv *ContentValidator) validateText(text, fieldName string, maxLength int) 
 	}
 
 	// Проверяем на наличие слишком длинных последовательностей одинаковых символов
-	if cv.hasRepeatedChars(text, 100) {
+	// Порог 200 символов - достаточно для отсева спама, но не блокирует нормальный контент
+	if cv.hasRepeatedChars(text, 200) {
 		return NewContentValidationError(fieldName, "contains too many repeated characters")
 	}
 
@@ -262,14 +263,26 @@ func (cv *ContentValidator) hasRepeatedChars(text string, threshold int) bool {
 		return false
 	}
 
+	// Игнорируем пробельные символы при подсчете повторений
+	// так как длинные отступы и пробелы - это нормально для текста
+	whitespaceChars := map[byte]bool{
+		' ':  true,
+		'\t': true,
+		'\n': true,
+		'\r': true,
+	}
+
 	currentChar := text[0]
 	count := 1
 
 	for i := 1; i < len(text); i++ {
 		if text[i] == currentChar {
-			count++
-			if count >= threshold {
-				return true
+			// Если это пробельный символ, не считаем его в последовательности
+			if !whitespaceChars[currentChar] {
+				count++
+				if count >= threshold {
+					return true
+				}
 			}
 		} else {
 			currentChar = text[i]
