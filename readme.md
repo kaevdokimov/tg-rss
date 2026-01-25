@@ -737,6 +737,7 @@ docker exec -it news-analyzer python test_connection.py
 ## 📚 Дополнительная документация
 
 - **Основной README** - этот файл
+- **Настройка деплоя** - [`DEPLOYMENT_SETUP.md`](DEPLOYMENT_SETUP.md) - как настроить автоматический деплой через GitHub Actions
 - **Соглашение коммитов** - [`COMMIT_CONVENTION.md`](COMMIT_CONVENTION.md)
 - **Аналитический модуль** - [`news-analyzer-python/README.md`](news-analyzer-python/README.md)
 - **Деплой модуля** - [`news-analyzer-python/README_DEPLOY.md`](news-analyzer-python/README_DEPLOY.md)

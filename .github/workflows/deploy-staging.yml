@@ -39,6 +39,7 @@ jobs:
     name: Сборка и деплой в staging
     needs: test
     runs-on: ubuntu-latest
+    if: vars.STAGING_DEPLOYMENT_ENABLED == 'true'
     permissions:
       contents: read
       packages: write

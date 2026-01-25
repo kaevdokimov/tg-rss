@@ -281,7 +281,7 @@ jobs:
     name: Deploy to Server
     runs-on: ubuntu-24.04
     needs: [docker-build, docker-build-analyzer]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEPLOYMENT_ENABLED == 'true'
     steps:
       # Проверка репозитория
       - name: Checkout code
