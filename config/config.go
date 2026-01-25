@@ -36,11 +36,15 @@ func LoadDBConfig() *DBConfig {
 	if err != nil {
 		log.Fatalf("Некорректный порт БД: %v", err)
 	}
+	dbPass := getEnv("POSTGRES_PASSWORD", "")
+	if dbPass == "" {
+		log.Fatalf("Пароль БД не задан (POSTGRES_PASSWORD)")
+	}
 	return &DBConfig{
 		DBHost: getEnv("POSTGRES_HOST", "db"),
 		DBPort: port,
 		DBUser: getEnv("POSTGRES_USER", "postgres"),
-		DBPass: getEnv("POSTGRES_PASSWORD", "password"),
+		DBPass: dbPass,
 		DBName: getEnv("POSTGRES_DB", "news_bot"),
 	}
 }

@@ -15,6 +15,13 @@ import (
 
 var newsLogger = monitoring.NewLogger("NewsProcessor")
 
+// Константы для управления памятью
+const (
+	MaxPendingNewsPerUser = 100            // Максимум новостей в очереди на пользователя
+	PendingNewsTTL        = 24 * time.Hour // TTL для новостей в очереди
+	CleanupInterval       = 1 * time.Hour  // Интервал очистки старых записей
+)
+
 // PendingNews представляет новость, ожидающую отправки
 type PendingNews struct {
 	NewsID      int64
@@ -25,6 +32,7 @@ type PendingNews struct {
 	Description string
 	Link        string
 	PublishedAt time.Time
+	AddedAt     time.Time // Когда добавлена в очередь (для TTL)
 }
 
 // NewsProcessor обрабатывает новости из Redis и записывает в БД
@@ -63,6 +71,9 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 
 	// Запускаем периодическую отправку накопленных новостей
 	go np.startPeriodicSending()
+	
+	// Запускаем периодическую очистку старых записей
+	go np.startPeriodicCleanup()
 
 	return np
 }
@@ -134,17 +145,28 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 
 	// Добавляем новость в очередь для каждого подписанного пользователя
 	np.pendingMutex.Lock()
+	defer np.pendingMutex.Unlock()
+	
 	addedToQueue := 0
+	
+	// Собираем все chatID для батч-проверки
+	chatIDs := make([]int64, len(subscriptions))
+	for i, subscription := range subscriptions {
+		chatIDs[i] = subscription.ChatId
+	}
+	
+	// Батч-проверка: проверяем для всех пользователей за один запрос
+	sentToUsers, err := db.IsNewsSentToUsers(np.db, chatIDs, newsID)
+	if err != nil {
+		newsLogger.Error("Ошибка при батч-проверке отправленных новостей", "error", err)
+		// Fallback: продолжаем, но не добавляем новости
+		return err
+	}
+	
+	// Добавляем новости в очередь только для тех, кому еще не отправляли
 	for _, subscription := range subscriptions {
-		// Проверяем, не отправляли ли уже эту новость пользователю
-		sent, err := db.IsNewsSentToUser(np.db, subscription.ChatId, newsID)
-		if err != nil {
-			newsLogger.Error("Ошибка при проверке отправленной новости для пользователя",
-				"user_id", subscription.ChatId,
-				"error", err)
-			continue
-		}
-		if sent {
+		// Проверяем результат батч-запроса
+		if sent, exists := sentToUsers[subscription.ChatId]; exists && sent {
 			newsLogger.Debug("Новость уже была отправлена пользователю",
 				"user_id", subscription.ChatId,
 				"title", newsItem.Title)
@@ -161,15 +183,26 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 			Description: newsItem.Description,
 			Link:        newsItem.Link,
 			PublishedAt: publishedAt,
+			AddedAt:     time.Now(), // Устанавливаем время добавления
 		}
-		np.pendingNews[subscription.ChatId] = append(np.pendingNews[subscription.ChatId], pending)
+		
+		// Проверяем лимит на количество новостей для пользователя
+		userQueue := np.pendingNews[subscription.ChatId]
+		if len(userQueue) >= MaxPendingNewsPerUser {
+			newsLogger.Warn("Очередь новостей пользователя переполнена, пропускаем",
+				"user_id", subscription.ChatId,
+				"queue_size", len(userQueue),
+				"max_size", MaxPendingNewsPerUser)
+			continue
+		}
+		
+		np.pendingNews[subscription.ChatId] = append(userQueue, pending)
 		addedToQueue++
 		newsLogger.Debug("Новость добавлена в очередь для пользователя",
 			"user_id", subscription.ChatId,
 			"title", newsItem.Title,
 			"queue_size", len(np.pendingNews[subscription.ChatId]))
 	}
-	np.pendingMutex.Unlock()
 
 	if addedToQueue > 0 {
 		newsLogger.Info("Новость добавлена в очередь для пользователей",
@@ -538,4 +571,61 @@ func (np *NewsProcessor) getSubscriptionsCached(sourceID int64) ([]db.Subscripti
 	newsLogger.Debug("Кэш подписок обновлен",
 		"sources_count", len(allSubscriptions))
 	return subscriptions, nil
+}
+
+// startPeriodicCleanup запускает периодическую очистку старых новостей из очереди
+func (np *NewsProcessor) startPeriodicCleanup() {
+	ticker := time.NewTicker(CleanupInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		np.cleanupOldNews()
+	}
+}
+
+// cleanupOldNews удаляет устаревшие новости из очереди
+func (np *NewsProcessor) cleanupOldNews() {
+	np.pendingMutex.Lock()
+	defer np.pendingMutex.Unlock()
+
+	now := time.Now()
+	totalRemoved := 0
+	usersAffected := 0
+
+	for chatID, newsQueue := range np.pendingNews {
+		// Фильтруем только актуальные новости (не старше TTL)
+		validNews := make([]PendingNews, 0, len(newsQueue))
+		removed := 0
+		
+		for _, news := range newsQueue {
+			if now.Sub(news.AddedAt) < PendingNewsTTL {
+				validNews = append(validNews, news)
+			} else {
+				removed++
+			}
+		}
+
+		if removed > 0 {
+			np.pendingNews[chatID] = validNews
+			totalRemoved += removed
+			usersAffected++
+			
+			newsLogger.Debug("Очищены устаревшие новости из очереди",
+				"user_id", chatID,
+				"removed", removed,
+				"remaining", len(validNews))
+		}
+
+		// Удаляем пустые очереди
+		if len(validNews) == 0 {
+			delete(np.pendingNews, chatID)
+		}
+	}
+
+	if totalRemoved > 0 {
+		newsLogger.Info("Периодическая очистка завершена",
+			"removed_news", totalRemoved,
+			"users_affected", usersAffected,
+			"remaining_users", len(np.pendingNews))
+	}
 }

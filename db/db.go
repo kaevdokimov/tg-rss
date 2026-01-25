@@ -184,6 +184,47 @@ func IsNewsSentToUser(db *sql.DB, chatID, newsID int64) (bool, error) {
 	return count > 0, nil
 }
 
+// IsNewsSentToUsers проверяет, была ли уже отправлена новость нескольким пользователям (батч-версия)
+// Возвращает map[chatID]bool, где true означает, что новость уже отправлена
+func IsNewsSentToUsers(db *sql.DB, chatIDs []int64, newsID int64) (map[int64]bool, error) {
+	if len(chatIDs) == 0 {
+		return make(map[int64]bool), nil
+	}
+
+	// Используем ANY для батч-запроса
+	rows, err := db.Query(`
+		SELECT DISTINCT chat_id
+		FROM messages
+		WHERE chat_id = ANY($1) AND news_id = $2
+	`, chatIDs, newsID)
+	
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при батч-проверке отправленных новостей: %w", err)
+	}
+	defer rows.Close()
+
+	// Создаем карту результатов
+	result := make(map[int64]bool)
+	for _, chatID := range chatIDs {
+		result[chatID] = false // По умолчанию не отправлена
+	}
+
+	// Помечаем отправленные
+	for rows.Next() {
+		var chatID int64
+		if err := rows.Scan(&chatID); err != nil {
+			return nil, fmt.Errorf("ошибка при сканировании результатов: %w", err)
+		}
+		result[chatID] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при итерации результатов: %w", err)
+	}
+
+	return result, nil
+}
+
 func Connect(config *config.DBConfig) (*sql.DB, error) {
 	psqlInfo := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",

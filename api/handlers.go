@@ -3,8 +3,11 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"tg-rss/db"
@@ -66,6 +69,56 @@ func sendJSON(w http.ResponseWriter, status int, response APIResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(response) // Ignore error after headers sent
+}
+
+// validateURL проверяет корректность и безопасность URL
+func validateURL(urlStr string) error {
+	if urlStr == "" {
+		return fmt.Errorf("URL не может быть пустым")
+	}
+
+	// Проверка длины
+	if len(urlStr) > 2048 {
+		return fmt.Errorf("URL слишком длинный (максимум 2048 символов)")
+	}
+
+	// Парсинг URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("некорректный формат URL: %w", err)
+	}
+
+	// Проверка схемы
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("разрешены только http и https схемы")
+	}
+
+	// Проверка наличия хоста
+	if parsedURL.Host == "" {
+		return fmt.Errorf("URL должен содержать хост")
+	}
+
+	// Запрет localhost и внутренних IP для безопасности
+	host := strings.ToLower(parsedURL.Hostname())
+	forbiddenHosts := []string{"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+	for _, forbidden := range forbiddenHosts {
+		if host == forbidden || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "172.16.") {
+			return fmt.Errorf("запрещено использовать внутренние/локальные адреса")
+		}
+	}
+
+	return nil
+}
+
+// validateName проверяет корректность имени
+func validateName(name string) error {
+	if name == "" {
+		return fmt.Errorf("имя не может быть пустым")
+	}
+	if len(name) > 255 {
+		return fmt.Errorf("имя слишком длинное (максимум 255 символов)")
+	}
+	return nil
 }
 
 // GetUsersHandler возвращает список всех пользователей (упрощенная версия)
@@ -236,10 +289,20 @@ func CreateSourceHandler(dbConn *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if req.Name == "" || req.URL == "" {
+		// Валидация имени
+		if err := validateName(req.Name); err != nil {
 			sendJSON(w, http.StatusBadRequest, APIResponse{
 				Success: false,
-				Error:   "Name and URL are required",
+				Error:   err.Error(),
+			})
+			return
+		}
+
+		// Валидация URL
+		if err := validateURL(req.URL); err != nil {
+			sendJSON(w, http.StatusBadRequest, APIResponse{
+				Success: false,
+				Error:   err.Error(),
 			})
 			return
 		}
@@ -341,9 +404,23 @@ func UpdateSourceHandler(dbConn *sql.DB) http.HandlerFunc {
 
 		// Обновляем поля
 		if req.Name != "" {
+			if err := validateName(req.Name); err != nil {
+				sendJSON(w, http.StatusBadRequest, APIResponse{
+					Success: false,
+					Error:   err.Error(),
+				})
+				return
+			}
 			currentSource.Name = req.Name
 		}
 		if req.URL != "" {
+			if err := validateURL(req.URL); err != nil {
+				sendJSON(w, http.StatusBadRequest, APIResponse{
+					Success: false,
+					Error:   err.Error(),
+				})
+				return
+			}
 			currentSource.Url = req.URL
 		}
 		if req.Status != "" {

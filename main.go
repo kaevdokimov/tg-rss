@@ -200,8 +200,11 @@ func startMetricsUpdater(ctx context.Context, dbConn *sql.DB) {
 // startHealthServer запускает HTTP сервер для health checks и метрик
 func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 	mux := http.NewServeMux()
+	
+	// Создаем rate limiter для API endpoints (100 запросов в минуту на IP)
+	apiRateLimiter := middleware.NewAPIRateLimiter(100, 1*time.Minute)
 
-	// Health check endpoint с middleware
+	// Health check endpoint с middleware (без rate limiting)
 	mux.HandleFunc("/health", middleware.Chain(func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем подключение к БД
 		if err := dbConn.Ping(); err != nil {
@@ -393,21 +396,51 @@ paths:
 		_, _ = fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
 	}, middleware.Logging, middleware.Recovery, middleware.CORS, middleware.Timeout(15*time.Second)))
 
-	// API для управления пользователями
-	mux.HandleFunc("/api/v1/users", api.GetUsersHandler(dbConn))
-	mux.HandleFunc("/api/v1/users/check", api.GetUserHandler(dbConn))
+	// API для управления пользователями (с rate limiting)
+	mux.HandleFunc("/api/v1/users", middleware.Chain(
+		api.GetUsersHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/users/check", middleware.Chain(
+		api.GetUserHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
 
-	// API для управления источниками
-	mux.HandleFunc("/api/v1/sources", api.GetSourcesHandler(dbConn))
-	mux.HandleFunc("/api/v1/sources/info", api.GetSourceHandler(dbConn))
-	mux.HandleFunc("/api/v1/sources/create", api.CreateSourceHandler(dbConn))
-	mux.HandleFunc("/api/v1/sources/update", api.UpdateSourceHandler(dbConn))
-	mux.HandleFunc("/api/v1/sources/delete", api.DeleteSourceHandler(dbConn))
+	// API для управления источниками (с rate limiting)
+	mux.HandleFunc("/api/v1/sources", middleware.Chain(
+		api.GetSourcesHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/sources/info", middleware.Chain(
+		api.GetSourceHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/sources/create", middleware.Chain(
+		api.CreateSourceHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/sources/update", middleware.Chain(
+		api.UpdateSourceHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/sources/delete", middleware.Chain(
+		api.DeleteSourceHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
 
-	// API для управления подписками
-	mux.HandleFunc("/api/v1/subscriptions", api.GetSubscriptionsHandler(dbConn))
-	mux.HandleFunc("/api/v1/subscriptions/subscribe", api.SubscribeHandler(dbConn))
-	mux.HandleFunc("/api/v1/subscriptions/unsubscribe", api.UnsubscribeHandler(dbConn))
+	// API для управления подписками (с rate limiting)
+	mux.HandleFunc("/api/v1/subscriptions", middleware.Chain(
+		api.GetSubscriptionsHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/subscriptions/subscribe", middleware.Chain(
+		api.SubscribeHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
+	mux.HandleFunc("/api/v1/subscriptions/unsubscribe", middleware.Chain(
+		api.UnsubscribeHandler(dbConn),
+		apiRateLimiter.RateLimit,
+	))
 
 	server := &http.Server{
 		Addr:    ":8080",

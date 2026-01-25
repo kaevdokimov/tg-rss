@@ -22,9 +22,25 @@ type GlobalRateLimiter struct {
 
 // NewRateLimiter создает новый RateLimiter с указанным периодом
 func NewRateLimiter(period time.Duration) *RateLimiter {
-	return &RateLimiter{
+	rl := &RateLimiter{
 		rates:  make(map[int64]time.Time),
 		period: period,
+	}
+	
+	// Запускаем автоматическую очистку каждые 10 минут
+	go rl.startPeriodicCleanup()
+	
+	return rl
+}
+
+// startPeriodicCleanup запускает периодическую очистку устаревших записей
+func (r *RateLimiter) startPeriodicCleanup() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	
+	for range ticker.C {
+		// Удаляем записи старше 1 часа
+		r.Cleanup(1 * time.Hour)
 	}
 }
 
