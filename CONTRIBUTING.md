@@ -20,8 +20,8 @@
 #### Процесс создания PR:
 1. **Форкните** репозиторий
 2. **Создайте ветку** для вашей фичи: `git checkout -b feature/amazing-feature`
-3. **Зафиксируйте изменения** согласно [соглашению о коммитах](COMMIT_CONVENTION.md)
-4. **Запустите тесты**: `make test`
+3. **Зафиксируйте изменения** согласно [соглашению о коммитах](docs/commit-convention.md)
+4. **Запустите тесты**: `go test ./...`
 5. **Создайте Pull Request** с подробным описанием
 
 #### Требования к PR:
@@ -39,14 +39,20 @@
 git clone https://github.com/kaevdokimov/tg-rss.git
 cd tg-rss
 
-# Запуск в режиме разработки
-make dev
+# Установка зависимостей
+go mod download
+
+# Запуск зависимостей (PostgreSQL, Redis)
+docker-compose up -d db redis
+
+# Запуск локально
+go run main.go
 
 # Запуск тестов
-make test
+go test ./...
 
 # Проверка кода
-make lint
+golangci-lint run
 ```
 
 #### Структура проекта:
@@ -64,7 +70,7 @@ make lint
 ## Соглашения
 
 ### Коммиты
-Мы следуем [Conventional Commits](COMMIT_CONVENTION.md):
+Мы следуем [Conventional Commits](docs/commit-convention.md):
 ```
 тип(область): краткое описание
 

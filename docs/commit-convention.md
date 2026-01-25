@@ -51,8 +51,8 @@
 - `config` - Конфигурация
 - `middleware` - HTTP middleware
 - `cache` - In-memory кэш
-- `security` - Безопасность
-- `workflow` - GitHub Actions
+- `security` / `sec` - Безопасность
+- `workflow` / `wf` - GitHub Actions
 - `infra` - Инфраструктура (Ansible, Docker)
 - `docs` - Документация
 
@@ -176,4 +176,4 @@ git commit --amend
 
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Semantic Versioning](https://semver.org/)
-- Локальная конвенция: `.cursor/COMMIT_CONVENTION.md`
+- [Effective Commit Messages](https://chris.beams.io/posts/git-commit/)

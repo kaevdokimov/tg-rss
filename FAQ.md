@@ -378,8 +378,7 @@ go run main.go
    ```
 
 2. Внесите изменения согласно:
-   - `.cursor/AGENTS.md` — общие правила
-   - `COMMIT_CONVENTION.md` — формат коммитов
+   - [docs/commit-convention.md](docs/commit-convention.md) — формат коммитов
    - Clean Architecture принципам
 
 3. Добавьте тесты:
@@ -448,5 +447,5 @@ GitHub Actions workflows:
 - [README.md](README.md) — обзор проекта
 - [DEPLOYMENT.md](DEPLOYMENT.md) — развертывание
 - [TESTING.md](TESTING.md) — тестирование
-- [docs/](docs/) — детальная документация
-- [.cursor/](. cursor/) — правила разработки
+- [docs/](docs/) — специализированная документация
+- [.context/](.context/) — техническая документация

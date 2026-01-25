@@ -6,11 +6,13 @@
 
 - [Требования](#требования)
 - [Быстрый старт](#быстрый-старт)
-- [Подробное развертывание](#подробное-развертывание)
+- [Настройка автоматического деплоя](#настройка-автоматического-деплоя)
+- [Варианты развертывания](#варианты-развертывания)
 - [Конфигурация](#конфигурация)
 - [Мониторинг](#мониторинг)
 - [Обновление](#обновление)
-- [Troubleshooting](#troubleshooting)
+- [Backup и восстановление](#backup-и-восстановление)
+- [Безопасность](#безопасность)
 
 ## Требования
 
@@ -94,7 +96,114 @@ curl http://localhost:8080/metrics
 # Отправьте /start вашему боту
 ```
 
-## Подробное развертывание
+## Настройка автоматического деплоя
+
+По умолчанию автоматический деплой **отключен**, чтобы избежать ошибок при отсутствии настроенного сервера.
+
+### Включение автоматического деплоя
+
+#### 1. Настройка переменных репозитория
+
+Перейдите: **Settings → Secrets and variables → Actions → Variables**
+
+Создайте переменные:
+
+**Для production деплоя (main ветка):**
+```
+DEPLOYMENT_ENABLED = true
+```
+
+**Для staging деплоя (develop/staging ветка):**
+```
+STAGING_DEPLOYMENT_ENABLED = true
+```
+
+#### 2. Настройка секретов для production
+
+Перейдите: **Settings → Secrets and variables → Actions → Secrets**
+
+**SSH доступ к серверу:**
+- `SERVER_HOST` - IP адрес или домен сервера
+- `SERVER_USER` - имя пользователя SSH
+- `SERVER_SSH_KEY` - приватный SSH ключ
+- `SERVER_PORT` - порт SSH (опционально, по умолчанию: 22)
+
+**Credentials для приложения:**
+- `TELEGRAM_API_KEY` - токен основного Telegram бота
+- `TELEGRAM_SIGNAL_API_KEY` - токен бота для отчетов
+- `POSTGRES_USER` - пользователь PostgreSQL
+- `POSTGRES_PASSWORD` - пароль PostgreSQL
+- `POSTGRES_DB` - имя базы данных
+- `CONTENT_SCRAPER_INTERVAL` - интервал скрапинга (например: `30m`)
+- `CONTENT_SCRAPER_BATCH` - размер батча (например: `10`)
+- `CONTENT_SCRAPER_CONCURRENT` - параллельные скраперы (например: `3`)
+
+**News Analyzer API:**
+- `NEWS_ANALYZER_ADMIN` - имя пользователя для Basic Auth
+- `NEWS_ANALYZER_PASSWORD` - пароль для Basic Auth
+
+**Telegram уведомления (опционально):**
+- `GH_NOTIFY_TELEGRAM_BOT_TOKEN` - токен бота для уведомлений
+- `GH_NOTIFY_TELEGRAM_CHAT_ID` - ID чата для уведомлений
+
+#### 3. Генерация SSH ключа
+
+```bash
+# Генерация нового SSH ключа
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/deploy_key -N ""
+
+# Скопировать публичный ключ на сервер
+ssh-copy-id -i ~/.ssh/deploy_key.pub user@your-server.com
+
+# Скопировать приватный ключ в буфер обмена
+cat ~/.ssh/deploy_key
+```
+
+Содержимое приватного ключа (`~/.ssh/deploy_key`) добавьте в секрет `SERVER_SSH_KEY`.
+
+#### 4. Подготовка сервера
+
+На сервере должны быть установлены Docker и Docker Compose:
+
+```bash
+# Обновление системы
+sudo apt update && sudo apt upgrade -y
+
+# Установка Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Добавление пользователя в группу docker
+sudo usermod -aG docker $USER
+
+# Установка Docker Compose
+sudo apt install docker-compose-plugin -y
+
+# Проверка установки
+docker --version
+docker compose version
+
+# Создание директории для проекта
+mkdir -p ~/news-bot
+```
+
+#### 5. Проверка настройки
+
+После настройки всех секретов и переменных:
+
+1. Сделайте commit и push в ветку `main`
+2. Откройте Actions в GitHub
+3. Найдите запущенный workflow "CI/CD Pipeline"
+4. Проверьте успешное выполнение job "Deploy to Server"
+
+### Отключение деплоя
+
+Чтобы временно отключить автоматический деплой:
+
+- `DEPLOYMENT_ENABLED` → `false` (для production)
+- `STAGING_DEPLOYMENT_ENABLED` → `false` (для staging)
+
+## Варианты развертывания
 
 ### Вариант 1: Docker Compose (рекомендуется)
 
@@ -206,12 +315,6 @@ ansible-playbook -i inventory/production/hosts playbooks/server-setup.yml --ask-
 ansible-playbook -i inventory/production/hosts playbooks/fast-deploy.yml --ask-vault-pass
 ```
 
-### Вариант 3: Kubernetes (enterprise)
-
-Для крупномасштабного развертывания.
-
-> Примечание: Kubernetes манифесты в разработке. Для простых сценариев рекомендуется Docker Compose.
-
 ## Конфигурация
 
 ### Переменные окружения
@@ -291,21 +394,6 @@ docker-compose logs --tail=100 news-bot
 1. Открыть Grafana
 2. Dashboards → Import
 3. Загрузить `docs/grafana-dashboard.json`
-
-### Алерты
-
-Настройка алертов в `prometheus/alert.rules.yml`:
-
-```yaml
-groups:
-  - name: tg_rss_alerts
-    rules:
-      - alert: BotDown
-        expr: up{job="news-bot"} == 0
-        for: 5m
-        annotations:
-          summary: "Бот недоступен"
-```
 
 ## Обновление
 
@@ -418,9 +506,33 @@ docker exec -i tg-rss-db psql -U postgres news_bot < backup.sql
    sudo journalctl -u docker -f
    ```
 
+Подробнее: [docs/security-setup.md](docs/security-setup.md)
+
 ## Troubleshooting
 
-См. [TROUBLESHOOTING.md](TROUBLESHOOTING.md) для детального руководства по решению проблем.
+### Ошибка "missing server host"
+
+**Решение:** Проверьте, что секрет `SERVER_HOST` установлен в Settings → Secrets.
+
+### SSH connection failed
+
+**Возможные причины:**
+1. Неправильный формат SSH ключа
+2. Неверный хост или порт
+3. Firewall блокирует SSH
+4. Публичный ключ не добавлен в `~/.ssh/authorized_keys`
+
+**Решение:** Проверьте логи workflow и убедитесь, что можете подключиться вручную.
+
+### Docker permission denied
+
+**Решение:**
+```bash
+sudo usermod -aG docker $USER
+# Выйдите и войдите заново
+```
+
+Подробнее: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ## Поддержка
 
