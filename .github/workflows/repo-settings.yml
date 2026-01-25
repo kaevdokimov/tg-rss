@@ -30,15 +30,17 @@ on:
 
 permissions:
   contents: read
-  # Required for branch protection management
-  actions: write
-  # Note: Full branch protection management requires admin token
-  # This workflow will check status but may fail to apply changes
 
 jobs:
   branch-protection:
     name: 'Configure Branch Protection'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for branch protection management
+      actions: write
+      # Note: Full branch protection management requires admin token
+      # This workflow will check status but may fail to apply changes
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
