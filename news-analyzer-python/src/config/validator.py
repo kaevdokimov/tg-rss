@@ -26,7 +26,9 @@ class EnvironmentConfig:
 
     def load_environment_configs(self) -> Dict[str, Dict[str, Any]]:
         """Загружает конфигурации для всех доступных окружений."""
-        environments_dir = self.base_config_path.parent / "environments"
+        # Определяем путь к environments относительно этого файла
+        config_module_dir = Path(__file__).parent.resolve()
+        environments_dir = config_module_dir / "environments"
 
         if not environments_dir.exists():
             logger.info("Директория environments не найдена, создаем базовую структуру")
@@ -195,18 +197,26 @@ class ConfigValidator:
         # Обязательные поля
         required_fields = ["host", "port", "user", "password", "database"]
         for field in required_fields:
-            if not db_config.get(field):
+            value = db_config.get(field)
+            # Пропускаем валидацию если значение - это переменная окружения
+            if isinstance(value, str) and value.startswith("${"):
+                continue
+            if not value:
                 self.errors.append(f"db.{field} - обязательное поле не заполнено")
 
         # Валидация порта
         port = db_config.get("port")
         if port:
-            try:
-                port_num = int(port)
-                if not (1024 <= port_num <= 65535):
-                    self.errors.append(f"db.port - порт должен быть в диапазоне 1024-65535")
-            except ValueError:
-                self.errors.append(f"db.port - некорректный номер порта")
+            # Пропускаем валидацию если это переменная окружения
+            if isinstance(port, str) and port.startswith("${"):
+                pass
+            else:
+                try:
+                    port_num = int(port)
+                    if not (1024 <= port_num <= 65535):
+                        self.errors.append(f"db.port - порт должен быть в диапазоне 1024-65535")
+                except (ValueError, TypeError):
+                    self.errors.append(f"db.port - некорректный номер порта")
 
         # Проверка подключения (опционально)
         if db_config.get("test_connection", True):
@@ -274,11 +284,21 @@ class ConfigValidator:
         if not isinstance(min_df, (int, float)) or min_df < 0:
             self.errors.append("vectorization.min_df - должно быть неотрицательным числом")
 
-        if not isinstance(max_df, float) or not (0 < max_df <= 1):
-            self.errors.append("vectorization.max_df - должно быть числом от 0 до 1")
+        if not isinstance(max_df, (int, float)):
+            self.errors.append("vectorization.max_df - должно быть числом")
+        elif isinstance(max_df, float) and not (0 < max_df <= 1):
+            self.errors.append("vectorization.max_df - должно быть числом от 0 до 1 (или целым числом для абсолютного порога)")
 
-        if min_df >= max_df:
-            self.errors.append("vectorization.min_df должно быть меньше max_df")
+        # Проверка совместимости min_df и max_df
+        # min_df может быть целым (абсолютное значение) или float (относительное)
+        # max_df может быть float от 0 до 1 (относительное) или целым (абсолютное)
+        # Сравнение имеет смысл только если оба параметра одного типа
+        if isinstance(min_df, int) and isinstance(max_df, int):
+            if min_df >= max_df:
+                self.errors.append("vectorization.min_df должно быть меньше max_df")
+        elif isinstance(min_df, float) and isinstance(max_df, float):
+            if min_df >= max_df:
+                self.errors.append("vectorization.min_df должно быть меньше max_df")
 
     def _validate_clustering_config(self, config: Dict[str, Any]):
         """Валидация конфигурации кластеризации."""

@@ -1,12 +1,19 @@
 """FastAPI приложение для метрик и health checks."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi import status as http_status
 from fastapi.responses import PlainTextResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
+import secrets
 import prometheus_client
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import psutil
 import os
 from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 
 from ..config import load_settings
 from ..db import Database
@@ -16,7 +23,61 @@ import os
 import subprocess  # nosec - used for local script execution
 import threading
 
-app = FastAPI(title="News Analyzer API", version="1.0.0")
+# Загружаем переменные окружения из .env при старте приложения
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+
+# Отключаем автоматическую генерацию /docs и /redoc
+app = FastAPI(
+    title="News Analyzer API",
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
+)
+
+# Security для Basic Auth
+security = HTTPBasic()
+
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    """Проверка учетных данных для доступа к документации."""
+    correct_username = os.getenv("NEWS_ANALYZER_ADMIN", "admin")
+    correct_password = os.getenv("NEWS_ANALYZER_PASSWORD", "changeme")
+    
+    is_correct_username = secrets.compare_digest(
+        credentials.username.encode("utf8"), correct_username.encode("utf8")
+    )
+    is_correct_password = secrets.compare_digest(
+        credentials.password.encode("utf8"), correct_password.encode("utf8")
+    )
+    
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="Неверные учетные данные",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+@app.get("/docs", include_in_schema=False)
+async def get_documentation(username: str = Depends(verify_credentials)):
+    """Swagger UI документация (защищена Basic Auth)."""
+    return get_swagger_ui_html(openapi_url="/openapi.json", title="News Analyzer API - Docs")
+
+
+@app.get("/redoc", include_in_schema=False)
+async def get_redoc_documentation(username: str = Depends(verify_credentials)):
+    """ReDoc документация (защищена Basic Auth)."""
+    return get_redoc_html(openapi_url="/openapi.json", title="News Analyzer API - ReDoc")
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_open_api_endpoint(username: str = Depends(verify_credentials)):
+    """OpenAPI схема (защищена Basic Auth)."""
+    return get_openapi(title="News Analyzer API", version="1.0.0", routes=app.routes)
 
 
 @app.get("/health")
