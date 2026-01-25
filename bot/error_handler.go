@@ -1,12 +1,9 @@
 package bot
 
 import (
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // handleTelegramError обрабатывает ошибки Telegram API и возвращает понятное сообщение для пользователя
@@ -65,21 +62,6 @@ func handleTelegramError(err error) string {
 	default:
 		// Для неизвестных ошибок возвращаем общее сообщение
 		return "❌ Произошла ошибка. Попробуйте позже или обратитесь к администратору."
-	}
-}
-
-// sendErrorMessage отправляет понятное сообщение об ошибке пользователю
-// TODO: использовать в обработчиках команд при возникновении ошибок
-func sendErrorMessage(bot *tgbotapi.BotAPI, chatId int64, err error) {
-	errorMsg := handleTelegramError(err)
-	if errorMsg == "" {
-		errorMsg = "❌ Произошла ошибка. Попробуйте позже."
-	}
-
-	msg := tgbotapi.NewMessage(chatId, errorMsg)
-	msg.ReplyMarkup = createMainKeyboard()
-	if _, err := bot.Send(msg); err != nil {
-		log.Printf("⚠️  Ошибка отправки сообщения об ошибке: %v", err)
 	}
 }
 

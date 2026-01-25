@@ -31,7 +31,7 @@ func CORS(next http.HandlerFunc) http.HandlerFunc {
 			"http://127.0.0.1:3000",
 			"http://127.0.0.1:8080",
 		}
-		
+
 		originAllowed := false
 		for _, allowed := range allowedOrigins {
 			if origin == allowed {
@@ -39,11 +39,11 @@ func CORS(next http.HandlerFunc) http.HandlerFunc {
 				break
 			}
 		}
-		
+
 		if originAllowed {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Max-Age", "3600")
@@ -178,7 +178,7 @@ func NewAPIRateLimiter(limit int, window time.Duration) *APIRateLimiter {
 func (rl *APIRateLimiter) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		rl.mu.Lock()
 		now := time.Now()
@@ -206,7 +206,7 @@ func (rl *APIRateLimiter) isAllowed(ip string) bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
-	
+
 	// Получаем историю запросов для этого IP
 	times, exists := rl.requests[ip]
 	if !exists {
@@ -253,9 +253,9 @@ func (rl *APIRateLimiter) RateLimit(next http.HandlerFunc) http.HandlerFunc {
 				"url", r.URL.Path,
 				"method", r.Method,
 			)
-			
+
 			monitoring.IncrementRateLimitRejected("api_rate_limiter")
-			
+
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
 			_, _ = w.Write([]byte("Слишком много запросов. Попробуйте позже."))

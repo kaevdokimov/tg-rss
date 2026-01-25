@@ -42,17 +42,6 @@ type newsCandidate struct {
 	item   rss.News
 }
 
-// parseSource парсит один RSS источник
-// TODO: используется ли эта функция? проверить необходимость
-func parseSource(source db.Source, tz *time.Location) parseResult {
-	newsList, err := rss.ParseRSSWithClient(source.Url, tz, rssHttpClient)
-	return parseResult{
-		source:   source,
-		newsList: newsList,
-		err:      err,
-	}
-}
-
 // parseSourceWithCircuitBreaker парсит источник с использованием circuit breaker
 func parseSourceWithCircuitBreaker(source db.Source, tz *time.Location) parseResult {
 	var newsList []rss.News
@@ -114,7 +103,7 @@ func StartRSSPolling(dbConn *sql.DB, interval time.Duration, tz *time.Location, 
 	defer func() {
 		if r := recover(); r != nil {
 			rssLogger.Error("КРИТИЧЕСКАЯ ОШИБКА в RSS парсере. RSS парсинг остановлен",
-			"error", r)
+				"error", r)
 			// Не перезапускаем автоматически, чтобы избежать утечки горутин
 			// Перезапуск должен происходить на уровне оркестратора (systemd, docker, etc.)
 		}
@@ -218,9 +207,9 @@ func runPollingCycle(dbConn *sql.DB, tz *time.Location, redisProducer *redis.Pro
 			monitoring.IncrementRSSPollsErrors()
 			sourcesWithErrors++
 			rssLogger.Warn("Ошибка парсинга RSS для источника",
-			"source_name", result.source.Name,
-			"source_url", result.source.Url,
-			"error", result.err)
+				"source_name", result.source.Name,
+				"source_url", result.source.Url,
+				"error", result.err)
 			continue
 		}
 

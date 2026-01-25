@@ -200,7 +200,7 @@ func startMetricsUpdater(ctx context.Context, dbConn *sql.DB) {
 // startHealthServer запускает HTTP сервер для health checks и метрик
 func startHealthServer(ctx context.Context, dbConn *sql.DB) {
 	mux := http.NewServeMux()
-	
+
 	// Создаем rate limiter для API endpoints (100 запросов в минуту на IP)
 	apiRateLimiter := middleware.NewAPIRateLimiter(100, 1*time.Minute)
 
@@ -394,76 +394,76 @@ paths:
 		_, _ = fmt.Fprintf(w, "# HELP db_connections_wait Current number of connections waiting\n")
 		_, _ = fmt.Fprintf(w, "# TYPE db_connections_wait gauge\n")
 		_, _ = fmt.Fprintf(w, "db_connections_wait %d\n", metrics.DBConnectionsWait)
-		
+
 		// Cache метрики
 		_, _ = fmt.Fprintf(w, "# HELP cache_hits_total Total number of cache hits by cache name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE cache_hits_total counter\n")
 		for name, hits := range metrics.CacheHits {
 			_, _ = fmt.Fprintf(w, "cache_hits_total{cache=\"%s\"} %d\n", name, hits)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP cache_misses_total Total number of cache misses by cache name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE cache_misses_total counter\n")
 		for name, misses := range metrics.CacheMisses {
 			_, _ = fmt.Fprintf(w, "cache_misses_total{cache=\"%s\"} %d\n", name, misses)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP cache_size Current size of cache by cache name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE cache_size gauge\n")
 		for name, size := range metrics.CacheSize {
 			_, _ = fmt.Fprintf(w, "cache_size{cache=\"%s\"} %d\n", name, size)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP cache_evictions_total Total number of cache evictions by cache name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE cache_evictions_total counter\n")
 		for name, evictions := range metrics.CacheEvictions {
 			_, _ = fmt.Fprintf(w, "cache_evictions_total{cache=\"%s\"} %d\n", name, evictions)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP cache_operations_total Total number of cache operations by cache name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE cache_operations_total counter\n")
 		for name, operations := range metrics.CacheOperations {
 			_, _ = fmt.Fprintf(w, "cache_operations_total{cache=\"%s\"} %d\n", name, operations)
 		}
-		
+
 		// Queue метрики
 		_, _ = fmt.Fprintf(w, "# HELP queue_size Current size of queue by queue name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE queue_size gauge\n")
 		for name, size := range metrics.QueueSize {
 			_, _ = fmt.Fprintf(w, "queue_size{queue=\"%s\"} %d\n", name, size)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP queue_processed_total Total number of processed items by queue name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE queue_processed_total counter\n")
 		for name, processed := range metrics.QueueProcessed {
 			_, _ = fmt.Fprintf(w, "queue_processed_total{queue=\"%s\"} %d\n", name, processed)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP queue_errors_total Total number of queue errors by queue name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE queue_errors_total counter\n")
 		for name, errors := range metrics.QueueErrors {
 			_, _ = fmt.Fprintf(w, "queue_errors_total{queue=\"%s\"} %d\n", name, errors)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP queue_latency_ms Average queue latency in milliseconds by queue name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE queue_latency_ms gauge\n")
 		for name, latency := range metrics.QueueLatencyMs {
 			_, _ = fmt.Fprintf(w, "queue_latency_ms{queue=\"%s\"} %d\n", name, latency)
 		}
-		
+
 		// Rate limiting метрики
 		_, _ = fmt.Fprintf(w, "# HELP rate_limit_hits_total Total number of rate limit hits by limiter name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE rate_limit_hits_total counter\n")
 		for name, hits := range metrics.RateLimitHits {
 			_, _ = fmt.Fprintf(w, "rate_limit_hits_total{limiter=\"%s\"} %d\n", name, hits)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP rate_limit_misses_total Total number of rate limit misses by limiter name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE rate_limit_misses_total counter\n")
 		for name, misses := range metrics.RateLimitMisses {
 			_, _ = fmt.Fprintf(w, "rate_limit_misses_total{limiter=\"%s\"} %d\n", name, misses)
 		}
-		
+
 		_, _ = fmt.Fprintf(w, "# HELP rate_limit_rejected_total Total number of rate limit rejections by limiter name\n")
 		_, _ = fmt.Fprintf(w, "# TYPE rate_limit_rejected_total counter\n")
 		for name, rejected := range metrics.RateLimitRejected {

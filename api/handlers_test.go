@@ -179,10 +179,10 @@ func TestCreateSourceHandler_Validation(t *testing.T) {
 		expectedError  string
 	}{
 		{
-			name: "Invalid JSON",
-			requestBody: "not-json",
+			name:           "Invalid JSON",
+			requestBody:    "not-json",
 			expectedStatus: http.StatusBadRequest,
-			expectedError: "Invalid JSON format",
+			expectedError:  "Invalid JSON format",
 		},
 		{
 			name: "Empty name",
@@ -191,7 +191,7 @@ func TestCreateSourceHandler_Validation(t *testing.T) {
 				URL:  "https://example.com/feed",
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: "имя не может быть пустым",
+			expectedError:  "имя не может быть пустым",
 		},
 		{
 			name: "Invalid URL scheme",
@@ -200,7 +200,7 @@ func TestCreateSourceHandler_Validation(t *testing.T) {
 				URL:  "ftp://example.com/feed",
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: "разрешены только http и https схемы",
+			expectedError:  "разрешены только http и https схемы",
 		},
 		{
 			name: "Localhost URL",
@@ -209,7 +209,7 @@ func TestCreateSourceHandler_Validation(t *testing.T) {
 				URL:  "http://localhost/feed",
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError: "запрещено использовать внутренние/локальные адреса",
+			expectedError:  "запрещено использовать внутренние/локальные адреса",
 		},
 	}
 
@@ -217,7 +217,7 @@ func TestCreateSourceHandler_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var body []byte
 			var err error
-			
+
 			if str, ok := tt.requestBody.(string); ok {
 				body = []byte(str)
 			} else {
@@ -232,7 +232,7 @@ func TestCreateSourceHandler_Validation(t *testing.T) {
 			handler(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
-			
+
 			var response APIResponse
 			err = json.NewDecoder(w.Body).Decode(&response)
 			require.NoError(t, err)
@@ -278,10 +278,10 @@ func TestUpdateSourceHandler_Validation(t *testing.T) {
 			if !tt.skipDBCheck {
 				t.Skip("Требуется реальная БД")
 			}
-			
+
 			var body []byte
 			var err error
-			
+
 			if str, ok := tt.requestBody.(string); ok {
 				body = []byte(str)
 			} else {
@@ -296,7 +296,7 @@ func TestUpdateSourceHandler_Validation(t *testing.T) {
 			handler(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
-			
+
 			var response APIResponse
 			err = json.NewDecoder(w.Body).Decode(&response)
 			require.NoError(t, err)
@@ -335,14 +335,14 @@ func TestGetUserHandler_InvalidInput(t *testing.T) {
 			if tt.queryParam != "" {
 				url += "?chat_id=" + tt.queryParam
 			}
-			
+
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 			w := httptest.NewRecorder()
 
 			handler(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
-			
+
 			var response APIResponse
 			err := json.NewDecoder(w.Body).Decode(&response)
 			require.NoError(t, err)
@@ -364,14 +364,14 @@ func TestAPIResponse_Structure(t *testing.T) {
 			Success: true,
 			Data:    map[string]int{"count": 5},
 		}
-		
+
 		data, err := json.Marshal(resp)
 		require.NoError(t, err)
-		
+
 		var decoded map[string]interface{}
 		err = json.Unmarshal(data, &decoded)
 		require.NoError(t, err)
-		
+
 		assert.True(t, decoded["success"].(bool))
 		assert.NotNil(t, decoded["data"])
 	})
@@ -381,14 +381,14 @@ func TestAPIResponse_Structure(t *testing.T) {
 			Success: false,
 			Error:   "test error",
 		}
-		
+
 		data, err := json.Marshal(resp)
 		require.NoError(t, err)
-		
+
 		var decoded map[string]interface{}
 		err = json.Unmarshal(data, &decoded)
 		require.NoError(t, err)
-		
+
 		assert.False(t, decoded["success"].(bool))
 		assert.Equal(t, "test error", decoded["error"])
 	})

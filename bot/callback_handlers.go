@@ -247,8 +247,8 @@ func handleSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, data st
 			log.Printf("Ошибка при регистрации пользователя: %v", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при регистрации пользователя.\n\nПожалуйста, используйте команду /start для регистрации.")
 			if _, err := bot.Send(msg); err != nil {
-			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
-		}
+				log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+			}
 			return
 		}
 		log.Printf("Автоматически зарегистрирован пользователь с chatId %d", chatId)
@@ -456,8 +456,8 @@ func handleQuickSubscribe(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, da
 			log.Printf("Ошибка при получении источников: %v", err)
 			msg := tgbotapi.NewMessage(chatId, "❌ Ошибка при получении источников")
 			if _, err := bot.Send(msg); err != nil {
-			log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
-		}
+				log.Printf("⚠️  Ошибка отправки сообщения: %v", err)
+			}
 			return
 		}
 

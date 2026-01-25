@@ -3,7 +3,7 @@ package bot
 import (
 	"sync"
 	"time"
-	
+
 	"tg-rss/monitoring"
 )
 
@@ -28,10 +28,10 @@ func NewRateLimiter(period time.Duration) *RateLimiter {
 		rates:  make(map[int64]time.Time),
 		period: period,
 	}
-	
+
 	// Запускаем автоматическую очистку каждые 10 минут
 	go rl.startPeriodicCleanup()
-	
+
 	return rl
 }
 
@@ -39,7 +39,7 @@ func NewRateLimiter(period time.Duration) *RateLimiter {
 func (r *RateLimiter) startPeriodicCleanup() {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		// Удаляем записи старше 1 часа
 		r.Cleanup(1 * time.Hour)

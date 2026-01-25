@@ -44,24 +44,24 @@ type Metrics struct {
 	ContentValidationErrors map[string]int64
 
 	// Database connection метрики
-	DBConnectionsOpen     int64
-	DBConnectionsIdle     int64
-	DBConnectionsInUse    int64
-	DBConnectionsWait     int64
+	DBConnectionsOpen  int64
+	DBConnectionsIdle  int64
+	DBConnectionsInUse int64
+	DBConnectionsWait  int64
 
 	// Cache метрики
-	CacheHits         map[string]int64
-	CacheMisses       map[string]int64
-	CacheSize         map[string]int64
-	CacheEvictions    map[string]int64
-	CacheOperations   map[string]int64
-	
+	CacheHits       map[string]int64
+	CacheMisses     map[string]int64
+	CacheSize       map[string]int64
+	CacheEvictions  map[string]int64
+	CacheOperations map[string]int64
+
 	// Queue метрики
-	QueueSize         map[string]int64
-	QueueProcessed    map[string]int64
-	QueueErrors       map[string]int64
-	QueueLatencyMs    map[string]int64
-	
+	QueueSize      map[string]int64
+	QueueProcessed map[string]int64
+	QueueErrors    map[string]int64
+	QueueLatencyMs map[string]int64
+
 	// Rate limiting метрики
 	RateLimitHits     map[string]int64
 	RateLimitMisses   map[string]int64
@@ -116,7 +116,7 @@ func GetMetrics() *Metrics {
 	for k, v := range globalMetrics.ContentValidationErrors {
 		contentValidationErrors[k] = v
 	}
-	
+
 	// Копируем метрики кэшей
 	cacheHits := make(map[string]int64)
 	cacheMisses := make(map[string]int64)
@@ -138,7 +138,7 @@ func GetMetrics() *Metrics {
 	for k, v := range globalMetrics.CacheOperations {
 		cacheOperations[k] = v
 	}
-	
+
 	// Копируем метрики очередей
 	queueSize := make(map[string]int64)
 	queueProcessed := make(map[string]int64)
@@ -156,7 +156,7 @@ func GetMetrics() *Metrics {
 	for k, v := range globalMetrics.QueueLatencyMs {
 		queueLatencyMs[k] = v
 	}
-	
+
 	// Копируем метрики rate limiting
 	rateLimitHits := make(map[string]int64)
 	rateLimitMisses := make(map[string]int64)
@@ -170,48 +170,48 @@ func GetMetrics() *Metrics {
 	for k, v := range globalMetrics.RateLimitRejected {
 		rateLimitRejected[k] = v
 	}
-	
+
 	globalMetrics.mu.RUnlock()
 
 	// Возвращаем копию для безопасности
 	return &Metrics{
-		RSSPollsTotal:          globalMetrics.RSSPollsTotal,
-		RSSPollsErrors:         globalMetrics.RSSPollsErrors,
-		RSSItemsProcessed:      globalMetrics.RSSItemsProcessed,
-		RedisMessagesProduced:  globalMetrics.RedisMessagesProduced,
-		RedisMessagesConsumed:  globalMetrics.RedisMessagesConsumed,
-		RedisErrors:            globalMetrics.RedisErrors,
-		TelegramMessagesSent:   globalMetrics.TelegramMessagesSent,
-		TelegramMessagesErrors: globalMetrics.TelegramMessagesErrors,
-		TelegramCommandsTotal:  globalMetrics.TelegramCommandsTotal,
-		DBQueriesTotal:         globalMetrics.DBQueriesTotal,
-		DBQueriesErrors:        globalMetrics.DBQueriesErrors,
-		CircuitBreakerCalls:      cbCalls,
-		CircuitBreakerFailures:   cbFailures,
-		CircuitBreakerRejected:   cbRejected,
-		HTTPRequestsTotal:        globalMetrics.HTTPRequestsTotal,
-		HTTPRequestsActive:       globalMetrics.HTTPRequestsActive,
-		HTTPRequestsErrors:       globalMetrics.HTTPRequestsErrors,
-		HTTPRequestsTimeout:      globalMetrics.HTTPRequestsTimeout,
-		ContentValidations:       globalMetrics.ContentValidations,
-		ContentValidationErrors:  contentValidationErrors,
-		DBConnectionsOpen:        globalMetrics.DBConnectionsOpen,
-		DBConnectionsIdle:        globalMetrics.DBConnectionsIdle,
-		DBConnectionsInUse:       globalMetrics.DBConnectionsInUse,
-		DBConnectionsWait:        globalMetrics.DBConnectionsWait,
-		CacheHits:                cacheHits,
-		CacheMisses:              cacheMisses,
-		CacheSize:                cacheSize,
-		CacheEvictions:           cacheEvictions,
-		CacheOperations:          cacheOperations,
-		QueueSize:                queueSize,
-		QueueProcessed:           queueProcessed,
-		QueueErrors:              queueErrors,
-		QueueLatencyMs:           queueLatencyMs,
-		RateLimitHits:            rateLimitHits,
-		RateLimitMisses:          rateLimitMisses,
-		RateLimitRejected:        rateLimitRejected,
-		LastUpdate:               globalMetrics.LastUpdate,
+		RSSPollsTotal:           globalMetrics.RSSPollsTotal,
+		RSSPollsErrors:          globalMetrics.RSSPollsErrors,
+		RSSItemsProcessed:       globalMetrics.RSSItemsProcessed,
+		RedisMessagesProduced:   globalMetrics.RedisMessagesProduced,
+		RedisMessagesConsumed:   globalMetrics.RedisMessagesConsumed,
+		RedisErrors:             globalMetrics.RedisErrors,
+		TelegramMessagesSent:    globalMetrics.TelegramMessagesSent,
+		TelegramMessagesErrors:  globalMetrics.TelegramMessagesErrors,
+		TelegramCommandsTotal:   globalMetrics.TelegramCommandsTotal,
+		DBQueriesTotal:          globalMetrics.DBQueriesTotal,
+		DBQueriesErrors:         globalMetrics.DBQueriesErrors,
+		CircuitBreakerCalls:     cbCalls,
+		CircuitBreakerFailures:  cbFailures,
+		CircuitBreakerRejected:  cbRejected,
+		HTTPRequestsTotal:       globalMetrics.HTTPRequestsTotal,
+		HTTPRequestsActive:      globalMetrics.HTTPRequestsActive,
+		HTTPRequestsErrors:      globalMetrics.HTTPRequestsErrors,
+		HTTPRequestsTimeout:     globalMetrics.HTTPRequestsTimeout,
+		ContentValidations:      globalMetrics.ContentValidations,
+		ContentValidationErrors: contentValidationErrors,
+		DBConnectionsOpen:       globalMetrics.DBConnectionsOpen,
+		DBConnectionsIdle:       globalMetrics.DBConnectionsIdle,
+		DBConnectionsInUse:      globalMetrics.DBConnectionsInUse,
+		DBConnectionsWait:       globalMetrics.DBConnectionsWait,
+		CacheHits:               cacheHits,
+		CacheMisses:             cacheMisses,
+		CacheSize:               cacheSize,
+		CacheEvictions:          cacheEvictions,
+		CacheOperations:         cacheOperations,
+		QueueSize:               queueSize,
+		QueueProcessed:          queueProcessed,
+		QueueErrors:             queueErrors,
+		QueueLatencyMs:          queueLatencyMs,
+		RateLimitHits:           rateLimitHits,
+		RateLimitMisses:         rateLimitMisses,
+		RateLimitRejected:       rateLimitRejected,
+		LastUpdate:              globalMetrics.LastUpdate,
 	}
 }
 

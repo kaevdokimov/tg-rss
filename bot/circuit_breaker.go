@@ -12,9 +12,9 @@ import (
 type CircuitBreakerState int32
 
 const (
-	StateClosed CircuitBreakerState = iota // Нормальная работа
-	StateOpen                               // Открыт - блокирует запросы
-	StateHalfOpen                           // Полуоткрыт - тестирует восстановление
+	StateClosed   CircuitBreakerState = iota // Нормальная работа
+	StateOpen                                // Открыт - блокирует запросы
+	StateHalfOpen                            // Полуоткрыт - тестирует восстановление
 )
 
 // CircuitBreaker реализует паттерн Circuit Breaker для защиты от каскадных сбоев
@@ -27,10 +27,10 @@ type CircuitBreaker struct {
 	resetTimeout     time.Duration // Время ожидания в Half-Open состоянии
 
 	// Состояние
-	state        int32 // CircuitBreakerState
-	failures     int32 // Текущее количество ошибок
-	lastFailure  time.Time
-	lastAttempt  time.Time
+	state       int32 // CircuitBreakerState
+	failures    int32 // Текущее количество ошибок
+	lastFailure time.Time
+	lastAttempt time.Time
 
 	// Синхронизация
 	mu sync.RWMutex

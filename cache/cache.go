@@ -43,7 +43,7 @@ func (c *Cache) Set(key string, value interface{}) {
 	}
 	c.data.Store(key, entry)
 	c.logger.Debug("cache entry set", "key", key, "ttl", c.ttl)
-	
+
 	// Обновляем метрики
 	monitoring.IncrementCacheOperations(c.name)
 }
@@ -96,7 +96,7 @@ func (c *Cache) Size() int {
 		}
 		return true
 	})
-	
+
 	// Обновляем метрику размера
 	monitoring.UpdateCacheSize(c.name, int64(count))
 	return count

@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
-
 	// monitoring functions will be implemented locally
 )
 
@@ -104,10 +103,10 @@ func (cv *ContentValidator) ValidateAndSanitizeContent(content *NewsContent) err
 		validMetaData := make(map[string]string)
 		for key, value := range content.MetaData {
 			if cv.validateMetaKey(key) && cv.validateMetaValue(value) {
-			validMetaData[key] = cv.sanitizeText(value)
-			// Валидная мета-данная - добавляем в список
-		}
-		// Недействительная мета-данная - пропускаем
+				validMetaData[key] = cv.sanitizeText(value)
+				// Валидная мета-данная - добавляем в список
+			}
+			// Недействительная мета-данная - пропускаем
 		}
 		content.MetaData = validMetaData
 	}

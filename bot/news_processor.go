@@ -71,7 +71,7 @@ func NewNewsProcessor(db *sql.DB, bot *tgbotapi.BotAPI) *NewsProcessor {
 
 	// Запускаем периодическую отправку накопленных новостей
 	go np.startPeriodicSending()
-	
+
 	// Запускаем периодическую очистку старых записей
 	go np.startPeriodicCleanup()
 
@@ -146,15 +146,15 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 	// Добавляем новость в очередь для каждого подписанного пользователя
 	np.pendingMutex.Lock()
 	defer np.pendingMutex.Unlock()
-	
+
 	addedToQueue := 0
-	
+
 	// Собираем все chatID для батч-проверки
 	chatIDs := make([]int64, len(subscriptions))
 	for i, subscription := range subscriptions {
 		chatIDs[i] = subscription.ChatId
 	}
-	
+
 	// Батч-проверка: проверяем для всех пользователей за один запрос
 	sentToUsers, err := db.IsNewsSentToUsers(np.db, chatIDs, newsID)
 	if err != nil {
@@ -162,7 +162,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 		// Fallback: продолжаем, но не добавляем новости
 		return err
 	}
-	
+
 	// Добавляем новости в очередь только для тех, кому еще не отправляли
 	for _, subscription := range subscriptions {
 		// Проверяем результат батч-запроса
@@ -185,7 +185,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 			PublishedAt: publishedAt,
 			AddedAt:     time.Now(), // Устанавливаем время добавления
 		}
-		
+
 		// Проверяем лимит на количество новостей для пользователя
 		userQueue := np.pendingNews[subscription.ChatId]
 		if len(userQueue) >= MaxPendingNewsPerUser {
@@ -195,7 +195,7 @@ func (np *NewsProcessor) ProcessNewsItem(newsItem redis.NewsItem) error {
 				"max_size", MaxPendingNewsPerUser)
 			continue
 		}
-		
+
 		np.pendingNews[subscription.ChatId] = append(userQueue, pending)
 		addedToQueue++
 		newsLogger.Debug("Новость добавлена в очередь для пользователя",
@@ -255,7 +255,7 @@ func (np *NewsProcessor) startPeriodicSending() {
 	// Затем отправляем по расписанию каждые 15 минут
 	for range ticker.C {
 		np.sendPendingNews()
-		
+
 		// Обновляем метрики размера очередей
 		np.pendingMutex.Lock()
 		totalQueueSize := int64(0)
@@ -263,7 +263,7 @@ func (np *NewsProcessor) startPeriodicSending() {
 			totalQueueSize += int64(len(queue))
 		}
 		np.pendingMutex.Unlock()
-		
+
 		monitoring.UpdateQueueSize("pending_news", totalQueueSize)
 	}
 }
@@ -390,7 +390,7 @@ func (np *NewsProcessor) sendPendingNews() {
 			messagesSent++
 		}
 	}
-	
+
 	// Обновляем метрики
 	monitoring.IncrementQueueProcessed("pending_news")
 	if errorCount > 0 {
@@ -441,9 +441,9 @@ func (np *NewsProcessor) sendNewsMessage(chatId int64, message string, newsList 
 						newInterval = MaxRateLimitInterval
 					}
 					newsLogger.Warn("Rate limit для пользователя, увеличиваем глобальный интервал",
-					"user_id", chatId,
-					"retry_after", retryAfter,
-					"new_interval", newInterval)
+						"user_id", chatId,
+						"retry_after", retryAfter,
+						"new_interval", newInterval)
 				}
 				np.globalRateLimiter.SetMinInterval(newInterval)
 			} else {
@@ -617,7 +617,7 @@ func (np *NewsProcessor) cleanupOldNews() {
 		// Фильтруем только актуальные новости (не старше TTL)
 		validNews := make([]PendingNews, 0, len(newsQueue))
 		removed := 0
-		
+
 		for _, news := range newsQueue {
 			if now.Sub(news.AddedAt) < PendingNewsTTL {
 				validNews = append(validNews, news)
@@ -630,7 +630,7 @@ func (np *NewsProcessor) cleanupOldNews() {
 			np.pendingNews[chatID] = validNews
 			totalRemoved += removed
 			usersAffected++
-			
+
 			newsLogger.Debug("Очищены устаревшие новости из очереди",
 				"user_id", chatID,
 				"removed", removed,

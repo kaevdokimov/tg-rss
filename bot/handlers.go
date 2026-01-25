@@ -246,7 +246,7 @@ func handleAddSource(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, link st
 			return
 		}
 		handlerLogger.Info("Автоматически зарегистрирован пользователь",
-		"chat_id", chatId)
+			"chat_id", chatId)
 	}
 
 	var subscription = db.Subscription{
@@ -373,7 +373,7 @@ func handleAddSubscription(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64, s
 			return
 		}
 		handlerLogger.Info("Автоматически зарегистрирован пользователь",
-		"chat_id", chatId)
+			"chat_id", chatId)
 	}
 
 	var subscription = db.Subscription{
@@ -506,7 +506,7 @@ func handleSubscribeAll(bot *tgbotapi.BotAPI, dbConn *sql.DB, chatId int64) {
 			return
 		}
 		handlerLogger.Info("Автоматически зарегистрирован пользователь",
-		"chat_id", chatId)
+			"chat_id", chatId)
 	}
 
 	// Подписываем на все источники

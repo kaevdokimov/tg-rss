@@ -45,10 +45,10 @@ type SourceResponse struct {
 
 // SubscriptionResponse представляет подписку в API
 type SubscriptionResponse struct {
-	ChatID    int64     `json:"chat_id"`
-	SourceID  int       `json:"source_id"`
-	SourceName string   `json:"source_name,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ChatID     int64     `json:"chat_id"`
+	SourceID   int       `json:"source_id"`
+	SourceName string    `json:"source_name,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // CreateSourceRequest представляет запрос на создание источника
@@ -139,7 +139,7 @@ func GetUsersHandler(dbConn *sql.DB) http.HandlerFunc {
 		sendJSON(w, http.StatusOK, APIResponse{
 			Success: true,
 			Data: map[string]interface{}{
-				"total_users": stats.TotalUsers,
+				"total_users":  stats.TotalUsers,
 				"active_users": stats.TotalUsers, // Упрощение
 			},
 		})
@@ -537,8 +537,8 @@ func GetSubscriptionsHandler(dbConn *sql.DB) http.HandlerFunc {
 		subscriptionResponses := make([]SubscriptionResponse, len(subscriptions))
 		for i, sub := range subscriptions {
 			subscriptionResponses[i] = SubscriptionResponse{
-				ChatID:   sub.ChatId,
-				SourceID: int(sub.SourceId),
+				ChatID:    sub.ChatId,
+				SourceID:  int(sub.SourceId),
 				CreatedAt: sub.CreatedAt,
 			}
 		}
