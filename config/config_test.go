@@ -42,11 +42,11 @@ func TestLoadDBConfig(t *testing.T) {
 		}
 	}()
 
-	// Тест с дефолтными значениями
+	// Тест с дефолтными значениями (пароль обязателен)
 	_ = os.Unsetenv("POSTGRES_HOST")
 	_ = os.Unsetenv("POSTGRES_PORT")
 	_ = os.Unsetenv("POSTGRES_USER")
-	_ = os.Unsetenv("POSTGRES_PASSWORD")
+	_ = os.Setenv("POSTGRES_PASSWORD", "test-password")
 	_ = os.Unsetenv("POSTGRES_DB")
 
 	cfg := LoadDBConfig()
@@ -58,6 +58,9 @@ func TestLoadDBConfig(t *testing.T) {
 	}
 	if cfg.DBUser != "postgres" {
 		t.Errorf("Ожидался DBUser 'postgres', получено '%s'", cfg.DBUser)
+	}
+	if cfg.DBPass != "test-password" {
+		t.Errorf("Ожидался DBPass 'test-password', получено '%s'", cfg.DBPass)
 	}
 	if cfg.DBName != "news_bot" {
 		t.Errorf("Ожидался DBName 'news_bot', получено '%s'", cfg.DBName)
