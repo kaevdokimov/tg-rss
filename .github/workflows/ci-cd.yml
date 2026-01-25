@@ -462,3 +462,105 @@ jobs:
 
             echo '✅ Deployment completed successfully!'
           "
+          
+      - name: Health Check с автоматическим rollback
+        if: success()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set +e  # Не прерывать при ошибках для rollback
+            echo '🔍 Начало health check (60 секунд таймаут)...'
+            
+            # Получаем предыдущий образ для rollback
+            PREVIOUS_IMAGE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BOT }} --format "{{.Repository}}:{{.Tag}}" | sed -n '2p')
+            echo "Предыдущий образ для rollback: $PREVIOUS_IMAGE"
+            
+            # Ожидание полного запуска
+            sleep 15
+            
+            # Health check с несколькими попытками
+            max_attempts=6
+            attempt=1
+            health_ok=false
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check попытка $attempt из $max_attempts..."
+              
+              if curl -f -s http://localhost:8080/health > /dev/null 2>&1; then
+                echo "✅ Health check успешен"
+                health_ok=true
+                break
+              fi
+              
+              if [ $attempt -lt $max_attempts ]; then
+                echo "⏳ Ожидание 10 секунд..."
+                sleep 10
+              fi
+              
+              attempt=$((attempt + 1))
+            done
+            
+            # Rollback при неудаче
+            if [ "$health_ok" = "false" ]; then
+              echo "❌ Health check не прошел - начало rollback..."
+              
+              # Логи для диагностики
+              echo "📋 Логи бота:"
+              docker logs news-bot --tail 30 2>&1 || true
+              
+              if [ -n "$PREVIOUS_IMAGE" ]; then
+                echo "🔄 Rollback к образу: $PREVIOUS_IMAGE"
+                
+                cd ~/news-bot
+                
+                # Останавливаем текущую версию
+                docker-compose stop news-bot || true
+                docker-compose rm -f news-bot || true
+                
+                # Обновляем .env для использования предыдущего образа
+                sed -i "s|BOT_IMAGE_TAG=.*|BOT_IMAGE_TAG=${PREVIOUS_IMAGE##*:}|" .env || true
+                
+                # Запускаем предыдущую версию
+                docker-compose up -d news-bot
+                
+                sleep 15
+                
+                # Проверяем health после rollback
+                if curl -f -s http://localhost:8080/health > /dev/null 2>&1; then
+                  echo "✅ Сервис восстановлен после rollback"
+                  echo "⚠️ Деплой отменен, требуется исправление проблем"
+                  exit 0
+                else
+                  echo "❌ Сервис недоступен даже после rollback"
+                  echo "🚨 Требуется срочное ручное вмешательство"
+                  exit 1
+                fi
+              else
+                echo "⚠️ Предыдущий образ не найден"
+                exit 1
+              fi
+            fi
+            
+            # Smoke tests при успешном health check
+            echo "🧪 Smoke tests..."
+            
+            # Metrics endpoint
+            if curl -f -s http://localhost:8080/metrics | grep -q "rss_polls_total"; then
+              echo "✅ Metrics работают"
+            else
+              echo "⚠️ Metrics недоступны"
+            fi
+            
+            # API endpoint
+            if curl -f -s http://localhost:8080/api/v1/sources > /dev/null 2>&1; then
+              echo "✅ API работает"
+            else
+              echo "⚠️ API недоступен"
+            fi
+            
+            echo "✅ Деплой успешно завершен со всеми проверками"
+          

@@ -255,6 +255,16 @@ func (np *NewsProcessor) startPeriodicSending() {
 	// Затем отправляем по расписанию каждые 15 минут
 	for range ticker.C {
 		np.sendPendingNews()
+		
+		// Обновляем метрики размера очередей
+		np.pendingMutex.Lock()
+		totalQueueSize := int64(0)
+		for _, queue := range np.pendingNews {
+			totalQueueSize += int64(len(queue))
+		}
+		np.pendingMutex.Unlock()
+		
+		monitoring.UpdateQueueSize("pending_news", totalQueueSize)
 	}
 }
 
@@ -288,6 +298,9 @@ func (np *NewsProcessor) sendPendingNews() {
 	newsLogger.Info("Начинаем отправку накопленных новостей",
 		"users_count", len(pendingCopy),
 		"total_news", totalNews)
+
+	messagesSent := 0
+	errorCount := 0
 
 	// Отправляем новости каждому пользователю
 	for chatId, newsList := range pendingCopy {
@@ -369,11 +382,19 @@ func (np *NewsProcessor) sendPendingNews() {
 			newsLogger.Warn("Не все новости были отправлены пользователю",
 				"user_id", chatId,
 				"returned_to_queue", len(newsList)-sentNewsCount)
+			errorCount++
 		} else if sentNewsCount > 0 {
 			newsLogger.Info("Список новостей отправлен пользователю",
 				"news_count", sentNewsCount,
 				"user_id", chatId)
+			messagesSent++
 		}
+	}
+	
+	// Обновляем метрики
+	monitoring.IncrementQueueProcessed("pending_news")
+	if errorCount > 0 {
+		monitoring.IncrementQueueErrors("pending_news")
 	}
 }
 

@@ -17,12 +17,19 @@ type CacheEntry struct {
 type Cache struct {
 	data   sync.Map
 	ttl    time.Duration
+	name   string // имя кэша для метрик
 	logger *monitoring.StructuredLogger
 }
 
 // NewCache создает новый кэш с указанным TTL
 func NewCache(ttl time.Duration) *Cache {
+	return NewNamedCache("default", ttl)
+}
+
+// NewNamedCache создает новый именованный кэш с указанным TTL
+func NewNamedCache(name string, ttl time.Duration) *Cache {
 	return &Cache{
+		name:   name,
 		ttl:    ttl,
 		logger: monitoring.GetLogger("cache"),
 	}
@@ -36,12 +43,16 @@ func (c *Cache) Set(key string, value interface{}) {
 	}
 	c.data.Store(key, entry)
 	c.logger.Debug("cache entry set", "key", key, "ttl", c.ttl)
+	
+	// Обновляем метрики
+	monitoring.IncrementCacheOperations(c.name)
 }
 
 // Get получает значение из кэша
 func (c *Cache) Get(key string) (interface{}, bool) {
 	entry, ok := c.data.Load(key)
 	if !ok {
+		monitoring.IncrementCacheMisses(c.name)
 		return nil, false
 	}
 
@@ -50,9 +61,12 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 		// Кэш истек, удаляем
 		c.data.Delete(key)
 		c.logger.Debug("cache entry expired", "key", key)
+		monitoring.IncrementCacheMisses(c.name)
+		monitoring.IncrementCacheEvictions(c.name)
 		return nil, false
 	}
 
+	monitoring.IncrementCacheHits(c.name)
 	return cacheEntry.Value, true
 }
 
@@ -76,11 +90,15 @@ func (c *Cache) Size() int {
 		if time.Now().After(cacheEntry.Expiration) {
 			// Удаляем просроченные записи при подсчете
 			c.data.Delete(key)
+			monitoring.IncrementCacheEvictions(c.name)
 		} else {
 			count++
 		}
 		return true
 	})
+	
+	// Обновляем метрику размера
+	monitoring.UpdateCacheSize(c.name, int64(count))
 	return count
 }
 
@@ -112,16 +130,16 @@ func (c *Cache) StartCleanupWorker(interval time.Duration) {
 // Глобальные кэши для различных типов данных
 var (
 	// UserCache кэширует информацию о пользователях (5 минут TTL)
-	UserCache = NewCache(5 * time.Minute)
+	UserCache = NewNamedCache("users", 5*time.Minute)
 
 	// SourceCache кэширует информацию об источниках RSS (10 минут TTL)
-	SourceCache = NewCache(10 * time.Minute)
+	SourceCache = NewNamedCache("sources", 10*time.Minute)
 
 	// ContentCache кэширует скрапированный контент (30 минут TTL)
-	ContentCache = NewCache(30 * time.Minute)
+	ContentCache = NewNamedCache("content", 30*time.Minute)
 
 	// SubscriptionCache кэширует подписки пользователей (5 минут TTL)
-	SubscriptionCache = NewCache(5 * time.Minute)
+	SubscriptionCache = NewNamedCache("subscriptions", 5*time.Minute)
 )
 
 func init() {

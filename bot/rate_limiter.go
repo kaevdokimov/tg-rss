@@ -3,6 +3,8 @@ package bot
 import (
 	"sync"
 	"time"
+	
+	"tg-rss/monitoring"
 )
 
 // RateLimiter реализует простой rate limiter для отправки сообщений
@@ -63,9 +65,11 @@ func (r *RateLimiter) Allow(chatID int64) bool {
 
 	if !exists || now.Sub(last) >= r.period {
 		r.rates[chatID] = now
+		monitoring.IncrementRateLimitHits("user_rate_limiter")
 		return true
 	}
 
+	monitoring.IncrementRateLimitRejected("user_rate_limiter")
 	return false
 }
 
@@ -77,9 +81,11 @@ func (gr *GlobalRateLimiter) AllowGlobal() bool {
 	now := time.Now()
 	if gr.lastSent.IsZero() || now.Sub(gr.lastSent) >= gr.minInterval {
 		gr.lastSent = now
+		monitoring.IncrementRateLimitHits("global_rate_limiter")
 		return true
 	}
 
+	monitoring.IncrementRateLimitRejected("global_rate_limiter")
 	return false
 }
 

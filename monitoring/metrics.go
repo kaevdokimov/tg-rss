@@ -49,6 +49,24 @@ type Metrics struct {
 	DBConnectionsInUse    int64
 	DBConnectionsWait     int64
 
+	// Cache метрики
+	CacheHits         map[string]int64
+	CacheMisses       map[string]int64
+	CacheSize         map[string]int64
+	CacheEvictions    map[string]int64
+	CacheOperations   map[string]int64
+	
+	// Queue метрики
+	QueueSize         map[string]int64
+	QueueProcessed    map[string]int64
+	QueueErrors       map[string]int64
+	QueueLatencyMs    map[string]int64
+	
+	// Rate limiting метрики
+	RateLimitHits     map[string]int64
+	RateLimitMisses   map[string]int64
+	RateLimitRejected map[string]int64
+
 	// Время последнего обновления
 	LastUpdate time.Time
 }
@@ -58,6 +76,18 @@ var globalMetrics = &Metrics{
 	CircuitBreakerFailures:  make(map[string]int64),
 	CircuitBreakerRejected:  make(map[string]int64),
 	ContentValidationErrors: make(map[string]int64),
+	CacheHits:               make(map[string]int64),
+	CacheMisses:             make(map[string]int64),
+	CacheSize:               make(map[string]int64),
+	CacheEvictions:          make(map[string]int64),
+	CacheOperations:         make(map[string]int64),
+	QueueSize:               make(map[string]int64),
+	QueueProcessed:          make(map[string]int64),
+	QueueErrors:             make(map[string]int64),
+	QueueLatencyMs:          make(map[string]int64),
+	RateLimitHits:           make(map[string]int64),
+	RateLimitMisses:         make(map[string]int64),
+	RateLimitRejected:       make(map[string]int64),
 	LastUpdate:              time.Now(),
 }
 
@@ -86,6 +116,61 @@ func GetMetrics() *Metrics {
 	for k, v := range globalMetrics.ContentValidationErrors {
 		contentValidationErrors[k] = v
 	}
+	
+	// Копируем метрики кэшей
+	cacheHits := make(map[string]int64)
+	cacheMisses := make(map[string]int64)
+	cacheSize := make(map[string]int64)
+	cacheEvictions := make(map[string]int64)
+	cacheOperations := make(map[string]int64)
+	for k, v := range globalMetrics.CacheHits {
+		cacheHits[k] = v
+	}
+	for k, v := range globalMetrics.CacheMisses {
+		cacheMisses[k] = v
+	}
+	for k, v := range globalMetrics.CacheSize {
+		cacheSize[k] = v
+	}
+	for k, v := range globalMetrics.CacheEvictions {
+		cacheEvictions[k] = v
+	}
+	for k, v := range globalMetrics.CacheOperations {
+		cacheOperations[k] = v
+	}
+	
+	// Копируем метрики очередей
+	queueSize := make(map[string]int64)
+	queueProcessed := make(map[string]int64)
+	queueErrors := make(map[string]int64)
+	queueLatencyMs := make(map[string]int64)
+	for k, v := range globalMetrics.QueueSize {
+		queueSize[k] = v
+	}
+	for k, v := range globalMetrics.QueueProcessed {
+		queueProcessed[k] = v
+	}
+	for k, v := range globalMetrics.QueueErrors {
+		queueErrors[k] = v
+	}
+	for k, v := range globalMetrics.QueueLatencyMs {
+		queueLatencyMs[k] = v
+	}
+	
+	// Копируем метрики rate limiting
+	rateLimitHits := make(map[string]int64)
+	rateLimitMisses := make(map[string]int64)
+	rateLimitRejected := make(map[string]int64)
+	for k, v := range globalMetrics.RateLimitHits {
+		rateLimitHits[k] = v
+	}
+	for k, v := range globalMetrics.RateLimitMisses {
+		rateLimitMisses[k] = v
+	}
+	for k, v := range globalMetrics.RateLimitRejected {
+		rateLimitRejected[k] = v
+	}
+	
 	globalMetrics.mu.RUnlock()
 
 	// Возвращаем копию для безопасности
@@ -114,6 +199,18 @@ func GetMetrics() *Metrics {
 		DBConnectionsIdle:        globalMetrics.DBConnectionsIdle,
 		DBConnectionsInUse:       globalMetrics.DBConnectionsInUse,
 		DBConnectionsWait:        globalMetrics.DBConnectionsWait,
+		CacheHits:                cacheHits,
+		CacheMisses:              cacheMisses,
+		CacheSize:                cacheSize,
+		CacheEvictions:           cacheEvictions,
+		CacheOperations:          cacheOperations,
+		QueueSize:                queueSize,
+		QueueProcessed:           queueProcessed,
+		QueueErrors:              queueErrors,
+		QueueLatencyMs:           queueLatencyMs,
+		RateLimitHits:            rateLimitHits,
+		RateLimitMisses:          rateLimitMisses,
+		RateLimitRejected:        rateLimitRejected,
 		LastUpdate:               globalMetrics.LastUpdate,
 	}
 }
@@ -365,6 +462,98 @@ func UpdateDBConnectionMetrics(open, idle, inUse, wait int64) {
 	globalMetrics.LastUpdate = time.Now()
 }
 
+// Cache метрики
+func IncrementCacheHits(cacheName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CacheHits[cacheName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementCacheMisses(cacheName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CacheMisses[cacheName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func UpdateCacheSize(cacheName string, size int64) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CacheSize[cacheName] = size
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementCacheEvictions(cacheName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CacheEvictions[cacheName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementCacheOperations(cacheName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.CacheOperations[cacheName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// Queue метрики
+func UpdateQueueSize(queueName string, size int64) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.QueueSize[queueName] = size
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementQueueProcessed(queueName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.QueueProcessed[queueName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementQueueErrors(queueName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.QueueErrors[queueName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func UpdateQueueLatency(queueName string, latencyMs int64) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	// Экспоненциальное сглаживание для latency
+	if current, exists := globalMetrics.QueueLatencyMs[queueName]; exists {
+		globalMetrics.QueueLatencyMs[queueName] = (current*9 + latencyMs) / 10
+	} else {
+		globalMetrics.QueueLatencyMs[queueName] = latencyMs
+	}
+	globalMetrics.LastUpdate = time.Now()
+}
+
+// Rate limiting метрики
+func IncrementRateLimitHits(limiterName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.RateLimitHits[limiterName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementRateLimitMisses(limiterName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.RateLimitMisses[limiterName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
+func IncrementRateLimitRejected(limiterName string) {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	globalMetrics.RateLimitRejected[limiterName]++
+	globalMetrics.LastUpdate = time.Now()
+}
+
 func Reset() {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
@@ -373,6 +562,18 @@ func Reset() {
 		CircuitBreakerFailures:  make(map[string]int64),
 		CircuitBreakerRejected:  make(map[string]int64),
 		ContentValidationErrors: make(map[string]int64),
+		CacheHits:               make(map[string]int64),
+		CacheMisses:             make(map[string]int64),
+		CacheSize:               make(map[string]int64),
+		CacheEvictions:          make(map[string]int64),
+		CacheOperations:         make(map[string]int64),
+		QueueSize:               make(map[string]int64),
+		QueueProcessed:          make(map[string]int64),
+		QueueErrors:             make(map[string]int64),
+		QueueLatencyMs:          make(map[string]int64),
+		RateLimitHits:           make(map[string]int64),
+		RateLimitMisses:         make(map[string]int64),
+		RateLimitRejected:       make(map[string]int64),
 		LastUpdate:              time.Now(),
 	}
 }

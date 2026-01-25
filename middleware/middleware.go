@@ -254,12 +254,15 @@ func (rl *APIRateLimiter) RateLimit(next http.HandlerFunc) http.HandlerFunc {
 				"method", r.Method,
 			)
 			
+			monitoring.IncrementRateLimitRejected("api_rate_limiter")
+			
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
 			_, _ = w.Write([]byte("Слишком много запросов. Попробуйте позже."))
 			return
 		}
 
+		monitoring.IncrementRateLimitHits("api_rate_limiter")
 		next(w, r)
 	}
 }

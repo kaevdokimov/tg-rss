@@ -1,0 +1,188 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - develop
+      - staging
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BOT: ${{ github.repository }}/news-bot
+  IMAGE_NAME_ANALYZER: ${{ github.repository }}/news-analyzer
+
+jobs:
+  test:
+    name: Тестирование перед деплоем
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout кода
+        uses: actions/checkout@v4
+
+      - name: Настройка Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Запуск тестов
+        run: |
+          go test -race -coverprofile=coverage.out -v ./...
+
+      - name: Загрузка покрытия
+        uses: codecov/codecov-action@v5
+        with:
+          file: ./coverage.out
+          flags: unittests
+
+  build-and-deploy:
+    name: Сборка и деплой в staging
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout кода
+        uses: actions/checkout@v4
+
+      - name: Вход в Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Извлечение метаданных для news-bot
+        id: meta-bot
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BOT }}
+          tags: |
+            type=ref,event=branch,suffix=-staging
+            type=sha,prefix=staging-
+
+      - name: Извлечение метаданных для news-analyzer
+        id: meta-analyzer
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_ANALYZER }}
+          tags: |
+            type=ref,event=branch,suffix=-staging
+            type=sha,prefix=staging-
+
+      - name: Сборка и push news-bot образа
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta-bot.outputs.tags }}
+          labels: ${{ steps.meta-bot.outputs.labels }}
+
+      - name: Сборка и push news-analyzer образа
+        uses: docker/build-push-action@v6
+        with:
+          context: ./news-analyzer-python
+          file: ./news-analyzer-python/Dockerfile
+          push: true
+          tags: ${{ steps.meta-analyzer.outputs.tags }}
+          labels: ${{ steps.meta-analyzer.outputs.labels }}
+
+      - name: Деплой в staging через SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script: |
+            # Переход в директорию проекта
+            cd /opt/tg-rss-staging
+            
+            # Получение обновлений
+            git fetch origin
+            git checkout staging
+            git pull origin staging
+            
+            # Обновление образов
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BOT }}:staging-${{ github.sha }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_ANALYZER }}:staging-${{ github.sha }}
+            
+            # Обновление docker-compose с новыми тегами
+            export BOT_IMAGE_TAG=staging-${{ github.sha }}
+            export ANALYZER_IMAGE_TAG=staging-${{ github.sha }}
+            
+            # Graceful restart
+            docker-compose up -d --no-deps news-bot news-analyzer
+            
+            # Ожидание запуска
+            sleep 10
+            
+            echo "Деплой в staging завершен"
+
+  smoke-tests:
+    name: Smoke tests в staging
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          max_attempts=6
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Попытка $attempt из $max_attempts..."
+            
+            if curl -f -s "http://${{ secrets.STAGING_HOST }}:8080/health"; then
+              echo "Health check успешен"
+              exit 0
+            fi
+            
+            echo "Health check не прошел, ожидание 10 секунд..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          echo "Health check не прошел после $max_attempts попыток"
+          exit 1
+
+      - name: Проверка metrics endpoint
+        run: |
+          curl -f -s "http://${{ secrets.STAGING_HOST }}:8080/metrics" | grep "rss_polls_total"
+
+      - name: Проверка API endpoints
+        run: |
+          # Проверка списка источников
+          curl -f -s "http://${{ secrets.STAGING_HOST }}:8080/api/v1/sources" | jq '.success'
+
+      - name: Уведомление об успешном деплое
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ Деплой в staging успешен
+            
+            📦 Коммит: ${{ github.sha }}
+            👤 Автор: ${{ github.actor }}
+            🌿 Ветка: ${{ github.ref_name }}
+            
+            Все smoke tests пройдены.
+
+      - name: Уведомление об ошибке
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ Деплой в staging не удался
+            
+            📦 Коммит: ${{ github.sha }}
+            👤 Автор: ${{ github.actor }}
+            🌿 Ветка: ${{ github.ref_name }}
+            
+            Проверьте логи: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
