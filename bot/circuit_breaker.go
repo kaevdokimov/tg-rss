@@ -78,7 +78,7 @@ func (cb *CircuitBreaker) canExecute() bool {
 		cb.mu.RLock()
 		lastFailure := cb.lastFailure
 		cb.mu.RUnlock()
-		
+
 		if time.Since(lastFailure) >= cb.recoveryTimeout {
 			cb.setState(StateHalfOpen)
 			return true
@@ -88,7 +88,7 @@ func (cb *CircuitBreaker) canExecute() bool {
 		cb.mu.RLock()
 		lastAttempt := cb.lastAttempt
 		cb.mu.RUnlock()
-		
+
 		return time.Since(lastAttempt) >= cb.resetTimeout
 	default:
 		return false
