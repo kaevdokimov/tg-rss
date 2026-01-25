@@ -101,9 +101,13 @@ jobs:
           echo "workflow=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
 
       - name: Send Telegram notification
-        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
-          # Send message to Telegram bot
+          # Send message to Telegram bot only if credentials are set
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram credentials not set, skipping notification"
+            exit 0
+          fi
+          
           # Create JSON payload with proper escaping
           JSON_PAYLOAD=$(cat <<EOF
           {
@@ -161,8 +165,13 @@ jobs:
           echo "- Проверить PRs от Dependabot" >> $GITHUB_STEP_SUMMARY
 
       - name: Отправить ежедневный отчет в Telegram
-        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
+          # Send daily report only if credentials are set
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram credentials not set, skipping daily report"
+            exit 0
+          fi
+          
           # Создаем ежедневное сообщение отчета с правильным экранированием
           REPO_NAME="${{ github.repository }}"
           ESCAPED_REPO=$(echo "$REPO_NAME" | sed 's/[_*[\]()~`>#+-=|{}.!]/\\&/g')
