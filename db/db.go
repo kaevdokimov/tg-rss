@@ -11,7 +11,6 @@ import (
 	"tg-rss/config"
 	"time"
 
-	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -192,12 +191,23 @@ func IsNewsSentToUsers(db *sql.DB, chatIDs []int64, newsID int64) (map[int64]boo
 		return make(map[int64]bool), nil
 	}
 
-	// Используем ANY для батч-запроса с pq.Array для корректной передачи слайса
-	rows, err := db.Query(`
+	// Создаем placeholders для IN-запроса
+	placeholders := make([]string, len(chatIDs))
+	args := make([]interface{}, len(chatIDs)+1)
+	for i, id := range chatIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	args[len(chatIDs)] = newsID
+
+	// Используем IN вместо ANY для совместимости
+	query := fmt.Sprintf(`
 		SELECT DISTINCT chat_id
 		FROM messages
-		WHERE chat_id = ANY($1) AND news_id = $2
-	`, pq.Array(chatIDs), newsID)
+		WHERE chat_id IN (%s) AND news_id = $%d
+	`, strings.Join(placeholders, ","), len(chatIDs)+1)
+
+	rows, err := db.Query(query, args...)
 
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при батч-проверке отправленных новостей: %w", err)
