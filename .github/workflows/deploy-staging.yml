@@ -95,7 +95,7 @@ jobs:
           labels: ${{ steps.meta-analyzer.outputs.labels }}
 
       - name: Деплой в staging через SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.4
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
