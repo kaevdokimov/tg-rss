@@ -411,6 +411,13 @@ jobs:
             echo '🛑 Stopping containers...'
             docker compose -f ~/news-bot/docker-compose.yml --env-file ~/news-bot/.env down --remove-orphans || true
 
+            # Освобождаем место на диске (избегаем "no space left on device")
+            echo '🧹 Очистка неиспользуемых данных Docker...'
+            docker container prune -f || true
+            docker image prune -a -f || true
+            docker builder prune -af || true
+            docker system df
+
             # Проверяем и очищаем повреждённые volumes
             echo '🔧 Checking volumes integrity...'
             if docker volume ls | grep -q db_data; then

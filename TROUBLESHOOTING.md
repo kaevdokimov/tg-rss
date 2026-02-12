@@ -499,7 +499,50 @@ Error parsing RSS: XML syntax error
 
 ## Проблемы с Docker
 
-### Нехватка места на диске
+### No space left on device (деплой / извлечение образов)
+
+**Симптомы**:
+- В CI/CD job "Deploy to Server": `failed to extract layer ... to overlayfs ... no space left on device`
+- При запуске контейнеров: `failed to create prepare snapshot dir: mkdir ... no space left on device`
+- Контейнеры redis, db или bot не создаются
+
+**Причина**: на сервере закончилось место на диске (образы, overlayfs, логи).
+
+**Диагностика на сервере**:
+```bash
+# Место на диске
+df -h
+
+# Что занимает место в Docker
+docker system df
+docker system df -v
+```
+
+**Решения**:
+
+1. **Срочно освободить место (на сервере по SSH)**:
+   ```bash
+   # Остановить стек
+   cd ~/news-bot && docker compose down
+
+   # Удалить неиспользуемые образы и кэш сборки
+   docker container prune -f
+   docker image prune -a -f
+   docker builder prune -af
+
+   # При необходимости — неиспользуемые volumes (осторожно: можно удалить данные!)
+   # docker volume prune -f
+
+   # Проверить результат
+   docker system df
+   df -h
+   ```
+
+2. **Запустить деплой снова** — в workflow добавлена автоматическая очистка перед деплоем (после `down`), при повторном прогоне места должно хватить.
+
+3. **Надолго**: увеличить диск, настроить ротацию логов (см. ниже), мониторить `df -h` и при необходимости добавить cron для `docker system prune -f`.
+
+### Нехватка места на диске (общая)
 
 **Диагностика**:
 ```bash
