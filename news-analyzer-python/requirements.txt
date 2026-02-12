@@ -25,3 +25,4 @@ testcontainers==4.14.1
 testcontainers-postgres==0.0.1rc1
 testcontainers-redis==0.0.1rc1
 urllib3>=2.6.3 # not directly required, pinned to fix GHSA-38jv-5279-wg99
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
