@@ -755,8 +755,7 @@ docker exec -it news-analyzer python test_connection.py
 - **Деплой модуля** - [`news-analyzer-python/README_DEPLOY.md`](news-analyzer-python/README_DEPLOY.md)
 
 ### Техническая документация
-- **Архитектура** - [`.context/ARCHITECTURE_C4.md`](.context/ARCHITECTURE_C4.md)
-- **Все технические документы** - [`.context/README.md`](.context/README.md)
+- **Навигация по документации и архитектура** - [DOCUMENTATION.md](DOCUMENTATION.md)
 
 ## ⚙️ Оптимизация ресурсов
 

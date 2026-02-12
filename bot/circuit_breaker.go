@@ -147,7 +147,7 @@ func (cb *CircuitBreaker) Reset() {
 }
 
 // ErrCircuitBreakerOpen ошибка, когда circuit breaker открыт
-var ErrCircuitBreakerOpen = NewCircuitBreakerError("circuit breaker is open")
+var ErrCircuitBreakerOpen = NewCircuitBreakerError("цепь разомкнута (circuit breaker открыт)")
 
 // CircuitBreakerError ошибка circuit breaker
 type CircuitBreakerError struct {

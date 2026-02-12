@@ -448,4 +448,4 @@ GitHub Actions workflows:
 - [DEPLOYMENT.md](DEPLOYMENT.md) — развертывание
 - [TESTING.md](TESTING.md) — тестирование
 - [docs/](docs/) — специализированная документация
-- [.context/](.context/) — техническая документация
+- [DOCUMENTATION.md](DOCUMENTATION.md) — навигация по документации
