@@ -405,6 +405,9 @@ jobs:
           # Основной деплой
           ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "
             set -e
+            set -a
+            source ~/news-bot/.env 2>/dev/null || true
+            set +a
             echo '🚀 Starting deployment...'
 
             # Останавливаем контейнеры
@@ -445,15 +448,14 @@ jobs:
             echo '📊 Container status:'
             docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '(bot|db|redis|news-analyzer)' || true
 
-            # Диагностика PostgreSQL
+            # Диагностика PostgreSQL (используем пользователя из .env, не postgres)
             echo '🔍 PostgreSQL diagnostics:'
             if docker ps | grep -q db; then
               echo '✅ PostgreSQL container exists'
               docker logs db --tail 10 || true
               echo 'Testing connection...'
-              docker exec db pg_isready -U postgres 2>/dev/null && echo '✅ Default postgres user works' || echo '❌ Default postgres user failed'
-              docker exec db pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB 2>/dev/null && echo '✅ Custom user works' || echo '❌ Custom user failed'
-              docker exec db psql -U postgres -l 2>/dev/null | head -10 || echo '❌ Cannot list databases'
+              docker exec db pg_isready -U \$POSTGRES_USER -d \$POSTGRES_DB 2>/dev/null && echo '✅ PostgreSQL user/db OK' || echo '❌ PostgreSQL connection failed (проверьте POSTGRES_PASSWORD и volume)'
+              docker exec db psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c '\l' 2>/dev/null | head -15 || echo '❌ Cannot list databases'
             else
               echo '❌ PostgreSQL container not found'
               docker logs db --tail 20 || true

@@ -132,7 +132,7 @@ STAGING_DEPLOYMENT_ENABLED = true
 - `TELEGRAM_API_KEY` - токен основного Telegram бота
 - `TELEGRAM_SIGNAL_API_KEY` - токен бота для отчетов
 - `POSTGRES_USER` - пользователь PostgreSQL
-- `POSTGRES_PASSWORD` - пароль PostgreSQL
+- `POSTGRES_PASSWORD` - пароль PostgreSQL (должен совпадать с паролем, под которым был впервые инициализирован volume БД на сервере; иначе будет «password authentication failed» — см. [TROUBLESHOOTING.md](TROUBLESHOOTING.md))
 - `POSTGRES_DB` - имя базы данных
 - `CONTENT_SCRAPER_INTERVAL` - интервал скрапинга (например: `30m`)
 - `CONTENT_SCRAPER_BATCH` - размер батча (например: `10`)

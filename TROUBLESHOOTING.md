@@ -284,6 +284,40 @@ docker exec -it tg-rss-db psql -U postgres -d news_bot
    # Увеличить MaxOpenConns в db/db.go
    ```
 
+### Password authentication failed for user "postgres"
+
+**Симптомы** (в `docker logs db`):
+```
+FATAL: password authentication failed for user "postgres"
+DETAIL: Password does not match for user "postgres".
+```
+
+**Причина**: Пароль в переменной `POSTGRES_PASSWORD` (в `.env` на сервере или в GitHub Secrets) **не совпадает** с паролем, под которым был впервые инициализирован volume PostgreSQL. Данные в volume создаются один раз при первом запуске; при деплое CI/CD перезаписывает `~/news-bot/.env` из секретов, и если пароль в секрете другой — подключения падают.
+
+**Решения**:
+
+1. **Привести пароль в секретах к уже существующей БД (рекомендуется, без потери данных)**  
+   Узнайте пароль, с которым volume был создан (старый `.env`, Ansible vault при первом деплое), и установите его в GitHub: **Settings → Secrets → Actions → `POSTGRES_PASSWORD`**. После следующего деплоя `.env` на сервере будет с правильным паролем.
+
+2. **Сменить пароль внутри работающей БД под старым паролем**  
+   Если есть доступ по старому паролю (например, временно вернули его в `.env` и перезапустили контейнеры):
+   ```bash
+   # На сервере: временно в .env подставьте старый POSTGRES_PASSWORD, затем:
+   docker exec -it db psql -U $POSTGRES_USER -d $POSTGRES_DB -c "ALTER USER $POSTGRES_USER PASSWORD 'новый_пароль';"
+   ```
+   После этого обновите `POSTGRES_PASSWORD` в GitHub Secrets на `новый_пароль` и задеплойте снова.
+
+3. **Пересоздать volume (потеря данных)**  
+   Если данные БД не нужны:
+   ```bash
+   cd ~/news-bot
+   docker compose down -v
+   # Удалить volume с данными БД
+   docker volume rm news-bot_db_data 2>/dev/null || true
+   docker compose --env-file .env up -d
+   ```
+   Пароль будет взят из текущего `.env` (из секретов при следующем деплое). Для продакшена предпочтительны варианты 1 или 2.
+
 ### Медленные запросы
 
 **Диагностика**:

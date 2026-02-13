@@ -74,11 +74,12 @@ services:
       - ./ansible/files/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./ansible/files/postgres/news_bot_init.sql:/docker-entrypoint-initdb.d/02-news_bot_init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d news_bot"]
-      interval: 30s
+      # $$ — подстановка из окружения контейнера; start_period даёт время на init-скрипты
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" || exit 1"]
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 6
+      start_period: 60s
 
   # NEWS-ANALYZER ВКЛЮЧЕН с оптимизированными ресурсами для сервера 900MB RAM, 1 CPU
   news-analyzer:
