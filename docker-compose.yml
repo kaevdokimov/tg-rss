@@ -54,7 +54,7 @@ services:
     command: redis-server /etc/redis/redis.conf
 
   db:
-    image: postgres:18.1-alpine3.23
+    image: postgres:18.2-alpine3.23
     container_name: db
     # Оптимизированные ограничения ресурсов для PostgreSQL
     mem_limit: ${DB_MEM_LIMIT:-200m}
