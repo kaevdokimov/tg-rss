@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine3.23 AS builder
+FROM golang:1.26-alpine3.23 AS builder
 
 # Устанавливаем необходимые зависимости для сборки
 RUN apk add --no-cache gcc musl-dev
