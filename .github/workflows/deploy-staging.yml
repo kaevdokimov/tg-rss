@@ -77,7 +77,7 @@ jobs:
             type=sha,prefix=staging-
 
       - name: Сборка и push news-bot образа
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -86,7 +86,7 @@ jobs:
           labels: ${{ steps.meta-bot.outputs.labels }}
 
       - name: Сборка и push news-analyzer образа
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./news-analyzer-python
           file: ./news-analyzer-python/Dockerfile

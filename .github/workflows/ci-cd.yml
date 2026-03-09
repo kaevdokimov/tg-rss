@@ -114,7 +114,7 @@ jobs:
 
       # Сборка и пуш Docker-образа с оптимизациями
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -164,7 +164,7 @@ jobs:
 
       # Сборка и пуш образа news-analyzer с оптимизациями
       - name: Build and Push News Analyzer Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./news-analyzer-python
           file: ./news-analyzer-python/Dockerfile
