@@ -87,7 +87,7 @@ jobs:
 
       # Настройка Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Кэширование Docker layers
       - name: Cache Docker layers
@@ -143,7 +143,7 @@ jobs:
 
       # Настройка Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Кэширование Docker layers для analyzer
       - name: Cache Docker layers (analyzer)
