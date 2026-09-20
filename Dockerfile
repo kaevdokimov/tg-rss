@@ -30,7 +30,7 @@ RUN CGO_ENABLED=1 go build \
 RUN go test -v ./...
 
 # Runtime stage
-FROM alpine:3.23
+FROM alpine:3.24
 
 # Устанавливаем необходимые runtime зависимости
 RUN apk add --no-cache ca-certificates tzdata wget && \
