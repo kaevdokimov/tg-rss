@@ -24,7 +24,7 @@ on:
       - '.github/workflows/go.yml'
 
 env:
-  GO_VERSION: '1.25.5'  # Required by go.mod
+  GO_VERSION: '1.27'  # Required by go.mod
 
 jobs:
   # Fast feedback job - basic checks
@@ -34,11 +34,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
-        go-version: ['1.25.5', '1.25']
+        os: [ubuntu-26.04]
+        go-version: ['1.27']
         include:
-          - os: ubuntu-24.04
-            go-version: '1.25.5'
+          - os: ubuntu-26.04
+            go-version: '1.27'
             latest: true
 
     steps:
@@ -98,7 +98,7 @@ jobs:
   # Linting and static analysis
   lint:
     name: Lint & Static Analysis
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
     - name: Update system packages
       run: |
@@ -134,7 +134,7 @@ jobs:
   # Security scanning
   security:
     name: Security Scan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       security-events: write
     steps:
@@ -181,10 +181,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-26.04
             arch: amd64
             cgo: 0
-          - os: ubuntu-24.04
+          - os: ubuntu-26.04
             arch: arm64
             cgo: 0
 
@@ -232,7 +232,7 @@ jobs:
   # Release job (only on main branch)
   release:
     name: Release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [test, lint, security, build]
     steps:
