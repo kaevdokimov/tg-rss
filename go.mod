@@ -1,6 +1,6 @@
 module tg-rss
 
-go 1.25.5
+go 1.27
 
 require github.com/go-redis/redis/v8 v8.11.5
 
