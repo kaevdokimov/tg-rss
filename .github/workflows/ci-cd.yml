@@ -15,7 +15,7 @@ on:
 jobs:
   build:
     name: Build and Test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Проверка репозитория
@@ -34,7 +34,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: '1.25'
+          go-version: '1.27'
           cache: true
 
       # Кэширование Go build
@@ -78,7 +78,7 @@ jobs:
 
   docker-build:
     name: Build and Push Docker Image
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build
     steps:
       # Проверка репозитория
@@ -134,7 +134,7 @@ jobs:
 
   docker-build-analyzer:
     name: Build and Push News Analyzer Image
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build
     steps:
       # Проверка репозитория
@@ -183,7 +183,7 @@ jobs:
 
   server-setup:
     name: Server Infrastructure Setup (Production Environment)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(github.event.head_commit.message, '[infra]')
     steps:
       - name: Checkout code
@@ -279,7 +279,7 @@ jobs:
 
   deploy:
     name: Deploy to Server
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [docker-build, docker-build-analyzer]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEPLOYMENT_ENABLED == 'true'
     steps:
