@@ -1,7 +1,7 @@
 # Зависимости для Python 3.13
 # Версии проверены на совместимость с Python 3.13
 pandas==3.0.1
-numpy==2.4.4
+numpy==2.5.3
 scikit-learn==1.9.1
 nltk==3.9.4
 pymorphy2==0.9.1
@@ -11,7 +11,7 @@ psycopg2-binary==2.9.11
 python-dotenv==1.2.3
 pyyaml==6.0.3
 tqdm==4.70.1
-requests==2.33.0
+requests==2.34.2
 prometheus-client==0.26.0
 psutil==7.2.2
 redis==8.1.0
@@ -24,5 +24,5 @@ pytest-mock==3.15.1
 testcontainers==4.14.2
 testcontainers-postgres==0.0.1rc1
 testcontainers-redis==0.0.1rc1
-urllib3>=2.6.3 # not directly required, pinned to fix GHSA-38jv-5279-wg99
+urllib3>=2.8.0 # not directly required, pinned to fix GHSA-38jv-5279-wg99
 zipp>=4.1.0 # not directly required, pinned by Snyk to avoid a vulnerability
