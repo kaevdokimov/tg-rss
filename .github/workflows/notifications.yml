@@ -33,7 +33,7 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.GH_NOTIFY_TELEGRAM_CHAT_ID }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate notification message
         id: notification
