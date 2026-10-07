@@ -1,7 +1,7 @@
 # Зависимости для Python 3.13
 # Версии проверены на совместимость с Python 3.13
 pandas==3.0.1
-numpy==2.4.4
+numpy==2.5.3
 scikit-learn==1.9.1
 nltk==3.9.4
 pymorphy2==0.9.1
