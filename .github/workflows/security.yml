@@ -182,7 +182,7 @@ jobs:
           extra_args: --debug --only-verified
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
