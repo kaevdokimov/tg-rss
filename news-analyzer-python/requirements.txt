@@ -20,7 +20,7 @@ uvicorn==0.54.0
 aiofiles==25.1.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
-pytest-mock==3.15.1
+pytest-mock==3.17.0
 testcontainers==4.14.2
 testcontainers-postgres==0.0.1rc1
 testcontainers-redis==0.0.1rc1
