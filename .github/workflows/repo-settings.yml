@@ -43,7 +43,7 @@ jobs:
       # This workflow will check status but may fail to apply changes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup GitHub CLI
         run: |
